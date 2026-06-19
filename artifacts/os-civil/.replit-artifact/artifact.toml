@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Ordem de Serviço Civil"
+version = "1.0.0"
+id = "artifacts/os-civil"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18274
+
+[services.development]
+run = "pnpm --filter @workspace/os-civil run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/os-civil", "run", "build" ]
+publicDir = "artifacts/os-civil/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18274"
+BASE_PATH = "/"

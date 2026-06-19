@@ -1,15 +1,21 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: service-orders
+    description: Ordens de Serviço
+  - name: technicians
+    description: Técnicos
+  - name: dashboard
+    description: Indicadores e Dashboard
+
 paths:
   /healthz:
     get:
@@ -24,6 +30,265 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /service-orders:
+    get:
+      operationId: listServiceOrders
+      tags: [service-orders]
+      summary: Listar ordens de serviço
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: priority
+          in: query
+          schema:
+            type: string
+        - name: technicianId
+          in: query
+          schema:
+            type: integer
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [daily, monthly, annual]
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista de ordens de serviço
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ServiceOrder"
+
+    post:
+      operationId: createServiceOrder
+      tags: [service-orders]
+      summary: Criar ordem de serviço
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceOrderInput"
+      responses:
+        "201":
+          description: OS criada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOrder"
+
+  /service-orders/{id}:
+    get:
+      operationId: getServiceOrder
+      tags: [service-orders]
+      summary: Buscar OS por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Ordem de serviço
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOrder"
+        "404":
+          description: Não encontrado
+
+    patch:
+      operationId: updateServiceOrder
+      tags: [service-orders]
+      summary: Atualizar OS
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceOrderUpdate"
+      responses:
+        "200":
+          description: OS atualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOrder"
+
+    delete:
+      operationId: deleteServiceOrder
+      tags: [service-orders]
+      summary: Deletar OS
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deletado
+
+  /service-orders/{id}/status:
+    patch:
+      operationId: updateServiceOrderStatus
+      tags: [service-orders]
+      summary: Atualizar status da OS
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusUpdate"
+      responses:
+        "200":
+          description: Status atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOrder"
+
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Resumo do dashboard com indicadores
+      responses:
+        "200":
+          description: Resumo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Estatísticas por período
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [daily, monthly, annual]
+            default: monthly
+      responses:
+        "200":
+          description: Estatísticas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatPoint"
+
+  /technicians:
+    get:
+      operationId: listTechnicians
+      tags: [technicians]
+      summary: Listar técnicos
+      responses:
+        "200":
+          description: Lista de técnicos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Technician"
+
+    post:
+      operationId: createTechnician
+      tags: [technicians]
+      summary: Cadastrar técnico
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TechnicianInput"
+      responses:
+        "201":
+          description: Técnico criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Technician"
+
+  /technicians/{id}:
+    patch:
+      operationId: updateTechnician
+      tags: [technicians]
+      summary: Atualizar técnico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TechnicianUpdate"
+      responses:
+        "200":
+          description: Técnico atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Technician"
+
+    delete:
+      operationId: deleteTechnician
+      tags: [technicians]
+      summary: Deletar técnico
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deletado
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +299,240 @@ components:
       required:
         - status
 
+    ServiceOrder:
+      type: object
+      required:
+        - id
+        - number
+        - title
+        - category
+        - priority
+        - status
+        - location
+        - createdAt
+      properties:
+        id:
+          type: integer
+        number:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        category:
+          type: string
+          enum: [manutencao, conservacao, limpeza, preventiva, construcao]
+        priority:
+          type: string
+          enum: [baixa, media, alta, urgente]
+        status:
+          type: string
+          enum: [aberta, em_andamento, concluida, cancelada]
+        location:
+          type: string
+        technicianId:
+          type: ["integer", "null"]
+        technicianName:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        scheduledAt:
+          type: ["string", "null"]
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ServiceOrderInput:
+      type: object
+      required:
+        - title
+        - category
+        - priority
+        - location
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        category:
+          type: string
+          enum: [manutencao, conservacao, limpeza, preventiva, construcao]
+        priority:
+          type: string
+          enum: [baixa, media, alta, urgente]
+        location:
+          type: string
+        technicianId:
+          type: integer
+        notes:
+          type: string
+        scheduledAt:
+          type: string
+
+    ServiceOrderUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          type: string
+          enum: [manutencao, conservacao, limpeza, preventiva, construcao]
+        priority:
+          type: string
+          enum: [baixa, media, alta, urgente]
+        status:
+          type: string
+          enum: [aberta, em_andamento, concluida, cancelada]
+        location:
+          type: string
+        technicianId:
+          type: integer
+        notes:
+          type: string
+        scheduledAt:
+          type: string
+        completedAt:
+          type: string
+
+    StatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [aberta, em_andamento, concluida, cancelada]
+        notes:
+          type: string
+
+    DashboardSummary:
+      type: object
+      required:
+        - totalOpen
+        - totalInProgress
+        - totalCompleted
+        - totalCancelled
+        - totalToday
+        - totalThisMonth
+        - totalThisYear
+        - byCategory
+        - byPriority
+        - completionRate
+      properties:
+        totalOpen:
+          type: integer
+        totalInProgress:
+          type: integer
+        totalCompleted:
+          type: integer
+        totalCancelled:
+          type: integer
+        totalToday:
+          type: integer
+        totalThisMonth:
+          type: integer
+        totalThisYear:
+          type: integer
+        completionRate:
+          type: number
+        byCategory:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryCount"
+        byPriority:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriorityCount"
+
+    CategoryCount:
+      type: object
+      required: [category, count]
+      properties:
+        category:
+          type: string
+        count:
+          type: integer
+
+    PriorityCount:
+      type: object
+      required: [priority, count]
+      properties:
+        priority:
+          type: string
+        count:
+          type: integer
+
+    StatPoint:
+      type: object
+      required: [label, total, completed, open, inProgress]
+      properties:
+        label:
+          type: string
+        total:
+          type: integer
+        completed:
+          type: integer
+        open:
+          type: integer
+        inProgress:
+          type: integer
+
+    Technician:
+      type: object
+      required:
+        - id
+        - name
+        - specialty
+        - active
+        - createdAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        specialty:
+          type: string
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        active:
+          type: boolean
+        createdAt:
+          type: string
+
+    TechnicianInput:
+      type: object
+      required:
+        - name
+        - specialty
+      properties:
+        name:
+          type: string
+          minLength: 1
+        specialty:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+
+    TechnicianUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        specialty:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        active:
+          type: boolean
