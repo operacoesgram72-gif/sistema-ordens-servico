@@ -40,7 +40,9 @@ async function enrichWithTechnician(orders: any[]) {
   const techMap = new Map(techs.map((t) => [t.id, t.name]));
   return orders.map((o) => ({
     ...o,
-    technicianName: o.technicianId ? techMap.get(o.technicianId) ?? null : null,
+    technicianName: o.technicianNameFree
+      ? o.technicianNameFree
+      : o.technicianId ? techMap.get(o.technicianId) ?? null : null,
     scheduledAt: o.scheduledAt ? o.scheduledAt.toISOString() : null,
     completedAt: o.completedAt ? o.completedAt.toISOString() : null,
     signedAt: o.signedAt ? o.signedAt.toISOString() : null,
@@ -124,25 +126,25 @@ router.post("/service-orders", async (req, res) => {
     const body = CreateServiceOrderBody.parse(req.body);
     const number = generateNumber();
 
-    // Auto-calculate estimated value if not provided
-    const estimatedValue =
-      body.estimatedValue !== undefined
-        ? body.estimatedValue
-        : body.formatoServico
-        ? MARKET_RATES[body.formatoServico] ?? null
-        : null;
+    // Always auto-calculate estimated value from formato_servico market rates
+    const estimatedValue = body.formatoServico
+      ? MARKET_RATES[body.formatoServico] ?? null
+      : null;
+
+    // Auto-generate title if not provided
+    const title = body.title?.trim() || number;
 
     const [created] = await db
       .insert(serviceOrdersTable)
       .values({
         number,
-        title: body.title,
+        title,
         description: body.description ?? null,
         category: body.category,
         priority: body.priority,
         location: body.location,
         department: body.department ?? null,
-        technicianId: body.technicianId ?? null,
+        technicianNameFree: (body as any).technicianName ?? null,
         notes: body.notes ?? null,
         tipo: body.tipo ?? null,
         formatoServico: body.formatoServico ?? null,
@@ -187,9 +189,13 @@ router.patch("/service-orders/:id", async (req, res) => {
     const updateData: any = { ...body, updatedAt: new Date() };
     if (body.scheduledAt) updateData.scheduledAt = new Date(body.scheduledAt);
     if (body.completedAt) updateData.completedAt = new Date(body.completedAt);
-    if (body.estimatedValue !== undefined) {
-      updateData.estimatedValue = body.estimatedValue !== null ? String(body.estimatedValue) : null;
+    // Map technicianName → technicianNameFree column
+    if ((body as any).technicianName !== undefined) {
+      updateData.technicianNameFree = (body as any).technicianName;
+      delete updateData.technicianName;
     }
+    // Remove fields not in DB columns
+    delete updateData.estimatedValue;
 
     const [updated] = await db
       .update(serviceOrdersTable)

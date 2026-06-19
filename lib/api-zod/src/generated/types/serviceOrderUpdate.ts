@@ -19,12 +19,12 @@ export interface ServiceOrderUpdate {
   status?: ServiceOrderUpdateStatus;
   location?: string;
   department?: string;
-  technicianId?: number;
+  /** Nome livre do técnico responsável */
+  technicianName?: string;
   notes?: string;
   tipo?: ServiceOrderUpdateTipo;
   formatoServico?: ServiceOrderUpdateFormatoServico;
   photos?: string;
-  estimatedValue?: number;
   scheduledAt?: string;
   completedAt?: string;
 }

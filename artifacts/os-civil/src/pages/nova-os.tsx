@@ -3,11 +3,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, Save, X, Image as ImageIcon } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Save, X, Image as ImageIcon, TrendingUp } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useCreateServiceOrder, useListTechnicians, getListServiceOrdersQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useCreateServiceOrder, getListServiceOrdersQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,70 +15,76 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
 
+const MARKET_RATES: Record<string, number> = {
+  civil: 280,
+  refrigeracao: 350,
+  hidraulica: 250,
+  mecanica: 320,
+  eletrica: 290,
+  outros: 180,
+};
+
 const formSchema = z.object({
-  title: z.string().min(3, "Título deve ter pelo menos 3 caracteres"),
+  location: z.string().min(2, "Local obrigatório"),
+  department: z.string().optional(),
   description: z.string().optional(),
   category: z.enum(["manutencao", "conservacao", "limpeza", "preventiva", "construcao"]),
   priority: z.enum(["baixa", "media", "alta", "urgente"]),
-  location: z.string().min(3, "Local obrigatório"),
-  technicianId: z.coerce.number().optional().or(z.literal("")),
   scheduledAt: z.date().optional(),
-  department: z.string().optional(),
   tipo: z.enum(["reforma", "revitalizacao", "preventiva", "corretiva", "outros"]).optional(),
   formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "outros"]).optional(),
-  estimatedValue: z.coerce.number().optional(),
-  photos: z.string().optional()
+  technicianName: z.string().optional(),
+  photos: z.string().optional(),
 });
 
 export default function NovaOS() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  const { data: technicians } = useListTechnicians();
   const createOrder = useCreateServiceOrder();
-
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      title: "",
-      description: "",
       location: "",
+      department: "",
+      description: "",
       category: "manutencao",
       priority: "media",
-      department: "",
-      estimatedValue: undefined,
-      photos: ""
-    }
+      technicianName: "",
+      photos: "",
+    },
   });
+
+  const formatoServico = form.watch("formatoServico");
+  const estimativaAuto = formatoServico ? MARKET_RATES[formatoServico] : null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    
-    const base64Promises = files.map((file) => {
-      return new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (error) => reject(error);
-      });
-    });
-
+    const base64Promises = files.map(
+      (file) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (error) => reject(error);
+        })
+    );
     try {
       const base64Files = await Promise.all(base64Promises);
       const newPhotos = [...photosBase64, ...base64Files];
       setPhotosBase64(newPhotos);
       form.setValue("photos", JSON.stringify(newPhotos));
-    } catch (err) {
+    } catch {
       toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
     }
   };
@@ -90,24 +96,38 @@ export default function NovaOS() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    const tipoLabel = values.tipo ? TIPO_LABELS[values.tipo] : "";
+    const formatoLabel = values.formatoServico ? FORMATO_SERVICO_LABELS[values.formatoServico] : "";
+    const autoTitle = [formatoLabel, tipoLabel, values.location]
+      .filter(Boolean)
+      .join(" — ") || `Serviço em ${values.location}`;
+
     createOrder.mutate(
-      { 
+      {
         data: {
-          ...values,
-          technicianId: values.technicianId ? Number(values.technicianId) : undefined,
+          title: autoTitle,
+          location: values.location,
+          department: values.department || undefined,
+          description: values.description || undefined,
+          category: values.category,
+          priority: values.priority,
           scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
-        } 
+          tipo: values.tipo,
+          formatoServico: values.formatoServico,
+          technicianName: values.technicianName || undefined,
+          photos: values.photos || undefined,
+        },
       },
       {
         onSuccess: () => {
-          toast({ title: "OS Criada com sucesso", description: "A ordem de serviço foi registrada." });
+          toast({ title: "OS criada com sucesso", description: "A ordem de serviço foi registrada." });
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
           setLocation("/ordens");
         },
         onError: () => {
           toast({ title: "Erro", description: "Não foi possível criar a OS.", variant: "destructive" });
-        }
+        },
       }
     );
   };
@@ -120,7 +140,7 @@ export default function NovaOS() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Nova Ordem de Serviço</h1>
-          <p className="text-muted-foreground mt-1">Cadastrar novo serviço ou chamado.</p>
+          <p className="text-muted-foreground mt-1">O ID é gerado automaticamente ao salvar.</p>
         </div>
       </div>
 
@@ -128,9 +148,9 @@ export default function NovaOS() {
         <CardContent className="pt-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
+
+                {/* Data do Serviço */}
                 <FormField
                   control={form.control}
                   name="scheduledAt"
@@ -141,17 +161,10 @@ export default function NovaOS() {
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
-                              variant={"outline"}
-                              className={cn(
-                                "w-full pl-3 text-left font-normal",
-                                !field.value && "text-muted-foreground"
-                              )}
+                              variant="outline"
+                              className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                             >
-                              {field.value ? (
-                                format(field.value, "dd/MM/yyyy")
-                              ) : (
-                                <span>Escolha uma data...</span>
-                              )}
+                              {field.value ? format(field.value, "dd/MM/yyyy") : <span>Escolha uma data...</span>}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
                           </FormControl>
@@ -161,7 +174,7 @@ export default function NovaOS() {
                             mode="single"
                             selected={field.value}
                             onSelect={field.onChange}
-                            disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             initialFocus
                           />
                         </PopoverContent>
@@ -171,28 +184,15 @@ export default function NovaOS() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Título da OS</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Conserto do ar condicionado sala 2" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+                {/* Local / Departamento */}
                 <FormField
                   control={form.control}
                   name="location"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Local / Endereço</FormLabel>
+                      <FormLabel>Local</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: Andar 3, Bloco B" {...field} />
+                        <Input placeholder="Ex: Andar 3, Bloco B, Corredor Principal" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -206,13 +206,14 @@ export default function NovaOS() {
                     <FormItem>
                       <FormLabel>Departamento</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ex: RH, Financeiro" {...field} />
+                        <Input placeholder="Ex: RH, Financeiro, Manutenção" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* Tipo de Serviço */}
                 <FormField
                   control={form.control}
                   name="tipo"
@@ -236,6 +237,7 @@ export default function NovaOS() {
                   )}
                 />
 
+                {/* Formato do Serviço + estimativa automática */}
                 <FormField
                   control={form.control}
                   name="formatoServico"
@@ -255,10 +257,17 @@ export default function NovaOS() {
                         </SelectContent>
                       </Select>
                       <FormMessage />
+                      {estimativaAuto !== null && (
+                        <div className="flex items-center gap-2 mt-1.5 text-sm text-amber-500">
+                          <TrendingUp className="w-3.5 h-3.5" />
+                          <span>Estimativa de mercado: <strong>R$ {estimativaAuto.toLocaleString("pt-BR")}</strong></span>
+                        </div>
+                      )}
                     </FormItem>
                   )}
                 />
 
+                {/* Categoria */}
                 <FormField
                   control={form.control}
                   name="category"
@@ -282,6 +291,7 @@ export default function NovaOS() {
                   )}
                 />
 
+                {/* Prioridade */}
                 <FormField
                   control={form.control}
                   name="priority"
@@ -305,44 +315,22 @@ export default function NovaOS() {
                   )}
                 />
 
+                {/* Técnico Responsável — texto livre */}
                 <FormField
                   control={form.control}
-                  name="estimatedValue"
+                  name="technicianName"
                   render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Valor Estimado (R$)</FormLabel>
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Técnico Responsável</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input placeholder="Nome do técnico responsável" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="technicianId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Técnico Responsável</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value?.toString() || ""}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Atribuir depois..." />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">Não atribuir agora</SelectItem>
-                          {technicians?.filter(t => t.active).map((tech) => (
-                            <SelectItem key={tech.id} value={tech.id.toString()}>{tech.name} ({tech.specialty})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+                {/* Descrição */}
                 <FormField
                   control={form.control}
                   name="description"
@@ -350,10 +338,10 @@ export default function NovaOS() {
                     <FormItem className="md:col-span-2">
                       <FormLabel>Descrição Detalhada</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Detalhes sobre o problema ou serviço a ser realizado..." 
-                          className="min-h-[120px]" 
-                          {...field} 
+                        <Textarea
+                          placeholder="Detalhes sobre o problema ou serviço a ser realizado..."
+                          className="min-h-[120px]"
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -361,6 +349,7 @@ export default function NovaOS() {
                   )}
                 />
 
+                {/* Fotos */}
                 <div className="md:col-span-2 space-y-3">
                   <Label>Fotos do Serviço</Label>
                   <div className="flex items-center gap-4">
@@ -368,12 +357,12 @@ export default function NovaOS() {
                       <ImageIcon className="w-4 h-4 mr-2" />
                       Anexar Imagens
                     </Button>
-                    <input 
-                      id="photo-upload" 
-                      type="file" 
-                      accept="image/*" 
-                      multiple 
-                      className="hidden" 
+                    <input
+                      id="photo-upload"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
                       onChange={handleFileChange}
                     />
                   </div>
@@ -394,7 +383,6 @@ export default function NovaOS() {
                     </div>
                   )}
                 </div>
-
               </div>
 
               <div className="flex justify-end pt-4 border-t border-border/50">

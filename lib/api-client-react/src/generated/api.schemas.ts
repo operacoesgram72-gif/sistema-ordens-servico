@@ -162,19 +162,19 @@ export const ServiceOrderInputFormatoServico = {
 } as const;
 
 export interface ServiceOrderInput {
-  /** @minLength 1 */
-  title: string;
+  /** Gerado automaticamente se não informado */
+  title?: string;
   description?: string;
   category: ServiceOrderInputCategory;
   priority: ServiceOrderInputPriority;
   location: string;
   department?: string;
-  technicianId?: number;
+  /** Nome livre do técnico responsável */
+  technicianName?: string;
   notes?: string;
   tipo?: ServiceOrderInputTipo;
   formatoServico?: ServiceOrderInputFormatoServico;
   photos?: string;
-  estimatedValue?: number;
   scheduledAt?: string;
 }
 
@@ -240,12 +240,12 @@ export interface ServiceOrderUpdate {
   status?: ServiceOrderUpdateStatus;
   location?: string;
   department?: string;
-  technicianId?: number;
+  /** Nome livre do técnico responsável */
+  technicianName?: string;
   notes?: string;
   tipo?: ServiceOrderUpdateTipo;
   formatoServico?: ServiceOrderUpdateFormatoServico;
   photos?: string;
-  estimatedValue?: number;
   scheduledAt?: string;
   completedAt?: string;
 }

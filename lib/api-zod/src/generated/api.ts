@@ -63,22 +63,18 @@ export const ListServiceOrdersResponse = zod.array(ListServiceOrdersResponseItem
 /**
  * @summary Criar ordem de serviço
  */
-
-
-
 export const CreateServiceOrderBody = zod.object({
-  "title": zod.string().min(1),
+  "title": zod.string().optional().describe('Gerado automaticamente se não informado'),
   "description": zod.string().optional(),
   "category": zod.enum(['manutencao', 'conservacao', 'limpeza', 'preventiva', 'construcao']),
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
   "location": zod.string(),
   "department": zod.string().optional(),
-  "technicianId": zod.number().optional(),
+  "technicianName": zod.string().optional().describe('Nome livre do técnico responsável'),
   "notes": zod.string().optional(),
   "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros']).optional(),
   "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros']).optional(),
   "photos": zod.string().optional(),
-  "estimatedValue": zod.number().optional(),
   "scheduledAt": zod.string().optional()
 })
 
@@ -132,12 +128,11 @@ export const UpdateServiceOrderBody = zod.object({
   "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']).optional(),
   "location": zod.string().optional(),
   "department": zod.string().optional(),
-  "technicianId": zod.number().optional(),
+  "technicianName": zod.string().optional().describe('Nome livre do técnico responsável'),
   "notes": zod.string().optional(),
   "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros']).optional(),
   "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros']).optional(),
   "photos": zod.string().optional(),
-  "estimatedValue": zod.number().optional(),
   "scheduledAt": zod.string().optional(),
   "completedAt": zod.string().optional()
 })

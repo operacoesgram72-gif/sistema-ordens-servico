@@ -414,14 +414,13 @@ components:
     ServiceOrderInput:
       type: object
       required:
-        - title
         - category
         - priority
         - location
       properties:
         title:
           type: string
-          minLength: 1
+          description: Gerado automaticamente se não informado
         description:
           type: string
         category:
@@ -434,8 +433,9 @@ components:
           type: string
         department:
           type: string
-        technicianId:
-          type: integer
+        technicianName:
+          type: string
+          description: Nome livre do técnico responsável
         notes:
           type: string
         tipo:
@@ -446,8 +446,6 @@ components:
           enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros]
         photos:
           type: string
-        estimatedValue:
-          type: number
         scheduledAt:
           type: string
 
@@ -471,8 +469,9 @@ components:
           type: string
         department:
           type: string
-        technicianId:
-          type: integer
+        technicianName:
+          type: string
+          description: Nome livre do técnico responsável
         notes:
           type: string
         tipo:
@@ -483,8 +482,6 @@ components:
           enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros]
         photos:
           type: string
-        estimatedValue:
-          type: number
         scheduledAt:
           type: string
         completedAt:

@@ -11,18 +11,18 @@ import type { ServiceOrderInputPriority } from './serviceOrderInputPriority';
 import type { ServiceOrderInputTipo } from './serviceOrderInputTipo';
 
 export interface ServiceOrderInput {
-  /** @minLength 1 */
-  title: string;
+  /** Gerado automaticamente se não informado */
+  title?: string;
   description?: string;
   category: ServiceOrderInputCategory;
   priority: ServiceOrderInputPriority;
   location: string;
   department?: string;
-  technicianId?: number;
+  /** Nome livre do técnico responsável */
+  technicianName?: string;
   notes?: string;
   tipo?: ServiceOrderInputTipo;
   formatoServico?: ServiceOrderInputFormatoServico;
   photos?: string;
-  estimatedValue?: number;
   scheduledAt?: string;
 }

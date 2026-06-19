@@ -13,6 +13,7 @@ export const serviceOrdersTable = pgTable("service_orders", {
   location: text("location").notNull(),
   department: text("department"),
   technicianId: integer("technician_id"),
+  technicianNameFree: text("technician_name_free"),
   notes: text("notes"),
   // New fields
   tipo: text("tipo"),                       // reforma, revitalizacao, preventiva, corretiva, outros
