@@ -3,31 +3,44 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 
 export * from './categoryCount';
 export * from './dashboardSummary';
+export * from './formatoIndicator';
+export * from './getDashboardIndicatorsParams';
 export * from './getDashboardStatsParams';
 export * from './getDashboardStatsPeriod';
 export * from './healthStatus';
+export * from './indicatorsData';
 export * from './listServiceOrdersParams';
 export * from './listServiceOrdersPeriod';
+export * from './locationIndicator';
+export * from './monthIndicator';
 export * from './priorityCount';
 export * from './serviceOrder';
 export * from './serviceOrderCategory';
+export * from './serviceOrderFormatoServico';
 export * from './serviceOrderInput';
 export * from './serviceOrderInputCategory';
+export * from './serviceOrderInputFormatoServico';
 export * from './serviceOrderInputPriority';
+export * from './serviceOrderInputTipo';
 export * from './serviceOrderPriority';
 export * from './serviceOrderStatus';
+export * from './serviceOrderTipo';
 export * from './serviceOrderUpdate';
 export * from './serviceOrderUpdateCategory';
+export * from './serviceOrderUpdateFormatoServico';
 export * from './serviceOrderUpdatePriority';
 export * from './serviceOrderUpdateStatus';
+export * from './serviceOrderUpdateTipo';
+export * from './signatureInput';
 export * from './statPoint';
 export * from './statusUpdate';
 export * from './statusUpdateStatus';
 export * from './technician';
+export * from './technicianIndicator';
 export * from './technicianInput';
 export * from './technicianUpdate';

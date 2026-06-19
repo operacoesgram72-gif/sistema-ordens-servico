@@ -6,10 +6,8 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface TechnicianInput {
-  /** @minLength 1 */
-  name: string;
-  specialty: string;
-  phone?: string;
-  email?: string;
+export interface SignatureInput {
+  signedBy: string;
+  /** Base64 signature image (optional if clicking to confirm) */
+  signature?: string;
 }

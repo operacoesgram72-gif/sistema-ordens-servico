@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, ClipboardList, PlusCircle, Users, HardHat } from "lucide-react";
+import { LayoutDashboard, ClipboardList, PlusCircle, Users, HardHat, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -7,6 +7,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Painel de Controle", icon: LayoutDashboard },
+    { href: "/indicadores", label: "Indicadores", icon: TrendingUp },
     { href: "/ordens", label: "Ordens de Serviço", icon: ClipboardList },
     { href: "/ordens/nova", label: "Nova OS", icon: PlusCircle },
     { href: "/tecnicos", label: "Equipe Técnica", icon: Users },

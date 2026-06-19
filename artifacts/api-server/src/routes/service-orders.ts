@@ -5,11 +5,22 @@ import {
   CreateServiceOrderBody,
   UpdateServiceOrderBody,
   UpdateServiceOrderStatusBody,
+  SignServiceOrderBody,
   ListServiceOrdersQueryParams,
 } from "@workspace/api-zod";
 import { eq, and, gte, lte, like, or, sql } from "drizzle-orm";
 
 const router = Router();
+
+// Market value reference per formato_servico (R$/service average)
+const MARKET_RATES: Record<string, number> = {
+  civil: 280,
+  refrigeracao: 350,
+  hidraulica: 250,
+  mecanica: 320,
+  eletrica: 290,
+  outros: 180,
+};
 
 function generateNumber(): string {
   const year = new Date().getFullYear();
@@ -32,6 +43,10 @@ async function enrichWithTechnician(orders: any[]) {
     technicianName: o.technicianId ? techMap.get(o.technicianId) ?? null : null,
     scheduledAt: o.scheduledAt ? o.scheduledAt.toISOString() : null,
     completedAt: o.completedAt ? o.completedAt.toISOString() : null,
+    signedAt: o.signedAt ? o.signedAt.toISOString() : null,
+    estimatedValue: o.estimatedValue !== null && o.estimatedValue !== undefined
+      ? Number(o.estimatedValue)
+      : null,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
   }));
@@ -41,13 +56,15 @@ async function enrichWithTechnician(orders: any[]) {
 router.get("/service-orders", async (req, res) => {
   try {
     const parsed = ListServiceOrdersQueryParams.safeParse(req.query);
-    const q = parsed.success ? parsed.data : req.query as any;
+    const q = parsed.success ? parsed.data : (req.query as any);
 
     const conditions: any[] = [];
 
     if (q.status) conditions.push(eq(serviceOrdersTable.status, q.status));
     if (q.category) conditions.push(eq(serviceOrdersTable.category, q.category));
     if (q.priority) conditions.push(eq(serviceOrdersTable.priority, q.priority));
+    if (q.tipo) conditions.push(eq(serviceOrdersTable.tipo, q.tipo));
+    if (q.formatoServico) conditions.push(eq(serviceOrdersTable.formatoServico, q.formatoServico));
     if (q.technicianId) conditions.push(eq(serviceOrdersTable.technicianId, Number(q.technicianId)));
 
     if (q.period === "daily") {
@@ -107,6 +124,14 @@ router.post("/service-orders", async (req, res) => {
     const body = CreateServiceOrderBody.parse(req.body);
     const number = generateNumber();
 
+    // Auto-calculate estimated value if not provided
+    const estimatedValue =
+      body.estimatedValue !== undefined
+        ? body.estimatedValue
+        : body.formatoServico
+        ? MARKET_RATES[body.formatoServico] ?? null
+        : null;
+
     const [created] = await db
       .insert(serviceOrdersTable)
       .values({
@@ -116,8 +141,13 @@ router.post("/service-orders", async (req, res) => {
         category: body.category,
         priority: body.priority,
         location: body.location,
+        department: body.department ?? null,
         technicianId: body.technicianId ?? null,
         notes: body.notes ?? null,
+        tipo: body.tipo ?? null,
+        formatoServico: body.formatoServico ?? null,
+        photos: body.photos ?? null,
+        estimatedValue: estimatedValue !== null ? String(estimatedValue) : null,
         scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
         status: "aberta",
       })
@@ -135,9 +165,11 @@ router.post("/service-orders", async (req, res) => {
 router.get("/service-orders/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const [row] = await db.select().from(serviceOrdersTable).where(eq(serviceOrdersTable.id, id));
+    const [row] = await db
+      .select()
+      .from(serviceOrdersTable)
+      .where(eq(serviceOrdersTable.id, id));
     if (!row) return res.status(404).json({ error: "Não encontrada" });
-
     const [enriched] = await enrichWithTechnician([row]);
     res.json(enriched);
   } catch (err) {
@@ -152,12 +184,12 @@ router.patch("/service-orders/:id", async (req, res) => {
     const id = Number(req.params.id);
     const body = UpdateServiceOrderBody.parse(req.body);
 
-    const updateData: any = {
-      ...body,
-      updatedAt: new Date(),
-    };
+    const updateData: any = { ...body, updatedAt: new Date() };
     if (body.scheduledAt) updateData.scheduledAt = new Date(body.scheduledAt);
     if (body.completedAt) updateData.completedAt = new Date(body.completedAt);
+    if (body.estimatedValue !== undefined) {
+      updateData.estimatedValue = body.estimatedValue !== null ? String(body.estimatedValue) : null;
+    }
 
     const [updated] = await db
       .update(serviceOrdersTable)
@@ -166,7 +198,6 @@ router.patch("/service-orders/:id", async (req, res) => {
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Não encontrada" });
-
     const [enriched] = await enrichWithTechnician([updated]);
     res.json(enriched);
   } catch (err) {
@@ -193,10 +224,7 @@ router.patch("/service-orders/:id/status", async (req, res) => {
     const id = Number(req.params.id);
     const body = UpdateServiceOrderStatusBody.parse(req.body);
 
-    const updateData: any = {
-      status: body.status,
-      updatedAt: new Date(),
-    };
+    const updateData: any = { status: body.status, updatedAt: new Date() };
     if (body.notes) updateData.notes = body.notes;
     if (body.status === "concluida") updateData.completedAt = new Date();
 
@@ -207,7 +235,35 @@ router.patch("/service-orders/:id/status", async (req, res) => {
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Não encontrada" });
+    const [enriched] = await enrichWithTechnician([updated]);
+    res.json(enriched);
+  } catch (err) {
+    req.log.error(err);
+    res.status(400).json({ error: "Dados inválidos" });
+  }
+});
 
+// POST /service-orders/:id/sign  — gestor assina e conclui a OS
+router.post("/service-orders/:id/sign", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const body = SignServiceOrderBody.parse(req.body);
+
+    const now = new Date();
+    const [updated] = await db
+      .update(serviceOrdersTable)
+      .set({
+        status: "concluida",
+        signedBy: body.signedBy,
+        signature: body.signature ?? "assinado",
+        signedAt: now,
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(serviceOrdersTable.id, id))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Não encontrada" });
     const [enriched] = await enrichWithTechnician([updated]);
     res.json(enriched);
   } catch (err) {

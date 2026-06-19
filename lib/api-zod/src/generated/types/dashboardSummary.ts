@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { CategoryCount } from './categoryCount';
 import type { PriorityCount } from './priorityCount';
@@ -17,6 +17,7 @@ export interface DashboardSummary {
   totalThisMonth: number;
   totalThisYear: number;
   completionRate: number;
+  totalEstimatedValue: number;
   byCategory: CategoryCount[];
   byPriority: PriorityCount[];
 }

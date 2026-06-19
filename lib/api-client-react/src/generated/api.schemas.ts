@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
@@ -40,6 +40,37 @@ export const ServiceOrderStatus = {
   cancelada: 'cancelada',
 } as const;
 
+/**
+ * @nullable
+ */
+export type ServiceOrderTipo = typeof ServiceOrderTipo[keyof typeof ServiceOrderTipo] | null;
+
+
+export const ServiceOrderTipo = {
+  reforma: 'reforma',
+  revitalizacao: 'revitalizacao',
+  preventiva: 'preventiva',
+  corretiva: 'corretiva',
+  outros: 'outros',
+  null: 'null',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ServiceOrderFormatoServico = typeof ServiceOrderFormatoServico[keyof typeof ServiceOrderFormatoServico] | null;
+
+
+export const ServiceOrderFormatoServico = {
+  civil: 'civil',
+  refrigeracao: 'refrigeracao',
+  hidraulica: 'hidraulica',
+  mecanica: 'mecanica',
+  eletrica: 'eletrica',
+  outros: 'outros',
+  null: 'null',
+} as const;
+
 export interface ServiceOrder {
   id: number;
   number: string;
@@ -51,11 +82,33 @@ export interface ServiceOrder {
   status: ServiceOrderStatus;
   location: string;
   /** @nullable */
+  department?: string | null;
+  /** @nullable */
   technicianId?: number | null;
   /** @nullable */
   technicianName?: string | null;
   /** @nullable */
   notes?: string | null;
+  /** @nullable */
+  tipo?: ServiceOrderTipo;
+  /** @nullable */
+  formatoServico?: ServiceOrderFormatoServico;
+  /**
+     * JSON array of base64 image strings
+     * @nullable
+     */
+  photos?: string | null;
+  /**
+     * Base64 signature image
+     * @nullable
+     */
+  signature?: string | null;
+  /** @nullable */
+  signedBy?: string | null;
+  /** @nullable */
+  signedAt?: string | null;
+  /** @nullable */
+  estimatedValue?: number | null;
   /** @nullable */
   scheduledAt?: string | null;
   /** @nullable */
@@ -85,6 +138,29 @@ export const ServiceOrderInputPriority = {
   urgente: 'urgente',
 } as const;
 
+export type ServiceOrderInputTipo = typeof ServiceOrderInputTipo[keyof typeof ServiceOrderInputTipo];
+
+
+export const ServiceOrderInputTipo = {
+  reforma: 'reforma',
+  revitalizacao: 'revitalizacao',
+  preventiva: 'preventiva',
+  corretiva: 'corretiva',
+  outros: 'outros',
+} as const;
+
+export type ServiceOrderInputFormatoServico = typeof ServiceOrderInputFormatoServico[keyof typeof ServiceOrderInputFormatoServico];
+
+
+export const ServiceOrderInputFormatoServico = {
+  civil: 'civil',
+  refrigeracao: 'refrigeracao',
+  hidraulica: 'hidraulica',
+  mecanica: 'mecanica',
+  eletrica: 'eletrica',
+  outros: 'outros',
+} as const;
+
 export interface ServiceOrderInput {
   /** @minLength 1 */
   title: string;
@@ -92,8 +168,13 @@ export interface ServiceOrderInput {
   category: ServiceOrderInputCategory;
   priority: ServiceOrderInputPriority;
   location: string;
+  department?: string;
   technicianId?: number;
   notes?: string;
+  tipo?: ServiceOrderInputTipo;
+  formatoServico?: ServiceOrderInputFormatoServico;
+  photos?: string;
+  estimatedValue?: number;
   scheduledAt?: string;
 }
 
@@ -128,6 +209,29 @@ export const ServiceOrderUpdateStatus = {
   cancelada: 'cancelada',
 } as const;
 
+export type ServiceOrderUpdateTipo = typeof ServiceOrderUpdateTipo[keyof typeof ServiceOrderUpdateTipo];
+
+
+export const ServiceOrderUpdateTipo = {
+  reforma: 'reforma',
+  revitalizacao: 'revitalizacao',
+  preventiva: 'preventiva',
+  corretiva: 'corretiva',
+  outros: 'outros',
+} as const;
+
+export type ServiceOrderUpdateFormatoServico = typeof ServiceOrderUpdateFormatoServico[keyof typeof ServiceOrderUpdateFormatoServico];
+
+
+export const ServiceOrderUpdateFormatoServico = {
+  civil: 'civil',
+  refrigeracao: 'refrigeracao',
+  hidraulica: 'hidraulica',
+  mecanica: 'mecanica',
+  eletrica: 'eletrica',
+  outros: 'outros',
+} as const;
+
 export interface ServiceOrderUpdate {
   title?: string;
   description?: string;
@@ -135,8 +239,13 @@ export interface ServiceOrderUpdate {
   priority?: ServiceOrderUpdatePriority;
   status?: ServiceOrderUpdateStatus;
   location?: string;
+  department?: string;
   technicianId?: number;
   notes?: string;
+  tipo?: ServiceOrderUpdateTipo;
+  formatoServico?: ServiceOrderUpdateFormatoServico;
+  photos?: string;
+  estimatedValue?: number;
   scheduledAt?: string;
   completedAt?: string;
 }
@@ -154,6 +263,12 @@ export const StatusUpdateStatus = {
 export interface StatusUpdate {
   status: StatusUpdateStatus;
   notes?: string;
+}
+
+export interface SignatureInput {
+  signedBy: string;
+  /** Base64 signature image (optional if clicking to confirm) */
+  signature?: string;
 }
 
 export interface CategoryCount {
@@ -175,6 +290,7 @@ export interface DashboardSummary {
   totalThisMonth: number;
   totalThisYear: number;
   completionRate: number;
+  totalEstimatedValue: number;
   byCategory: CategoryCount[];
   byPriority: PriorityCount[];
 }
@@ -185,6 +301,42 @@ export interface StatPoint {
   completed: number;
   open: number;
   inProgress: number;
+}
+
+export interface LocationIndicator {
+  location: string;
+  total: number;
+  completed: number;
+  estimatedValue: number;
+}
+
+export interface MonthIndicator {
+  month: string;
+  total: number;
+  completed: number;
+  estimatedValue: number;
+}
+
+export interface TechnicianIndicator {
+  technicianName: string;
+  total: number;
+  completed: number;
+  estimatedValue: number;
+}
+
+export interface FormatoIndicator {
+  formato: string;
+  total: number;
+  estimatedValue: number;
+  avgValuePerService: number;
+}
+
+export interface IndicatorsData {
+  totalValue: number;
+  byLocation: LocationIndicator[];
+  byMonth: MonthIndicator[];
+  byTechnician: TechnicianIndicator[];
+  byFormatoServico: FormatoIndicator[];
 }
 
 export interface Technician {
@@ -219,6 +371,8 @@ export type ListServiceOrdersParams = {
 status?: string;
 category?: string;
 priority?: string;
+tipo?: string;
+formatoServico?: string;
 technicianId?: number;
 dateFrom?: string;
 dateTo?: string;
@@ -247,4 +401,8 @@ export const GetDashboardStatsPeriod = {
   monthly: 'monthly',
   annual: 'annual',
 } as const;
+
+export type GetDashboardIndicatorsParams = {
+year?: number;
+};
 

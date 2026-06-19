@@ -3,13 +3,12 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -24,6 +23,8 @@ export const ListServiceOrdersQueryParams = zod.object({
   "status": zod.coerce.string().optional(),
   "category": zod.coerce.string().optional(),
   "priority": zod.coerce.string().optional(),
+  "tipo": zod.coerce.string().optional(),
+  "formatoServico": zod.coerce.string().optional(),
   "technicianId": zod.coerce.number().optional(),
   "dateFrom": zod.coerce.string().optional(),
   "dateTo": zod.coerce.string().optional(),
@@ -40,9 +41,17 @@ export const ListServiceOrdersResponseItem = zod.object({
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
   "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']),
   "location": zod.string(),
+  "department": zod.string().nullish(),
   "technicianId": zod.number().nullish(),
   "technicianName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros', 'null']).nullish(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros', 'null']).nullish(),
+  "photos": zod.string().nullish().describe('JSON array of base64 image strings'),
+  "signature": zod.string().nullish().describe('Base64 signature image'),
+  "signedBy": zod.string().nullish(),
+  "signedAt": zod.string().nullish(),
+  "estimatedValue": zod.number().nullish(),
   "scheduledAt": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -63,8 +72,13 @@ export const CreateServiceOrderBody = zod.object({
   "category": zod.enum(['manutencao', 'conservacao', 'limpeza', 'preventiva', 'construcao']),
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
   "location": zod.string(),
+  "department": zod.string().optional(),
   "technicianId": zod.number().optional(),
   "notes": zod.string().optional(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros']).optional(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros']).optional(),
+  "photos": zod.string().optional(),
+  "estimatedValue": zod.number().optional(),
   "scheduledAt": zod.string().optional()
 })
 
@@ -85,9 +99,17 @@ export const GetServiceOrderResponse = zod.object({
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
   "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']),
   "location": zod.string(),
+  "department": zod.string().nullish(),
   "technicianId": zod.number().nullish(),
   "technicianName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros', 'null']).nullish(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros', 'null']).nullish(),
+  "photos": zod.string().nullish().describe('JSON array of base64 image strings'),
+  "signature": zod.string().nullish().describe('Base64 signature image'),
+  "signedBy": zod.string().nullish(),
+  "signedAt": zod.string().nullish(),
+  "estimatedValue": zod.number().nullish(),
   "scheduledAt": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -109,8 +131,13 @@ export const UpdateServiceOrderBody = zod.object({
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']).optional(),
   "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']).optional(),
   "location": zod.string().optional(),
+  "department": zod.string().optional(),
   "technicianId": zod.number().optional(),
   "notes": zod.string().optional(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros']).optional(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros']).optional(),
+  "photos": zod.string().optional(),
+  "estimatedValue": zod.number().optional(),
   "scheduledAt": zod.string().optional(),
   "completedAt": zod.string().optional()
 })
@@ -124,9 +151,17 @@ export const UpdateServiceOrderResponse = zod.object({
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
   "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']),
   "location": zod.string(),
+  "department": zod.string().nullish(),
   "technicianId": zod.number().nullish(),
   "technicianName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros', 'null']).nullish(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros', 'null']).nullish(),
+  "photos": zod.string().nullish().describe('JSON array of base64 image strings'),
+  "signature": zod.string().nullish().describe('Base64 signature image'),
+  "signedBy": zod.string().nullish(),
+  "signedAt": zod.string().nullish(),
+  "estimatedValue": zod.number().nullish(),
   "scheduledAt": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -163,9 +198,56 @@ export const UpdateServiceOrderStatusResponse = zod.object({
   "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
   "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']),
   "location": zod.string(),
+  "department": zod.string().nullish(),
   "technicianId": zod.number().nullish(),
   "technicianName": zod.string().nullish(),
   "notes": zod.string().nullish(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros', 'null']).nullish(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros', 'null']).nullish(),
+  "photos": zod.string().nullish().describe('JSON array of base64 image strings'),
+  "signature": zod.string().nullish().describe('Base64 signature image'),
+  "signedBy": zod.string().nullish(),
+  "signedAt": zod.string().nullish(),
+  "estimatedValue": zod.number().nullish(),
+  "scheduledAt": zod.string().nullish(),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Assinar e concluir OS (pelo gestor)
+ */
+export const SignServiceOrderParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SignServiceOrderBody = zod.object({
+  "signedBy": zod.string(),
+  "signature": zod.string().optional().describe('Base64 signature image (optional if clicking to confirm)')
+})
+
+export const SignServiceOrderResponse = zod.object({
+  "id": zod.number(),
+  "number": zod.string(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "category": zod.enum(['manutencao', 'conservacao', 'limpeza', 'preventiva', 'construcao']),
+  "priority": zod.enum(['baixa', 'media', 'alta', 'urgente']),
+  "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada']),
+  "location": zod.string(),
+  "department": zod.string().nullish(),
+  "technicianId": zod.number().nullish(),
+  "technicianName": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros', 'null']).nullish(),
+  "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'outros', 'null']).nullish(),
+  "photos": zod.string().nullish().describe('JSON array of base64 image strings'),
+  "signature": zod.string().nullish().describe('Base64 signature image'),
+  "signedBy": zod.string().nullish(),
+  "signedAt": zod.string().nullish(),
+  "estimatedValue": zod.number().nullish(),
   "scheduledAt": zod.string().nullish(),
   "completedAt": zod.string().nullish(),
   "createdAt": zod.string(),
@@ -185,6 +267,7 @@ export const GetDashboardSummaryResponse = zod.object({
   "totalThisMonth": zod.number(),
   "totalThisYear": zod.number(),
   "completionRate": zod.number(),
+  "totalEstimatedValue": zod.number(),
   "byCategory": zod.array(zod.object({
   "category": zod.string(),
   "count": zod.number()
@@ -213,6 +296,42 @@ export const GetDashboardStatsResponseItem = zod.object({
   "inProgress": zod.number()
 })
 export const GetDashboardStatsResponse = zod.array(GetDashboardStatsResponseItem)
+
+
+/**
+ * @summary Indicadores por local, mês e responsável com projeção de valor
+ */
+export const GetDashboardIndicatorsQueryParams = zod.object({
+  "year": zod.coerce.number().optional()
+})
+
+export const GetDashboardIndicatorsResponse = zod.object({
+  "totalValue": zod.number(),
+  "byLocation": zod.array(zod.object({
+  "location": zod.string(),
+  "total": zod.number(),
+  "completed": zod.number(),
+  "estimatedValue": zod.number()
+})),
+  "byMonth": zod.array(zod.object({
+  "month": zod.string(),
+  "total": zod.number(),
+  "completed": zod.number(),
+  "estimatedValue": zod.number()
+})),
+  "byTechnician": zod.array(zod.object({
+  "technicianName": zod.string(),
+  "total": zod.number(),
+  "completed": zod.number(),
+  "estimatedValue": zod.number()
+})),
+  "byFormatoServico": zod.array(zod.object({
+  "formato": zod.string(),
+  "total": zod.number(),
+  "estimatedValue": zod.number(),
+  "avgValuePerService": zod.number()
+}))
+})
 
 
 /**

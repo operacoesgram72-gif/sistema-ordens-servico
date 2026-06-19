@@ -1,20 +1,16 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
   - name: service-orders
-    description: Ordens de Serviço
   - name: technicians
-    description: Técnicos
   - name: dashboard
-    description: Indicadores e Dashboard
 
 paths:
   /healthz:
@@ -22,7 +18,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -46,6 +41,14 @@ paths:
           schema:
             type: string
         - name: priority
+          in: query
+          schema:
+            type: string
+        - name: tipo
+          in: query
+          schema:
+            type: string
+        - name: formatoServico
           in: query
           schema:
             type: string
@@ -182,6 +185,31 @@ paths:
               schema:
                 $ref: "#/components/schemas/ServiceOrder"
 
+  /service-orders/{id}/sign:
+    post:
+      operationId: signServiceOrder
+      tags: [service-orders]
+      summary: Assinar e concluir OS (pelo gestor)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignatureInput"
+      responses:
+        "200":
+          description: OS assinada e concluída
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceOrder"
+
   /dashboard/summary:
     get:
       operationId: getDashboardSummary
@@ -216,6 +244,24 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/StatPoint"
+
+  /dashboard/indicators:
+    get:
+      operationId: getDashboardIndicators
+      tags: [dashboard]
+      summary: Indicadores por local, mês e responsável com projeção de valor
+      parameters:
+        - name: year
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Indicadores
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IndicatorsData"
 
   /technicians:
     get:
@@ -330,12 +376,32 @@ components:
           enum: [aberta, em_andamento, concluida, cancelada]
         location:
           type: string
+        department:
+          type: ["string", "null"]
         technicianId:
           type: ["integer", "null"]
         technicianName:
           type: ["string", "null"]
         notes:
           type: ["string", "null"]
+        tipo:
+          type: ["string", "null"]
+          enum: [reforma, revitalizacao, preventiva, corretiva, outros, "null"]
+        formatoServico:
+          type: ["string", "null"]
+          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros, "null"]
+        photos:
+          type: ["string", "null"]
+          description: JSON array of base64 image strings
+        signature:
+          type: ["string", "null"]
+          description: Base64 signature image
+        signedBy:
+          type: ["string", "null"]
+        signedAt:
+          type: ["string", "null"]
+        estimatedValue:
+          type: ["number", "null"]
         scheduledAt:
           type: ["string", "null"]
         completedAt:
@@ -366,10 +432,22 @@ components:
           enum: [baixa, media, alta, urgente]
         location:
           type: string
+        department:
+          type: string
         technicianId:
           type: integer
         notes:
           type: string
+        tipo:
+          type: string
+          enum: [reforma, revitalizacao, preventiva, corretiva, outros]
+        formatoServico:
+          type: string
+          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros]
+        photos:
+          type: string
+        estimatedValue:
+          type: number
         scheduledAt:
           type: string
 
@@ -391,10 +469,22 @@ components:
           enum: [aberta, em_andamento, concluida, cancelada]
         location:
           type: string
+        department:
+          type: string
         technicianId:
           type: integer
         notes:
           type: string
+        tipo:
+          type: string
+          enum: [reforma, revitalizacao, preventiva, corretiva, outros]
+        formatoServico:
+          type: string
+          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros]
+        photos:
+          type: string
+        estimatedValue:
+          type: number
         scheduledAt:
           type: string
         completedAt:
@@ -411,6 +501,17 @@ components:
         notes:
           type: string
 
+    SignatureInput:
+      type: object
+      required:
+        - signedBy
+      properties:
+        signedBy:
+          type: string
+        signature:
+          type: string
+          description: Base64 signature image (optional if clicking to confirm)
+
     DashboardSummary:
       type: object
       required:
@@ -424,6 +525,7 @@ components:
         - byCategory
         - byPriority
         - completionRate
+        - totalEstimatedValue
       properties:
         totalOpen:
           type: integer
@@ -440,6 +542,8 @@ components:
         totalThisYear:
           type: integer
         completionRate:
+          type: number
+        totalEstimatedValue:
           type: number
         byCategory:
           type: array
@@ -482,6 +586,81 @@ components:
           type: integer
         inProgress:
           type: integer
+
+    IndicatorsData:
+      type: object
+      required: [byLocation, byMonth, byTechnician, byFormatoServico, totalValue]
+      properties:
+        totalValue:
+          type: number
+        byLocation:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocationIndicator"
+        byMonth:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonthIndicator"
+        byTechnician:
+          type: array
+          items:
+            $ref: "#/components/schemas/TechnicianIndicator"
+        byFormatoServico:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormatoIndicator"
+
+    LocationIndicator:
+      type: object
+      required: [location, total, completed, estimatedValue]
+      properties:
+        location:
+          type: string
+        total:
+          type: integer
+        completed:
+          type: integer
+        estimatedValue:
+          type: number
+
+    MonthIndicator:
+      type: object
+      required: [month, total, completed, estimatedValue]
+      properties:
+        month:
+          type: string
+        total:
+          type: integer
+        completed:
+          type: integer
+        estimatedValue:
+          type: number
+
+    TechnicianIndicator:
+      type: object
+      required: [technicianName, total, completed, estimatedValue]
+      properties:
+        technicianName:
+          type: string
+        total:
+          type: integer
+        completed:
+          type: integer
+        estimatedValue:
+          type: number
+
+    FormatoIndicator:
+      type: object
+      required: [formato, total, estimatedValue, avgValuePerService]
+      properties:
+        formato:
+          type: string
+        total:
+          type: integer
+        estimatedValue:
+          type: number
+        avgValuePerService:
+          type: number
 
     Technician:
       type: object

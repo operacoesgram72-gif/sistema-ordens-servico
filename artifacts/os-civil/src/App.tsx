@@ -9,6 +9,7 @@ import Ordens from "@/pages/ordens";
 import NovaOS from "@/pages/nova-os";
 import OSDetail from "@/pages/os-detail";
 import Tecnicos from "@/pages/tecnicos";
+import Indicadores from "@/pages/indicadores";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ function Router() {
         <Route path="/ordens/nova" component={NovaOS} />
         <Route path="/ordens/:id" component={OSDetail} />
         <Route path="/tecnicos" component={Tecnicos} />
+        <Route path="/indicadores" component={Indicadores} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

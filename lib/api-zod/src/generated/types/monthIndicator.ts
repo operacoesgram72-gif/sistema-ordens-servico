@@ -6,10 +6,9 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface TechnicianInput {
-  /** @minLength 1 */
-  name: string;
-  specialty: string;
-  phone?: string;
-  email?: string;
+export interface MonthIndicator {
+  month: string;
+  total: number;
+  completed: number;
+  estimatedValue: number;
 }

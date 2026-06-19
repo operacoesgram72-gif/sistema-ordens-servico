@@ -8,6 +8,23 @@ export const CATEGORY_LABELS: Record<ServiceOrderCategory, string> = {
   construcao: "Construção Civil",
 };
 
+export const TIPO_LABELS: Record<string, string> = {
+  reforma: "Reforma",
+  revitalizacao: "Revitalização",
+  preventiva: "Preventiva",
+  corretiva: "Corretiva",
+  outros: "Outros",
+};
+
+export const FORMATO_SERVICO_LABELS: Record<string, string> = {
+  civil: "Civil",
+  refrigeracao: "Refrigeração",
+  hidraulica: "Hidráulica",
+  mecanica: "Mecânica",
+  eletrica: "Elétrica",
+  outros: "Outros",
+};
+
 export const PRIORITY_LABELS: Record<ServiceOrderPriority, string> = {
   baixa: "Baixa",
   media: "Média",

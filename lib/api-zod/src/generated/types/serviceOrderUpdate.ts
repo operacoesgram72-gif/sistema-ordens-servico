@@ -3,11 +3,13 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { ServiceOrderUpdateCategory } from './serviceOrderUpdateCategory';
+import type { ServiceOrderUpdateFormatoServico } from './serviceOrderUpdateFormatoServico';
 import type { ServiceOrderUpdatePriority } from './serviceOrderUpdatePriority';
 import type { ServiceOrderUpdateStatus } from './serviceOrderUpdateStatus';
+import type { ServiceOrderUpdateTipo } from './serviceOrderUpdateTipo';
 
 export interface ServiceOrderUpdate {
   title?: string;
@@ -16,8 +18,13 @@ export interface ServiceOrderUpdate {
   priority?: ServiceOrderUpdatePriority;
   status?: ServiceOrderUpdateStatus;
   location?: string;
+  department?: string;
   technicianId?: number;
   notes?: string;
+  tipo?: ServiceOrderUpdateTipo;
+  formatoServico?: ServiceOrderUpdateFormatoServico;
+  photos?: string;
+  estimatedValue?: number;
   scheduledAt?: string;
   completedAt?: string;
 }

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import {
   useMutation,
@@ -21,12 +21,15 @@ import type {
 
 import type {
   DashboardSummary,
+  GetDashboardIndicatorsParams,
   GetDashboardStatsParams,
   HealthStatus,
+  IndicatorsData,
   ListServiceOrdersParams,
   ServiceOrder,
   ServiceOrderInput,
   ServiceOrderUpdate,
+  SignatureInput,
   StatPoint,
   StatusUpdate,
   Technician,
@@ -55,7 +58,6 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
@@ -570,6 +572,78 @@ export const useUpdateServiceOrderStatus = <TError = ErrorType<unknown>,
       return useMutation(getUpdateServiceOrderStatusMutationOptions(options));
     }
 
+export const getSignServiceOrderUrl = (id: number,) => {
+
+
+
+
+  return `/api/service-orders/${id}/sign`
+}
+
+/**
+ * @summary Assinar e concluir OS (pelo gestor)
+ */
+export const signServiceOrder = async (id: number,
+    signatureInput: SignatureInput, options?: RequestInit): Promise<ServiceOrder> => {
+
+  return customFetch<ServiceOrder>(getSignServiceOrderUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      signatureInput,)
+  }
+);}
+
+
+
+
+export const getSignServiceOrderMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof signServiceOrder>>, TError,{id: number;data: BodyType<SignatureInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof signServiceOrder>>, TError,{id: number;data: BodyType<SignatureInput>}, TContext> => {
+
+const mutationKey = ['signServiceOrder'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof signServiceOrder>>, {id: number;data: BodyType<SignatureInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  signServiceOrder(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SignServiceOrderMutationResult = NonNullable<Awaited<ReturnType<typeof signServiceOrder>>>
+    export type SignServiceOrderMutationBody = BodyType<SignatureInput>
+    export type SignServiceOrderMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Assinar e concluir OS (pelo gestor)
+ */
+export const useSignServiceOrder = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof signServiceOrder>>, TError,{id: number;data: BodyType<SignatureInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof signServiceOrder>>,
+        TError,
+        {id: number;data: BodyType<SignatureInput>},
+        TContext
+      > => {
+      return useMutation(getSignServiceOrderMutationOptions(options));
+    }
+
 export const getGetDashboardSummaryUrl = () => {
 
 
@@ -719,6 +793,90 @@ export function useGetDashboardStats<TData = Awaited<ReturnType<typeof getDashbo
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetDashboardStatsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetDashboardIndicatorsUrl = (params?: GetDashboardIndicatorsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/dashboard/indicators?${stringifiedParams}` : `/api/dashboard/indicators`
+}
+
+/**
+ * @summary Indicadores por local, mês e responsável com projeção de valor
+ */
+export const getDashboardIndicators = async (params?: GetDashboardIndicatorsParams, options?: RequestInit): Promise<IndicatorsData> => {
+
+  return customFetch<IndicatorsData>(getGetDashboardIndicatorsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDashboardIndicatorsQueryKey = (params?: GetDashboardIndicatorsParams,) => {
+    return [
+    `/api/dashboard/indicators`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetDashboardIndicatorsQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardIndicators>>, TError = ErrorType<unknown>>(params?: GetDashboardIndicatorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardIndicators>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardIndicatorsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardIndicators>>> = ({ signal }) => getDashboardIndicators(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDashboardIndicators>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDashboardIndicatorsQueryResult = NonNullable<Awaited<ReturnType<typeof getDashboardIndicators>>>
+export type GetDashboardIndicatorsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Indicadores por local, mês e responsável com projeção de valor
+ */
+
+export function useGetDashboardIndicators<TData = Awaited<ReturnType<typeof getDashboardIndicators>>, TError = ErrorType<unknown>>(
+ params?: GetDashboardIndicatorsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardIndicators>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDashboardIndicatorsQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

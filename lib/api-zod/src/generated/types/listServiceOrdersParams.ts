@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import type { ListServiceOrdersPeriod } from './listServiceOrdersPeriod';
 
@@ -11,6 +11,8 @@ export type ListServiceOrdersParams = {
 status?: string;
 category?: string;
 priority?: string;
+tipo?: string;
+formatoServico?: string;
 technicianId?: number;
 dateFrom?: string;
 dateTo?: string;
