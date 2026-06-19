@@ -10,11 +10,12 @@ import NovaOS from "@/pages/nova-os";
 import OSDetail from "@/pages/os-detail";
 import Tecnicos from "@/pages/tecnicos";
 import Indicadores from "@/pages/indicadores";
+import RegistrarOS from "@/pages/registrar-os";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
 
-function Router() {
+function ManagementRouter() {
   return (
     <AppLayout>
       <Switch>
@@ -35,7 +36,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
+          <Switch>
+            {/* Rota pública para funcionários — sem sidebar de gestão */}
+            <Route path="/registrar" component={RegistrarOS} />
+            {/* Todas as outras rotas ficam dentro do layout de gestão */}
+            <Route component={ManagementRouter} />
+          </Switch>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

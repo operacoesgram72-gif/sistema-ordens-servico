@@ -1,9 +1,11 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, ClipboardList, PlusCircle, Users, HardHat, TrendingUp } from "lucide-react";
+import { LayoutDashboard, ClipboardList, PlusCircle, Users, HardHat, TrendingUp, Share2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { toast } = useToast();
 
   const navItems = [
     { href: "/", label: "Painel de Controle", icon: LayoutDashboard },
@@ -13,6 +15,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/tecnicos", label: "Equipe Técnica", icon: Users },
   ];
 
+  const employeeUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/registrar`;
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(employeeUrl).then(() => {
+      toast({ title: "Link copiado!", description: "Envie para os funcionários registrarem chamados." });
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground dark">
       {/* Sidebar */}
@@ -21,22 +31,50 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <HardHat className="w-6 h-6 text-primary mr-3" />
           <span className="font-bold text-lg tracking-tight uppercase">OS Civil</span>
         </div>
+
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {navItems.map((item) => {
-            const isActive = location === item.href;
+            const isActive =
+              item.href === "/"
+                ? location === "/"
+                : location === item.href || location.startsWith(item.href + "/");
             return (
-              <Link key={item.href} href={item.href} className={cn(
-                "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                isActive 
-                  ? "bg-primary/10 text-primary" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-              )}>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                  isActive
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+              >
                 <item.icon className={cn("w-5 h-5 mr-3", isActive ? "text-primary" : "text-muted-foreground")} />
                 {item.label}
               </Link>
             );
           })}
         </nav>
+
+        {/* Link para funcionários */}
+        <div className="p-3 border-t border-border">
+          <div className="rounded-md bg-muted/50 border border-border/70 p-3 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <Share2 className="w-3.5 h-3.5" />
+              Link para Funcionários
+            </div>
+            <p className="text-xs text-muted-foreground leading-snug">
+              Compartilhe este link para que os funcionários registrem chamados.
+            </p>
+            <button
+              onClick={copyLink}
+              className="w-full flex items-center justify-center gap-2 text-xs bg-primary/10 hover:bg-primary/20 text-primary font-medium py-2 px-3 rounded-md transition-colors"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copiar link de registro
+            </button>
+          </div>
+        </div>
       </aside>
 
       {/* Main Content */}
