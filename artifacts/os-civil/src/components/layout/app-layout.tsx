@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, ClipboardList, PlusCircle, Users, HardHat, TrendingUp, Share2, Copy } from "lucide-react";
+import { LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp, Share2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,9 +27,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground dark">
       {/* Sidebar */}
       <aside className="w-full md:w-64 border-r border-border bg-card flex flex-col shrink-0">
-        <div className="h-16 flex items-center px-6 border-b border-border shrink-0">
-          <HardHat className="w-6 h-6 text-primary mr-3" />
-          <span className="font-bold text-lg tracking-tight uppercase">OS Civil</span>
+
+        {/* Logo + Identidade da empresa */}
+        <div className="px-5 py-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-3">
+            <img
+              src="/logo-amazonica.png"
+              alt="Logo Rede Amazônica"
+              className="h-10 w-10 object-contain"
+            />
+            <div className="min-w-0">
+              <div className="font-bold text-sm leading-tight text-foreground truncate">
+                Grupo Rede Amazônica
+              </div>
+              <div className="text-xs text-muted-foreground">Departamento: Operações</div>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-border/60">
+            <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+              Painel de Serviços
+            </span>
+          </div>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
@@ -64,7 +82,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               Link para Funcionários
             </div>
             <p className="text-xs text-muted-foreground leading-snug">
-              Compartilhe este link para que os funcionários registrem chamados.
+              Compartilhe para que os funcionários registrem chamados.
             </p>
             <button
               onClick={copyLink}

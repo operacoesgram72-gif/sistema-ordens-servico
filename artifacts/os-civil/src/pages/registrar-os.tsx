@@ -133,10 +133,21 @@ export default function RegistrarOS() {
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
       {/* Header */}
-      <header className="border-b border-border bg-card px-6 py-4 flex items-center gap-3 shrink-0">
-        <HardHat className="w-6 h-6 text-primary" />
-        <span className="font-bold text-lg tracking-tight uppercase">OS Civil</span>
-        <span className="text-muted-foreground text-sm ml-2">— Registro de Chamado</span>
+      <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
+        <img
+          src="/logo-amazonica.png"
+          alt="Logo Rede Amazônica"
+          className="h-10 w-10 object-contain"
+        />
+        <div className="border-l border-border pl-4">
+          <div className="font-bold text-sm leading-tight">Grupo Rede Amazônica</div>
+          <div className="text-xs text-muted-foreground">Departamento: Operações</div>
+        </div>
+        <div className="ml-auto">
+          <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+            Painel de Serviços
+          </span>
+        </div>
       </header>
 
       <div className="flex-1 flex items-start justify-center px-4 py-8">
