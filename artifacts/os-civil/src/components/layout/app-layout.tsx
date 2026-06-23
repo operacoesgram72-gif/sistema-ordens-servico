@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp, Share2, Copy } from "lucide-react";
+import { LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp, Share2, Copy, BookUser, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -13,6 +13,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/ordens", label: "Ordens de Serviço", icon: ClipboardList },
     { href: "/ordens/nova", label: "Nova OS", icon: PlusCircle },
     { href: "/tecnicos", label: "Equipe Técnica", icon: Users },
+    { href: "/cadastros", label: "Dados Cadastrais", icon: BookUser },
+    { href: "/configuracoes", label: "Configurações", icon: Settings2 },
   ];
 
   const employeeUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/registrar`;

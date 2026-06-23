@@ -367,6 +367,47 @@ export interface TechnicianUpdate {
   active?: boolean;
 }
 
+export interface Contact {
+  id: number;
+  name: string;
+  /** @nullable */
+  cpf?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  address?: string | null;
+  /** @nullable */
+  birthDate?: string | null;
+  /** @nullable */
+  notes?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ContactInput {
+  /** @minLength 1 */
+  name: string;
+  cpf?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  birthDate?: string;
+  notes?: string;
+}
+
+export interface SettingsData {
+  /** Email para receber notificações de novas OS */
+  notificationEmail?: string;
+  smtpHost?: string;
+  smtpPort?: string;
+  smtpUser?: string;
+  smtpPass?: string;
+  companyName?: string;
+  department?: string;
+}
+
 export type ListServiceOrdersParams = {
 status?: string;
 category?: string;

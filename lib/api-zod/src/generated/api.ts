@@ -330,6 +330,121 @@ export const GetDashboardIndicatorsResponse = zod.object({
 
 
 /**
+ * @summary Listar contatos/funcionários
+ */
+export const ListContactsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "cpf": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListContactsResponse = zod.array(ListContactsResponseItem)
+
+
+/**
+ * @summary Cadastrar contato
+ */
+
+
+
+export const CreateContactBody = zod.object({
+  "name": zod.string().min(1),
+  "cpf": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "address": zod.string().optional(),
+  "birthDate": zod.string().optional(),
+  "notes": zod.string().optional()
+})
+
+
+/**
+ * @summary Atualizar contato
+ */
+export const UpdateContactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateContactBody = zod.object({
+  "name": zod.string().min(1),
+  "cpf": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "email": zod.string().optional(),
+  "address": zod.string().optional(),
+  "birthDate": zod.string().optional(),
+  "notes": zod.string().optional()
+})
+
+export const UpdateContactResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "cpf": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "address": zod.string().nullish(),
+  "birthDate": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Deletar contato
+ */
+export const DeleteContactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Buscar configurações
+ */
+export const GetSettingsResponse = zod.object({
+  "notificationEmail": zod.string().optional().describe('Email para receber notificações de novas OS'),
+  "smtpHost": zod.string().optional(),
+  "smtpPort": zod.string().optional(),
+  "smtpUser": zod.string().optional(),
+  "smtpPass": zod.string().optional(),
+  "companyName": zod.string().optional(),
+  "department": zod.string().optional()
+})
+
+
+/**
+ * @summary Atualizar configurações
+ */
+export const UpdateSettingsBody = zod.object({
+  "notificationEmail": zod.string().optional().describe('Email para receber notificações de novas OS'),
+  "smtpHost": zod.string().optional(),
+  "smtpPort": zod.string().optional(),
+  "smtpUser": zod.string().optional(),
+  "smtpPass": zod.string().optional(),
+  "companyName": zod.string().optional(),
+  "department": zod.string().optional()
+})
+
+export const UpdateSettingsResponse = zod.object({
+  "notificationEmail": zod.string().optional().describe('Email para receber notificações de novas OS'),
+  "smtpHost": zod.string().optional(),
+  "smtpPort": zod.string().optional(),
+  "smtpUser": zod.string().optional(),
+  "smtpPass": zod.string().optional(),
+  "companyName": zod.string().optional(),
+  "department": zod.string().optional()
+})
+
+
+/**
  * @summary Listar técnicos
  */
 export const ListTechniciansResponseItem = zod.object({

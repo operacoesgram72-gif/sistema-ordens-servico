@@ -11,6 +11,8 @@ tags:
   - name: service-orders
   - name: technicians
   - name: dashboard
+  - name: contacts
+  - name: settings
 
 paths:
   /healthz:
@@ -262,6 +264,106 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/IndicatorsData"
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: Listar contatos/funcionários
+      responses:
+        "200":
+          description: Lista de contatos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Cadastrar contato
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          description: Contato criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{id}:
+    patch:
+      operationId: updateContact
+      tags: [contacts]
+      summary: Atualizar contato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "200":
+          description: Contato atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      summary: Deletar contato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deletado
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Buscar configurações
+      responses:
+        "200":
+          description: Configurações
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsData"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Atualizar configurações
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsData"
+      responses:
+        "200":
+          description: Configurações atualizadas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SettingsData"
 
   /technicians:
     get:
@@ -712,3 +814,71 @@ components:
           type: string
         active:
           type: boolean
+
+    Contact:
+      type: object
+      required:
+        - id
+        - name
+        - createdAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        cpf:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        address:
+          type: ["string", "null"]
+        birthDate:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ContactInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+        cpf:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        birthDate:
+          type: string
+        notes:
+          type: string
+
+    SettingsData:
+      type: object
+      properties:
+        notificationEmail:
+          type: string
+          description: Email para receber notificações de novas OS
+        smtpHost:
+          type: string
+        smtpPort:
+          type: string
+        smtpUser:
+          type: string
+        smtpPass:
+          type: string
+        companyName:
+          type: string
+        department:
+          type: string

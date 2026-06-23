@@ -9,6 +9,7 @@ import {
   ListServiceOrdersQueryParams,
 } from "@workspace/api-zod";
 import { eq, and, gte, lte, like, or, sql } from "drizzle-orm";
+import { sendOsNotification } from "./settings";
 
 const router = Router();
 
@@ -157,6 +158,17 @@ router.post("/service-orders", async (req, res) => {
 
     const [enriched] = await enrichWithTechnician([created]);
     res.status(201).json(enriched);
+
+    // Fire email notification asynchronously (non-blocking)
+    sendOsNotification({
+      number: created.number,
+      title: created.title,
+      location: created.location,
+      priority: created.priority,
+      technicianName: (enriched as any).technicianName ?? null,
+      formatoServico: created.formatoServico ?? null,
+      estimatedValue: created.estimatedValue ? Number(created.estimatedValue) : null,
+    }).catch(() => {}); // already handled internally
   } catch (err) {
     req.log.error(err);
     res.status(400).json({ error: "Dados inválidos" });

@@ -11,6 +11,8 @@ import OSDetail from "@/pages/os-detail";
 import Tecnicos from "@/pages/tecnicos";
 import Indicadores from "@/pages/indicadores";
 import RegistrarOS from "@/pages/registrar-os";
+import Cadastros from "@/pages/cadastros";
+import Configuracoes from "@/pages/configuracoes";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -25,6 +27,8 @@ function ManagementRouter() {
         <Route path="/ordens/:id" component={OSDetail} />
         <Route path="/tecnicos" component={Tecnicos} />
         <Route path="/indicadores" component={Indicadores} />
+        <Route path="/cadastros" component={Cadastros} />
+        <Route path="/configuracoes" component={Configuracoes} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>

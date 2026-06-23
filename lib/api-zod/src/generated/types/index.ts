@@ -7,6 +7,8 @@
  */
 
 export * from './categoryCount';
+export * from './contact';
+export * from './contactInput';
 export * from './dashboardSummary';
 export * from './formatoIndicator';
 export * from './getDashboardIndicatorsParams';
@@ -36,6 +38,7 @@ export * from './serviceOrderUpdateFormatoServico';
 export * from './serviceOrderUpdatePriority';
 export * from './serviceOrderUpdateStatus';
 export * from './serviceOrderUpdateTipo';
+export * from './settingsData';
 export * from './signatureInput';
 export * from './statPoint';
 export * from './statusUpdate';
