@@ -175,6 +175,7 @@ export default function Ordens() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[110px]">Data</TableHead>
               <TableHead className="w-[100px]">Número</TableHead>
               <TableHead>Título / Local</TableHead>
               <TableHead>Tipo</TableHead>
@@ -183,7 +184,6 @@ export default function Ordens() {
               <TableHead>Prioridade</TableHead>
               <TableHead>Técnico</TableHead>
               <TableHead className="text-right">Valor Est.</TableHead>
-              <TableHead className="text-right">Data</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -202,6 +202,7 @@ export default function Ordens() {
                   Nenhuma ordem de serviço encontrada.
                 </TableCell>
               </TableRow>
+
             ) : (
               ordens?.map((os) => (
                 <TableRow 
@@ -209,6 +210,9 @@ export default function Ordens() {
                   className="cursor-pointer hover:bg-muted/50 transition-colors"
                   onClick={() => setLocation(`/ordens/${os.id}`)}
                 >
+                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    {format(new Date(os.createdAt), "dd/MM/yyyy")}
+                  </TableCell>
                   <TableCell className="font-mono font-medium text-primary">{os.number}</TableCell>
                   <TableCell>
                     <div className="font-medium truncate max-w-[200px]">{os.title}</div>
@@ -233,11 +237,8 @@ export default function Ordens() {
                   <TableCell className="text-sm">
                     {os.technicianName || <span className="text-muted-foreground italic">Não atribuído</span>}
                   </TableCell>
-                  <TableCell className="text-right text-sm font-mono text-amber-500">
+                  <TableCell className="text-right text-sm font-mono text-yellow-500">
                     {formatCurrency(os.estimatedValue)}
-                  </TableCell>
-                  <TableCell className="text-right text-sm text-muted-foreground whitespace-nowrap">
-                    {format(new Date(os.createdAt), "dd/MM/yyyy")}
                   </TableCell>
                 </TableRow>
               ))

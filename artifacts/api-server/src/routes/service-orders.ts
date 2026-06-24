@@ -24,9 +24,8 @@ const MARKET_RATES: Record<string, number> = {
 };
 
 function generateNumber(): string {
-  const year = new Date().getFullYear();
-  const rand = Math.floor(Math.random() * 90000) + 10000;
-  return `OS-${year}-${rand}`;
+  const rand = Math.floor(Math.random() * 9000) + 1000;
+  return `OS-${rand}`;
 }
 
 function parseDate(val: unknown): Date | undefined {

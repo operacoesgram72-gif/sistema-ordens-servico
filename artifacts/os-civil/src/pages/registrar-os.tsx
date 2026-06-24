@@ -2,7 +2,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, HardHat, TrendingUp } from "lucide-react";
+import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays } from "lucide-react";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -169,9 +170,17 @@ export default function RegistrarOS() {
                 <p className="text-sm text-muted-foreground">
                   Guarde o número acima para acompanhar seu chamado com o gestor.
                 </p>
-                <Button onClick={() => setSubmitted(null)} className="mt-2">
-                  Registrar Novo Chamado
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
+                  <Button onClick={() => setSubmitted(null)} variant="outline" className="flex-1">
+                    Registrar Novo Chamado
+                  </Button>
+                  <Link href="/pmoc">
+                    <Button className="flex-1 gap-2 w-full">
+                      <CalendarDays className="w-4 h-4" />
+                      Ver Cronograma PMOC
+                    </Button>
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ) : (
@@ -216,6 +225,7 @@ export default function RegistrarOS() {
                                     onSelect={field.onChange}
                                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                     initialFocus
+                                    className="[--cell-size:2.75rem] text-base"
                                   />
                                 </PopoverContent>
                               </Popover>
@@ -233,21 +243,6 @@ export default function RegistrarOS() {
                               <FormLabel>Local <span className="text-destructive">*</span></FormLabel>
                               <FormControl>
                                 <Input placeholder="Ex: Andar 3, Bloco B, Corredor" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        {/* Departamento */}
-                        <FormField
-                          control={form.control}
-                          name="department"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Departamento</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Ex: RH, Financeiro, Manutenção" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

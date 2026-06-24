@@ -187,6 +187,7 @@ export default function NovaOS() {
                             onSelect={field.onChange}
                             disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             initialFocus
+                            className="[--cell-size:2.75rem] text-base"
                           />
                         </PopoverContent>
                       </Popover>
