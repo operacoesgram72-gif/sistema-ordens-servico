@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp, Share2, Copy, BookUser, Settings2 } from "lucide-react";
+import { LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp, Share2, Copy, BookUser, Settings2, Wind } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
@@ -19,9 +19,15 @@ const navSections = [
     ],
   },
   {
+    label: "Manutenção",
+    items: [
+      { href: "/pmoc", label: "PMOC e Bebedouros", icon: Wind },
+    ],
+  },
+  {
     label: "Gestão",
     items: [
-      { href: "/tecnicos", label: "Equipe Técnica", icon: Users },
+      { href: "/tecnicos", label: "Equipes", icon: Users },
       { href: "/cadastros", label: "Dados Cadastrais", icon: BookUser },
     ],
   },

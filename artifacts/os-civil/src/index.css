@@ -80,19 +80,19 @@
   --sidebar: 224 20% 7%;
   --sidebar-foreground: 220 10% 90%;
   --sidebar-border: 224 20% 14%;
-  --sidebar-primary: 32 100% 55%;
-  --sidebar-primary-foreground: 224 20% 10%;
+  --sidebar-primary: 213 94% 52%;
+  --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 224 20% 14%;
   --sidebar-accent-foreground: 220 10% 90%;
-  --sidebar-ring: 32 100% 55%;
+  --sidebar-ring: 213 94% 52%;
 
   --popover: 224 20% 10%;
   --popover-foreground: 220 10% 90%;
   --popover-border: 224 20% 16%;
 
-  /* Primary is an energetic industrial amber/orange */
-  --primary: 32 100% 55%;
-  --primary-foreground: 224 20% 10%;
+  /* Primary blue — inspired by the Rede Amazônica brand */
+  --primary: 213 94% 52%;
+  --primary-foreground: 0 0% 100%;
 
   --secondary: 224 20% 16%;
   --secondary-foreground: 220 10% 90%;
@@ -107,9 +107,9 @@
   --destructive-foreground: 0 0% 100%;
 
   --input: 224 20% 16%;
-  --ring: 32 100% 55%;
+  --ring: 213 94% 52%;
 
-  --chart-1: 32 100% 55%;
+  --chart-1: 213 94% 52%;
   --chart-2: 210 100% 60%;
   --chart-3: 142 70% 45%;
   --chart-4: 280 80% 65%;
@@ -142,18 +142,18 @@
   --sidebar: 224 20% 7%;
   --sidebar-foreground: 220 10% 90%;
   --sidebar-border: 224 20% 14%;
-  --sidebar-primary: 32 100% 55%;
-  --sidebar-primary-foreground: 224 20% 10%;
+  --sidebar-primary: 213 94% 52%;
+  --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 224 20% 14%;
   --sidebar-accent-foreground: 220 10% 90%;
-  --sidebar-ring: 32 100% 55%;
+  --sidebar-ring: 213 94% 52%;
 
   --popover: 224 20% 10%;
   --popover-foreground: 220 10% 90%;
   --popover-border: 224 20% 16%;
 
-  --primary: 32 100% 55%;
-  --primary-foreground: 224 20% 10%;
+  --primary: 213 94% 52%;
+  --primary-foreground: 0 0% 100%;
 
   --secondary: 224 20% 16%;
   --secondary-foreground: 220 10% 90%;
@@ -168,7 +168,7 @@
   --destructive-foreground: 0 0% 100%;
 
   --input: 224 20% 16%;
-  --ring: 32 100% 55%;
+  --ring: 213 94% 52%;
 }
 
 @layer base {

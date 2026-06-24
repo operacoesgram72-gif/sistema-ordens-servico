@@ -13,6 +13,7 @@ import Indicadores from "@/pages/indicadores";
 import RegistrarOS from "@/pages/registrar-os";
 import Cadastros from "@/pages/cadastros";
 import Configuracoes from "@/pages/configuracoes";
+import Pmoc from "@/pages/pmoc";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ function ManagementRouter() {
         <Route path="/indicadores" component={Indicadores} />
         <Route path="/cadastros" component={Cadastros} />
         <Route path="/configuracoes" component={Configuracoes} />
+        <Route path="/pmoc" component={Pmoc} />
         <Route component={NotFound} />
       </Switch>
     </AppLayout>
@@ -41,9 +43,7 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Switch>
-            {/* Rota pública para funcionários — sem sidebar de gestão */}
             <Route path="/registrar" component={RegistrarOS} />
-            {/* Todas as outras rotas ficam dentro do layout de gestão */}
             <Route component={ManagementRouter} />
           </Switch>
         </WouterRouter>

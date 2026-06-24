@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, Save, X, Image as ImageIcon, TrendingUp } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Save, X, Paperclip, TrendingUp, Film } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -16,7 +16,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
@@ -33,7 +32,6 @@ const MARKET_RATES: Record<string, number> = {
 
 const formSchema = z.object({
   location: z.string().min(2, "Local obrigatório"),
-  department: z.string().optional(),
   description: z.string().optional(),
   category: z.enum(["manutencao", "conservacao", "limpeza", "preventiva", "construcao"]),
   priority: z.enum(["baixa", "media", "alta", "urgente"]),
@@ -44,18 +42,19 @@ const formSchema = z.object({
   photos: z.string().optional(),
 });
 
+type MediaFile = { src: string; type: "image" | "video"; name: string };
+
 export default function NovaOS() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
-  const [photosBase64, setPhotosBase64] = useState<string[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       location: "",
-      department: "",
       description: "",
       category: "manutencao",
       priority: "media",
@@ -70,29 +69,35 @@ export default function NovaOS() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    const base64Promises = files.map(
-      (file) =>
-        new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = (error) => reject(error);
-        })
+    const processed = await Promise.all(
+      files.map(
+        (file) =>
+          new Promise<MediaFile>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () =>
+              resolve({
+                src: reader.result as string,
+                type: file.type.startsWith("video/") ? "video" : "image",
+                name: file.name,
+              });
+            reader.onerror = reject;
+          })
+      )
     );
     try {
-      const base64Files = await Promise.all(base64Promises);
-      const newPhotos = [...photosBase64, ...base64Files];
-      setPhotosBase64(newPhotos);
-      form.setValue("photos", JSON.stringify(newPhotos));
+      const updated = [...mediaFiles, ...processed];
+      setMediaFiles(updated);
+      form.setValue("photos", JSON.stringify(updated.map((f) => f.src)));
     } catch {
-      toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
+      toast({ title: "Erro", description: "Falha ao processar arquivo", variant: "destructive" });
     }
   };
 
-  const removePhoto = (index: number) => {
-    const newPhotos = photosBase64.filter((_, i) => i !== index);
-    setPhotosBase64(newPhotos);
-    form.setValue("photos", JSON.stringify(newPhotos));
+  const removeMedia = (index: number) => {
+    const updated = mediaFiles.filter((_, i) => i !== index);
+    setMediaFiles(updated);
+    form.setValue("photos", JSON.stringify(updated.map((f) => f.src)));
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
@@ -107,7 +112,6 @@ export default function NovaOS() {
         data: {
           title: autoTitle,
           location: values.location,
-          department: values.department || undefined,
           description: values.description || undefined,
           category: values.category,
           priority: values.priority,
@@ -155,17 +159,24 @@ export default function NovaOS() {
                   control={form.control}
                   name="scheduledAt"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2 md:w-1/2 flex flex-col justify-end">
-                      <FormLabel>Data do Serviço</FormLabel>
+                    <FormItem className="md:col-span-2 md:w-1/2 flex flex-col">
+                      <FormLabel className="text-sm font-semibold">Data do Serviço</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
                               variant="outline"
-                              className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                              className={cn(
+                                "w-full pl-4 pr-3 py-5 text-left font-medium border-2 transition-colors",
+                                field.value
+                                  ? "border-primary text-foreground bg-primary/10"
+                                  : "border-border hover:border-primary/60 text-foreground"
+                              )}
                             >
-                              {field.value ? format(field.value, "dd/MM/yyyy") : <span>Escolha uma data...</span>}
-                              <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              <CalendarIcon className="mr-3 h-4 w-4 text-primary shrink-0" />
+                              {field.value
+                                ? <span className="text-primary font-semibold">{format(field.value, "dd/MM/yyyy")}</span>
+                                : <span className="text-muted-foreground">Escolha uma data...</span>}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
@@ -184,29 +195,15 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Local / Departamento */}
+                {/* Local */}
                 <FormField
                   control={form.control}
                   name="location"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-2">
                       <FormLabel>Local</FormLabel>
                       <FormControl>
                         <Input placeholder="Ex: Andar 3, Bloco B, Corredor Principal" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="department"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Departamento</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: RH, Financeiro, Manutenção" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -258,7 +255,7 @@ export default function NovaOS() {
                       </Select>
                       <FormMessage />
                       {estimativaAuto !== null && (
-                        <div className="flex items-center gap-2 mt-1.5 text-sm text-amber-500">
+                        <div className="flex items-center gap-2 mt-1.5 text-sm text-primary">
                           <TrendingUp className="w-3.5 h-3.5" />
                           <span>Estimativa de mercado: <strong>R$ {estimativaAuto.toLocaleString("pt-BR")}</strong></span>
                         </div>
@@ -315,7 +312,7 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Técnico Responsável — texto livre */}
+                {/* Técnico Responsável */}
                 <FormField
                   control={form.control}
                   name="technicianName"
@@ -349,34 +346,47 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Fotos */}
+                {/* Anexos (imagens e vídeos) */}
                 <div className="md:col-span-2 space-y-3">
-                  <Label>Fotos do Serviço</Label>
+                  <Label>Anexos (Imagens e Vídeos)</Label>
                   <div className="flex items-center gap-4">
-                    <Button variant="outline" type="button" onClick={() => document.getElementById("photo-upload")?.click()}>
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Anexar Imagens
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => document.getElementById("media-upload")?.click()}
+                      className="gap-2"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                      Anexar Mídia
                     </Button>
+                    <span className="text-xs text-muted-foreground">Imagens e vídeos suportados</span>
                     <input
-                      id="photo-upload"
+                      id="media-upload"
                       type="file"
-                      accept="image/*"
+                      accept="image/*,video/*"
                       multiple
                       className="hidden"
                       onChange={handleFileChange}
                     />
                   </div>
-                  {photosBase64.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-4">
-                      {photosBase64.map((src, idx) => (
-                        <div key={idx} className="relative group rounded-md overflow-hidden border border-border">
-                          <img src={src} alt="Preview" className="w-full h-24 object-cover" />
+                  {mediaFiles.length > 0 && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
+                      {mediaFiles.map((file, idx) => (
+                        <div key={idx} className="relative group rounded-md overflow-hidden border border-border bg-muted/20">
+                          {file.type === "image" ? (
+                            <img src={file.src} alt="Preview" className="w-full h-24 object-cover" />
+                          ) : (
+                            <div className="w-full h-24 flex flex-col items-center justify-center gap-1 text-muted-foreground">
+                              <Film className="w-6 h-6 text-primary" />
+                              <span className="text-[10px] text-center px-1 truncate w-full text-center leading-tight">{file.name}</span>
+                            </div>
+                          )}
                           <button
                             type="button"
-                            onClick={() => removePhoto(idx)}
-                            className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => removeMedia(idx)}
+                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       ))}

@@ -1,14 +1,106 @@
 import { useState, useEffect } from "react";
-import { Save, Bell, Share2, Copy, CheckCircle2, Mail, Server, Info, Send, XCircle, Loader2, ExternalLink } from "lucide-react";
+import {
+  Save, Bell, Share2, Copy, CheckCircle2, Mail, Server, Info,
+  Send, XCircle, Loader2, ExternalLink, Plug, Plus, Trash2, Eye, EyeOff,
+} from "lucide-react";
 import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 type TestResult = { ok: true } | { ok: false; error: string } | null;
+
+type Integration = {
+  id: string;
+  name: string;
+  description: string;
+  logo: string;
+  category: string;
+  docsUrl: string;
+};
+
+type SavedConnection = {
+  id: string;
+  integrationId: string;
+  label: string;
+  apiKey: string;
+  endpointUrl: string;
+};
+
+const AVAILABLE_INTEGRATIONS: Integration[] = [
+  {
+    id: "power-bi",
+    name: "Power BI",
+    description: "Visualize dados do sistema em dashboards do Power BI via API REST.",
+    logo: "📊",
+    category: "Business Intelligence",
+    docsUrl: "https://learn.microsoft.com/pt-br/power-bi/developer/embedded/",
+  },
+  {
+    id: "power-apps",
+    name: "Power Apps",
+    description: "Conecte formulários e fluxos do Power Apps ao sistema via conector personalizado.",
+    logo: "⚡",
+    category: "Low-Code",
+    docsUrl: "https://learn.microsoft.com/pt-br/power-apps/",
+  },
+  {
+    id: "google-sheets",
+    name: "Google Sheets",
+    description: "Exporte ordens de serviço automaticamente para uma planilha do Google.",
+    logo: "📋",
+    category: "Planilhas",
+    docsUrl: "https://developers.google.com/sheets/api",
+  },
+  {
+    id: "supabase",
+    name: "Supabase",
+    description: "Sincronize dados com um banco Supabase para backup ou análise externa.",
+    logo: "🔗",
+    category: "Banco de Dados",
+    docsUrl: "https://supabase.com/docs",
+  },
+  {
+    id: "google-forms",
+    name: "Google Forms",
+    description: "Importe respostas de formulários do Google como novas ordens de serviço.",
+    logo: "📝",
+    category: "Formulários",
+    docsUrl: "https://developers.google.com/forms/api",
+  },
+  {
+    id: "power-automate",
+    name: "Power Automate",
+    description: "Crie fluxos automáticos no Power Automate acionados por eventos do sistema.",
+    logo: "🔄",
+    category: "Automação",
+    docsUrl: "https://learn.microsoft.com/pt-br/power-automate/",
+  },
+  {
+    id: "zapier",
+    name: "Zapier",
+    description: "Conecte o sistema a mais de 6.000 aplicativos via webhooks do Zapier.",
+    logo: "⚡",
+    category: "Automação",
+    docsUrl: "https://zapier.com/help/create/code-webhooks",
+  },
+  {
+    id: "slack",
+    name: "Slack",
+    description: "Envie notificações de novas OS ou alertas para canais do Slack.",
+    logo: "💬",
+    category: "Comunicação",
+    docsUrl: "https://api.slack.com/messaging/webhooks",
+  },
+];
+
+function genId() {
+  return Math.random().toString(36).slice(2, 9);
+}
 
 export default function Configuracoes() {
   const { toast } = useToast();
@@ -26,6 +118,11 @@ export default function Configuracoes() {
     smtpUser: "",
     smtpPass: "",
   });
+
+  const [connections, setConnections] = useState<SavedConnection[]>([]);
+  const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [connForm, setConnForm] = useState({ label: "", apiKey: "", endpointUrl: "" });
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (settings) {
@@ -83,6 +180,21 @@ export default function Configuracoes() {
     }
   };
 
+  const saveConnection = (integrationId: string) => {
+    if (!connForm.label.trim()) return;
+    setConnections((prev) => [
+      ...prev,
+      { id: genId(), integrationId, ...connForm },
+    ]);
+    setConnForm({ label: "", apiKey: "", endpointUrl: "" });
+    setAddingFor(null);
+    toast({ title: "Conexão salva!", description: "Integração configurada com sucesso." });
+  };
+
+  const removeConnection = (id: string) => setConnections((prev) => prev.filter((c) => c.id !== id));
+
+  const toggleShowKey = (id: string) => setShowKey((prev) => ({ ...prev, [id]: !prev[id] }));
+
   if (isLoading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[50vh]">
@@ -93,11 +205,13 @@ export default function Configuracoes() {
 
   const smtpComplete = form.smtpHost && form.smtpPort && form.smtpUser && form.smtpPass && form.notificationEmail;
 
+  const categories = [...new Set(AVAILABLE_INTEGRATIONS.map((i) => i.category))];
+
   return (
     <div className="p-6 md:p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground mt-1">Ajustes do sistema, notificações e compartilhamento.</p>
+        <p className="text-muted-foreground mt-1">Ajustes do sistema, notificações e integrações.</p>
       </div>
 
       {/* Notificações por E-mail */}
@@ -142,9 +256,8 @@ export default function Configuracoes() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* SMTP guidance */}
-          <div className="rounded-md bg-amber-950/30 border border-amber-700/50 p-4 space-y-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
+          <div className="rounded-md bg-primary/5 border border-primary/20 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary">
               <Info className="w-4 h-4 shrink-0" />
               Erro 535 Authentication Failed? Veja como corrigir:
             </div>
@@ -158,17 +271,17 @@ export default function Configuracoes() {
                 <li>Confirme que SMTP está habilitado em <span className="font-mono bg-muted px-1 rounded">Configurações → E-mail → IMAP/POP/SMTP</span></li>
               </ol>
               <a href="https://www.zoho.com/mail/help/zoho-smtp.html" target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 underline underline-offset-2 mt-1">
+                className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 underline underline-offset-2 mt-1">
                 <ExternalLink className="w-3 h-3" />Documentação SMTP do Zoho
               </a>
             </div>
 
-            <div className="border-t border-amber-700/30 pt-2 space-y-1">
+            <div className="border-t border-primary/20 pt-2 space-y-1">
               <p className="text-xs font-semibold text-foreground">Gmail (smtp.gmail.com)</p>
               <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
                 <li>Ative a <strong className="text-foreground">Verificação em duas etapas</strong> na sua conta Google</li>
                 <li>Acesse <span className="font-mono bg-muted px-1 rounded">myaccount.google.com/apppasswords</span> e crie uma <strong className="text-foreground">Senha de App</strong></li>
-                <li>Use essa senha de 16 caracteres — <strong className="text-amber-400">nunca a senha normal da conta</strong></li>
+                <li>Use essa senha de 16 caracteres — <strong className="text-primary">nunca a senha normal da conta</strong></li>
               </ol>
             </div>
           </div>
@@ -192,7 +305,6 @@ export default function Configuracoes() {
             </div>
           </div>
 
-          {/* Test email result feedback */}
           {testResult && (
             <div className={`rounded-md border p-3 flex items-start gap-2 text-sm ${
               testResult.ok
@@ -210,7 +322,6 @@ export default function Configuracoes() {
             </div>
           )}
 
-          {/* Test button */}
           <div className="flex justify-end">
             <Button
               variant="outline"
@@ -218,9 +329,7 @@ export default function Configuracoes() {
               disabled={!smtpComplete || testing}
               className="gap-2"
             >
-              {testing
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Send className="w-4 h-4" />}
+              {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               {testing ? "Enviando..." : "Testar Envio"}
             </Button>
           </div>
@@ -248,6 +357,153 @@ export default function Configuracoes() {
           <p className="text-xs text-muted-foreground">
             O funcionário preenche o formulário e recebe um número de protocolo. Nenhuma informação de gestão é visível nessa página.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Integrações */}
+      <Card className="bg-card border-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Plug className="w-5 h-5 text-primary" />
+            Integrações e Conexões
+          </CardTitle>
+          <CardDescription>
+            Conecte o sistema a outras plataformas para compartilhamento, análise e automação.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+
+          {/* Conexões ativas */}
+          {connections.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Conexões Ativas</p>
+              {connections.map((conn) => {
+                const integration = AVAILABLE_INTEGRATIONS.find((i) => i.id === conn.integrationId);
+                return (
+                  <div key={conn.id} className="flex items-center gap-3 p-3 rounded-md border border-border/70 bg-muted/20 group">
+                    <span className="text-lg">{integration?.logo}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{conn.label}</span>
+                        <Badge variant="outline" className="text-[10px] py-0 text-emerald-400 border-emerald-700/50">Configurado</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{integration?.name}</p>
+                      {conn.endpointUrl && (
+                        <p className="text-xs text-muted-foreground truncate">{conn.endpointUrl}</p>
+                      )}
+                      {conn.apiKey && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {showKey[conn.id] ? conn.apiKey : "••••••••••••••••"}
+                          </span>
+                          <button onClick={() => toggleShowKey(conn.id)} className="text-muted-foreground hover:text-foreground">
+                            {showKey[conn.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeConnection(conn.id)}
+                      className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Integrações disponíveis por categoria */}
+          {categories.map((category) => (
+            <div key={category} className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">{category}</p>
+              <div className="grid grid-cols-1 gap-2">
+                {AVAILABLE_INTEGRATIONS.filter((i) => i.category === category).map((integration) => {
+                  const isAdding = addingFor === integration.id;
+                  const connCount = connections.filter((c) => c.integrationId === integration.id).length;
+
+                  return (
+                    <div key={integration.id} className="rounded-md border border-border/70 bg-muted/20 overflow-hidden">
+                      <div className="flex items-center gap-3 p-3">
+                        <span className="text-xl shrink-0">{integration.logo}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{integration.name}</span>
+                            {connCount > 0 && (
+                              <Badge variant="outline" className="text-[10px] py-0 text-emerald-400 border-emerald-700/50">
+                                {connCount} conexão{connCount > 1 ? "ões" : ""}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground leading-snug">{integration.description}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <a
+                            href={integration.docsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                            title="Ver documentação"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                          <Button
+                            size="sm"
+                            variant={isAdding ? "default" : "outline"}
+                            className="gap-1.5 h-7 text-xs"
+                            onClick={() => {
+                              setAddingFor(isAdding ? null : integration.id);
+                              setConnForm({ label: "", apiKey: "", endpointUrl: "" });
+                            }}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            {isAdding ? "Cancelar" : "Conectar"}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {isAdding && (
+                        <div className="px-4 pb-4 pt-1 border-t border-border/50 space-y-3 bg-card/40">
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Nome da Conexão *</Label>
+                            <Input
+                              placeholder="Ex: Planilha OS 2025"
+                              value={connForm.label}
+                              onChange={(e) => setConnForm(f => ({ ...f, label: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">URL / Endpoint</Label>
+                            <Input
+                              placeholder="https://..."
+                              value={connForm.endpointUrl}
+                              onChange={(e) => setConnForm(f => ({ ...f, endpointUrl: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs">Chave de API / Token</Label>
+                            <Input
+                              type="password"
+                              placeholder="Cole sua chave aqui"
+                              value={connForm.apiKey}
+                              onChange={(e) => setConnForm(f => ({ ...f, apiKey: e.target.value }))}
+                            />
+                          </div>
+                          <div className="flex justify-end">
+                            <Button size="sm" className="gap-1.5" onClick={() => saveConnection(integration.id)}>
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              Salvar Conexão
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
