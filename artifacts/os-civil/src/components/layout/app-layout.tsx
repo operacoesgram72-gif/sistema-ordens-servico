@@ -3,19 +3,39 @@ import { LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp, Share2, 
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+const navSections = [
+  {
+    label: "Visão Geral",
+    items: [
+      { href: "/", label: "Painel de Controle", icon: LayoutDashboard },
+      { href: "/indicadores", label: "Indicadores", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "Ordens de Serviço",
+    items: [
+      { href: "/ordens", label: "Listar OS", icon: ClipboardList },
+      { href: "/ordens/nova", label: "Nova OS", icon: PlusCircle },
+    ],
+  },
+  {
+    label: "Gestão",
+    items: [
+      { href: "/tecnicos", label: "Equipe Técnica", icon: Users },
+      { href: "/cadastros", label: "Dados Cadastrais", icon: BookUser },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { href: "/configuracoes", label: "Configurações", icon: Settings2 },
+    ],
+  },
+];
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { toast } = useToast();
-
-  const navItems = [
-    { href: "/", label: "Painel de Controle", icon: LayoutDashboard },
-    { href: "/indicadores", label: "Indicadores", icon: TrendingUp },
-    { href: "/ordens", label: "Ordens de Serviço", icon: ClipboardList },
-    { href: "/ordens/nova", label: "Nova OS", icon: PlusCircle },
-    { href: "/tecnicos", label: "Equipe Técnica", icon: Users },
-    { href: "/cadastros", label: "Dados Cadastrais", icon: BookUser },
-    { href: "/configuracoes", label: "Configurações", icon: Settings2 },
-  ];
 
   const employeeUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/registrar`;
 
@@ -24,6 +44,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       toast({ title: "Link copiado!", description: "Envie para os funcionários registrarem chamados." });
     });
   };
+
+  const isActive = (href: string) =>
+    href === "/" ? location === "/" : location === href || location.startsWith(href + "/");
 
   return (
     <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground dark">
@@ -52,28 +75,35 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map((item) => {
-            const isActive =
-              item.href === "/"
-                ? location === "/"
-                : location === item.href || location.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-primary/10 text-primary"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-              >
-                <item.icon className={cn("w-5 h-5 mr-3", isActive ? "text-primary" : "text-muted-foreground")} />
-                {item.label}
-              </Link>
-            );
-          })}
+        {/* Navegação por seções */}
+        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
+          {navSections.map((section) => (
+            <div key={section.label}>
+              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                {section.label}
+              </p>
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = isActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                        active
+                          ? "bg-primary/10 text-primary"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <item.icon className={cn("w-4 h-4 mr-3 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Link para funcionários */}
