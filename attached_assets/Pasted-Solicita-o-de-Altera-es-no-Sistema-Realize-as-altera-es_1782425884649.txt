@@ -1,0 +1,94 @@
+Solicitação de Alterações no Sistema
+
+Realize as alterações abaixo mantendo todas as funcionalidades atuais do sistema. Não remova, altere ou quebre recursos já existentes, exceto onde especificado.
+
+1. Novo menu de acesso para Funcionários
+
+Antes da tela "Nova Ordem de Serviço", criar uma tela de menu exclusiva para funcionários contendo três botões:
+
+Inserir Ordem de Serviço
+Ao clicar, direcionar para a página Nova Ordem de Serviço.
+PMOC e Bebedouros
+Ao clicar, direcionar para a página de Cronograma PMOC e Bebedouros.
+Retirada de Materiais e Ferramentas
+Ao clicar, direcionar para a nova página de registro de retirada e entrega de materiais.
+2. Página de Retirada de Materiais e Ferramentas
+
+Adicionar uma nova opção no menu lateral denominada:
+
+Retirada de Materiais e Ferramentas
+
+Nesta página criar um formulário contendo os seguintes campos:
+
+Data
+Tipo de material/ferramenta
+Quantidade
+Justificativa
+Inserção de foto
+Caixa de seleção (radio button ou dropdown) com as opções:
+Retirada
+Entrega
+
+Todos os registros devem ser gravados automaticamente e ficar disponíveis para consulta, edição e exclusão.
+
+3. Cronograma PMOC e Bebedouros
+
+Aumentar a largura e melhorar o aproveitamento da tela da tabela de cronograma, tornando-a mais confortável para visualização e edição.
+
+4. Salvamento Automático
+
+Na página de PMOC e Bebedouros:
+
+salvar automaticamente qualquer alteração realizada na tabela;
+não exigir botão "Salvar";
+manter a possibilidade de:
+editar registros;
+excluir registros;
+atualizar informações posteriormente.
+5. Separação por Estados
+
+Na página PMOC e Bebedouros, abaixo da tabela principal (ou na posição mais adequada), criar abas independentes para:
+
+Amazonas
+Amapá
+Acre
+Rondônia
+Roraima
+Interiores
+
+Cada aba deverá possuir:
+
+tabela própria;
+mesmo layout;
+mesmas colunas;
+mesmas funcionalidades;
+salvamento automático;
+edição;
+exclusão.
+
+Os dados de uma aba não podem interferir nas demais.
+
+6. Notificação por E-mail da Ordem de Serviço
+
+Atualmente o e-mail enviado após o registro da Ordem de Serviço não contém a descrição do serviço executado.
+
+Alterar o envio para que o corpo do e-mail também apresente a Descrição do Serviço Executado, mantendo todas as demais informações já existentes.
+
+7. Indicadores
+
+Na seção Indicadores, remover os textos explicativos das legendas.
+
+Manter apenas:
+
+as legendas em cores;
+a identificação correspondente a cada cor.
+
+O objetivo é deixar a interface mais limpa, organizada e de fácil visualização.
+
+Requisitos Gerais
+Não alterar funcionalidades existentes que não estejam descritas nesta solicitação.
+Manter o mesmo padrão visual do sistema.
+Garantir compatibilidade com dispositivos móveis e computadores.
+Garantir que todos os novos registros utilizem o mesmo banco de dados já existente.
+Não criar tabelas duplicadas ou estruturas que possam causar perda de dados.
+Verificar se todas as alterações permanecem funcionais após a implementação.
