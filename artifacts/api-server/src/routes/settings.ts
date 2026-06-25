@@ -161,6 +161,7 @@ export async function sendOsNotification(os: {
   title: string;
   location: string;
   priority: string;
+  description?: string | null;
   technicianName?: string | null;
   formatoServico?: string | null;
   estimatedValue?: number | null;
@@ -168,6 +169,10 @@ export async function sendOsNotification(os: {
   const valor = os.estimatedValue
     ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(os.estimatedValue)
     : "Não definido";
+
+  const descriptionRow = os.description
+    ? `<tr><td style="padding:6px 0;color:#666;vertical-align:top">Descrição</td><td style="white-space:pre-wrap">${os.description}</td></tr>`
+    : "";
 
   const result = await attemptSendEmail({
     subject: `[Nova OS] ${os.number} — ${os.location}`,
@@ -184,6 +189,7 @@ export async function sendOsNotification(os: {
             <tr><td style="padding:6px 0;color:#666">Prioridade</td><td>${os.priority}</td></tr>
             <tr><td style="padding:6px 0;color:#666">Formato</td><td>${os.formatoServico || "-"}</td></tr>
             <tr><td style="padding:6px 0;color:#666">Técnico</td><td>${os.technicianName || "Não atribuído"}</td></tr>
+            ${descriptionRow}
             <tr><td style="padding:6px 0;color:#666">Valor Estimado</td><td style="color:#f59e0b;font-weight:bold">${valor}</td></tr>
           </table>
         </div>

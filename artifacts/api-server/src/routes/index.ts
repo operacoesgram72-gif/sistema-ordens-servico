@@ -5,6 +5,7 @@ import techniciansRouter from "./technicians";
 import dashboardRouter from "./dashboard";
 import contactsRouter from "./contacts";
 import settingsRouter from "./settings";
+import materialWithdrawalsRouter from "./material-withdrawals";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(techniciansRouter);
 router.use(dashboardRouter);
 router.use(contactsRouter);
 router.use(settingsRouter);
+router.use(materialWithdrawalsRouter);
 
 export default router;

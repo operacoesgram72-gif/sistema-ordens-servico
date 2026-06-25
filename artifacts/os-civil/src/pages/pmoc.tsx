@@ -1,9 +1,8 @@
-import React, { useState } from "react";
-import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Eye } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import React, { useState, useEffect, useCallback } from "react";
+import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -41,6 +40,24 @@ type PmocRow = {
   observacao: string;
 };
 
+type EditingCell =
+  | { rowId: string; field: "cod" | "modelo" | "tensao" | "btu" | "local" | "tipoArea" | "linkFicha" | "observacao" }
+  | { rowId: string; field: "execucao"; quarter: QuarterKey }
+  | null;
+
+type PhotoDialogState = { rowId: string; quarter: QuarterKey } | null;
+
+const STATE_TABS = [
+  { key: "amazonas", label: "Amazonas" },
+  { key: "amapa", label: "Amapá" },
+  { key: "acre", label: "Acre" },
+  { key: "rondonia", label: "Rondônia" },
+  { key: "roraima", label: "Roraima" },
+  { key: "interiores", label: "Interiores" },
+] as const;
+
+type StateTabKey = "amazonas" | "amapa" | "acre" | "rondonia" | "roraima" | "interiores";
+
 function genId() {
   return Math.random().toString(36).slice(2, 9);
 }
@@ -70,21 +87,41 @@ const defaultRows: PmocRow[] = [
   },
 ];
 
-type EditingCell =
-  | { rowId: string; field: "cod" | "modelo" | "tensao" | "btu" | "local" | "tipoArea" | "linkFicha" | "observacao" }
-  | { rowId: string; field: "execucao"; quarter: QuarterKey }
-  | null;
+function loadRows(storageKey: string, fallback: PmocRow[]): PmocRow[] {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (raw) return JSON.parse(raw) as PmocRow[];
+  } catch {}
+  return fallback;
+}
 
-type PhotoDialogState = { rowId: string; quarter: QuarterKey } | null;
+function saveRows(storageKey: string, rows: PmocRow[]) {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(rows));
+  } catch {}
+}
 
-export default function Pmoc() {
+interface PmocTableProps {
+  storageKey: string;
+  initialRows?: PmocRow[];
+}
+
+function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const { toast } = useToast();
-  const [rows, setRows] = useState<PmocRow[]>(defaultRows);
+  const [rows, setRowsRaw] = useState<PmocRow[]>(() => loadRows(storageKey, initialRows));
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
   const [editValue, setEditValue] = useState("");
   const [photoDialog, setPhotoDialog] = useState<PhotoDialogState>(null);
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
+
+  const setRows = useCallback((updater: PmocRow[] | ((prev: PmocRow[]) => PmocRow[])) => {
+    setRowsRaw(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      saveRows(storageKey, next);
+      return next;
+    });
+  }, [storageKey]);
 
   const addRow = () => {
     const nextCod = `AR${String(rows.length + 1).padStart(3, "0")}`;
@@ -152,7 +189,8 @@ export default function Pmoc() {
     }));
   };
 
-  const getRowField = (row: PmocRow, field: string) => (row as any)[field] ?? "";
+  const dialogRow = photoDialog ? rows.find(r => r.id === photoDialog.rowId) : null;
+  const dialogPhotos = dialogRow && photoDialog ? dialogRow[photoDialog.quarter].fotos : [];
 
   const EditableCell = ({ rowId, field, value, quarter, className = "" }: {
     rowId: string; field: any; value: string; quarter?: QuarterKey; className?: string;
@@ -160,7 +198,7 @@ export default function Pmoc() {
     const isEditing = editingCell &&
       editingCell.rowId === rowId &&
       editingCell.field === field &&
-      ("quarter" in editingCell ? editingCell.quarter === quarter : true);
+      ("quarter" in editingCell ? editingCell.quarter === quarter : !("quarter" in editingCell) || quarter === undefined);
 
     if (isEditing) {
       return (
@@ -189,22 +227,10 @@ export default function Pmoc() {
     );
   };
 
-  const dialogRow = photoDialog ? rows.find(r => r.id === photoDialog.rowId) : null;
-  const dialogPhotos = dialogRow && photoDialog ? dialogRow[photoDialog.quarter].fotos : [];
-
   return (
-    <div className="p-4 md:p-6 max-w-full mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Wind className="w-7 h-7 text-primary" />
-            PMOC e Bebedouros
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Cronograma anual de manutenção preventiva. Clique em qualquer célula para editar.
-          </p>
-        </div>
-        <Button onClick={addRow} className="gap-2 shrink-0">
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <Button onClick={addRow} size="sm" className="gap-2">
           <Plus className="w-4 h-4" />
           Adicionar Equipamento
         </Button>
@@ -222,7 +248,6 @@ export default function Pmoc() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-
             {dialogPhotos.length > 0 && (
               <div className="space-y-2 max-h-52 overflow-y-auto">
                 {dialogPhotos.map(photo => (
@@ -238,27 +263,13 @@ export default function Pmoc() {
                 ))}
               </div>
             )}
-
             <div className="space-y-2 pt-2 border-t border-border/50">
               <p className="text-xs text-muted-foreground font-medium">Adicionar novo link de foto</p>
               <div className="space-y-2">
-                <Input
-                  placeholder="URL da foto (Google Drive, Photos, etc.)"
-                  value={newPhotoUrl}
-                  onChange={e => setNewPhotoUrl(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addPhoto()}
-                  className="text-sm"
-                />
-                <Input
-                  placeholder="Nome/descrição (opcional)"
-                  value={newPhotoLabel}
-                  onChange={e => setNewPhotoLabel(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addPhoto()}
-                  className="text-sm"
-                />
+                <Input placeholder="URL da foto (Google Drive, Photos, etc.)" value={newPhotoUrl} onChange={e => setNewPhotoUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && addPhoto()} className="text-sm" />
+                <Input placeholder="Nome/descrição (opcional)" value={newPhotoLabel} onChange={e => setNewPhotoLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && addPhoto()} className="text-sm" />
                 <Button onClick={addPhoto} size="sm" className="w-full gap-2">
-                  <Plus className="w-4 h-4" />
-                  Adicionar Foto
+                  <Plus className="w-4 h-4" />Adicionar Foto
                 </Button>
               </div>
             </div>
@@ -266,34 +277,33 @@ export default function Pmoc() {
         </div>
       )}
 
-      {/* Tabela PMOC */}
       <Card className="bg-card border-border/50">
         <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-xs border-collapse" style={{ minWidth: "1200px" }}>
+          <table className="w-full text-xs border-collapse" style={{ minWidth: "1600px" }}>
             <thead>
               <tr className="bg-muted/40 border-b border-border">
-                <th className="text-left px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 whitespace-nowrap w-16">Cod.</th>
-                <th className="text-left px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 min-w-[130px]">Modelo</th>
-                <th className="text-center px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 w-16">Tensão (V)</th>
-                <th className="text-center px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 w-16">BTU (s)</th>
-                <th className="text-left px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 min-w-[120px]">Local</th>
-                <th className="text-left px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 w-24">Tipo de Área</th>
-                <th className="text-left px-2 py-2 font-semibold text-muted-foreground border-r border-border/40 w-20">Link da Ficha</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 whitespace-nowrap w-20">Cod.</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[160px]">Modelo</th>
+                <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20">Tensão (V)</th>
+                <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20">BTU (s)</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[150px]">Local</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-28">Tipo de Área</th>
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-24">Link da Ficha</th>
                 {QUARTERS.map(q => (
-                  <th key={q.key} colSpan={3} className="text-center px-2 py-2 font-semibold text-primary border-r border-border/40 bg-primary/5 whitespace-nowrap">
+                  <th key={q.key} colSpan={3} className="text-center px-3 py-2.5 font-semibold text-primary border-r border-border/40 bg-primary/5 whitespace-nowrap">
                     {q.label}
                   </th>
                 ))}
-                <th className="text-left px-2 py-2 font-semibold text-muted-foreground min-w-[120px]">Observação</th>
-                <th className="w-8" />
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground min-w-[140px]">Observação</th>
+                <th className="w-10" />
               </tr>
               <tr className="bg-muted/20 border-b border-border text-[10px] text-muted-foreground">
                 <th colSpan={7} />
                 {QUARTERS.map(q => (
                   <React.Fragment key={q.key}>
-                    <th className="text-center px-1 py-1 border-r border-border/30 font-normal">Execução</th>
-                    <th className="text-center px-1 py-1 border-r border-border/30 font-normal">OK</th>
-                    <th className="text-center px-1 py-1 border-r border-border/30 font-normal">Foto</th>
+                    <th className="text-center px-2 py-1.5 border-r border-border/30 font-normal min-w-[100px]">Execução</th>
+                    <th className="text-center px-2 py-1.5 border-r border-border/30 font-normal w-14">OK</th>
+                    <th className="text-center px-2 py-1.5 border-r border-border/30 font-normal w-14">Foto</th>
                   </React.Fragment>
                 ))}
                 <th />
@@ -303,35 +313,28 @@ export default function Pmoc() {
             <tbody className="divide-y divide-border/40">
               {rows.map((row) => (
                 <tr key={row.id} className="group hover:bg-muted/10 transition-colors">
-                  {/* Cod */}
-                  <td className="px-2 py-1.5 border-r border-border/30 font-mono font-bold text-primary">
+                  <td className="px-3 py-2 border-r border-border/30 font-mono font-bold text-primary">
                     <EditableCell rowId={row.id} field="cod" value={row.cod} />
                   </td>
-                  {/* Modelo */}
-                  <td className="px-2 py-1.5 border-r border-border/30">
+                  <td className="px-3 py-2 border-r border-border/30">
                     <EditableCell rowId={row.id} field="modelo" value={row.modelo} />
                   </td>
-                  {/* Tensão */}
-                  <td className="px-2 py-1.5 border-r border-border/30 text-center">
+                  <td className="px-3 py-2 border-r border-border/30 text-center">
                     <EditableCell rowId={row.id} field="tensao" value={row.tensao} className="text-center" />
                   </td>
-                  {/* BTU */}
-                  <td className="px-2 py-1.5 border-r border-border/30 text-center">
+                  <td className="px-3 py-2 border-r border-border/30 text-center">
                     <EditableCell rowId={row.id} field="btu" value={row.btu} className="text-center" />
                   </td>
-                  {/* Local */}
-                  <td className="px-2 py-1.5 border-r border-border/30">
+                  <td className="px-3 py-2 border-r border-border/30">
                     <EditableCell rowId={row.id} field="local" value={row.local} />
                   </td>
-                  {/* Tipo Área */}
-                  <td className="px-2 py-1.5 border-r border-border/30">
+                  <td className="px-3 py-2 border-r border-border/30">
                     <EditableCell rowId={row.id} field="tipoArea" value={row.tipoArea} />
                   </td>
-                  {/* Link da Ficha */}
-                  <td className="px-2 py-1.5 border-r border-border/30">
+                  <td className="px-3 py-2 border-r border-border/30">
                     {row.linkFicha ? (
                       <div className="flex items-center gap-1">
-                        <a href={row.linkFicha} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-mono truncate max-w-[60px]">
+                        <a href={row.linkFicha} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline font-mono truncate max-w-[70px]">
                           {row.cod}
                         </a>
                         <button onClick={() => startEdit(row.id, "linkFicha", undefined, row.linkFicha)} className="opacity-0 group-hover:opacity-60">
@@ -342,17 +345,14 @@ export default function Pmoc() {
                       <EditableCell rowId={row.id} field="linkFicha" value={row.linkFicha} />
                     )}
                   </td>
-                  {/* Quarters */}
                   {QUARTERS.map(q => {
                     const qdata = row[q.key as QuarterKey];
                     return (
                       <React.Fragment key={`${row.id}-${q.key}`}>
-                        {/* Execução */}
-                        <td className="px-2 py-1.5 border-r border-border/30 bg-primary/3">
+                        <td className="px-3 py-2 border-r border-border/30 bg-primary/[0.03]">
                           <EditableCell rowId={row.id} field="execucao" quarter={q.key as QuarterKey} value={qdata.execucao} />
                         </td>
-                        {/* OK */}
-                        <td className="px-1 py-1.5 border-r border-border/30 text-center bg-primary/3">
+                        <td className="px-2 py-2 border-r border-border/30 text-center bg-primary/[0.03]">
                           <button
                             onClick={() => toggleOk(row.id, q.key as QuarterKey)}
                             className={cn(
@@ -366,8 +366,7 @@ export default function Pmoc() {
                             {qdata.ok ? "OK" : "—"}
                           </button>
                         </td>
-                        {/* Foto */}
-                        <td className="px-1 py-1.5 border-r border-border/30 bg-primary/3 text-center">
+                        <td className="px-2 py-2 border-r border-border/30 bg-primary/[0.03] text-center">
                           <button
                             onClick={() => openPhotoDialog(row.id, q.key as QuarterKey)}
                             className={cn(
@@ -385,12 +384,10 @@ export default function Pmoc() {
                       </React.Fragment>
                     );
                   })}
-                  {/* Observação */}
-                  <td className="px-2 py-1.5">
+                  <td className="px-3 py-2">
                     <EditableCell rowId={row.id} field="observacao" value={row.observacao} />
                   </td>
-                  {/* Remover */}
-                  <td className="px-1 py-1.5 text-center">
+                  <td className="px-2 py-2 text-center">
                     <button
                       onClick={() => removeRow(row.id)}
                       className="text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
@@ -402,7 +399,7 @@ export default function Pmoc() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={20} className="text-center py-10 text-muted-foreground">
+                  <td colSpan={24} className="text-center py-10 text-muted-foreground">
                     Nenhum equipamento cadastrado. Clique em "Adicionar Equipamento" para começar.
                   </td>
                 </tr>
@@ -413,8 +410,66 @@ export default function Pmoc() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        💡 Clique em qualquer célula de texto para editar · Clique no status para alternar OK · Clique no ícone de foto para gerenciar imagens via link
+        💡 Clique em qualquer célula para editar · Alterações salvas automaticamente · Clique no status para alternar OK · Clique no ícone de foto para gerenciar imagens
       </p>
+    </div>
+  );
+}
+
+export default function Pmoc() {
+  const [activeStateTab, setActiveStateTab] = useState<StateTabKey>("amazonas");
+
+  return (
+    <div className="p-4 md:p-6 w-full max-w-full space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <Wind className="w-7 h-7 text-primary" />
+            PMOC e Bebedouros
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Cronograma anual de manutenção preventiva. Alterações salvas automaticamente.
+          </p>
+        </div>
+      </div>
+
+      {/* Tabela Principal */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-primary border-primary/40 font-semibold px-3 py-1">
+            Tabela Principal
+          </Badge>
+        </div>
+        <PmocTable storageKey="pmoc_main" initialRows={defaultRows} />
+      </div>
+
+      {/* Abas por Estado */}
+      <div className="space-y-4">
+        <div className="border-b border-border">
+          <div className="flex gap-1 overflow-x-auto pb-0 scrollbar-hide">
+            {STATE_TABS.map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveStateTab(tab.key)}
+                className={cn(
+                  "px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
+                  activeStateTab === tab.key
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {STATE_TABS.map(tab => (
+          <div key={tab.key} className={cn(activeStateTab === tab.key ? "block" : "hidden")}>
+            <PmocTable storageKey={`pmoc_state_${tab.key}`} initialRows={[]} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

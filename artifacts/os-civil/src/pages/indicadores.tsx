@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useGetDashboardIndicators } from "@workspace/api-client-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -57,7 +57,7 @@ export default function Indicadores() {
         </div>
       </div>
 
-      {/* KPI Cards com legendas */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
@@ -66,7 +66,6 @@ export default function Indicadores() {
               <div className="text-sm font-medium text-muted-foreground">Total de OS no Ano</div>
             </div>
             <div className="text-3xl font-bold font-mono text-primary">{totalOs}</div>
-            <p className="text-xs text-muted-foreground mt-1">Ordens abertas em {selectedYear}</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -76,9 +75,6 @@ export default function Indicadores() {
               <div className="text-sm font-medium text-muted-foreground">OS Concluídas</div>
             </div>
             <div className="text-3xl font-bold font-mono text-emerald-500">{totalCompleted}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {totalOs > 0 ? `${Math.round((totalCompleted / totalOs) * 100)}% do total` : "Nenhuma OS ainda"}
-            </p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -88,7 +84,6 @@ export default function Indicadores() {
               <div className="text-sm font-medium text-muted-foreground">Valor Total Estimado</div>
             </div>
             <div className="text-3xl font-bold font-mono text-yellow-500">{formatCurrency(indicators.totalValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Soma estimada de todas as OS</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
@@ -98,7 +93,6 @@ export default function Indicadores() {
               <div className="text-sm font-medium text-muted-foreground">Valor Médio por OS</div>
             </div>
             <div className="text-3xl font-bold font-mono text-primary">{formatCurrency(avgValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Custo médio por ordem de serviço</p>
           </CardContent>
         </Card>
       </div>
@@ -109,9 +103,6 @@ export default function Indicadores() {
         <Card className="bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-lg">Volume Mensal de OS</CardTitle>
-            <CardDescription>
-              Quantidade de ordens abertas, concluídas e valor estimado mês a mês em {selectedYear}.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[320px] w-full">
@@ -139,6 +130,7 @@ export default function Indicadores() {
                       return value;
                     }}
                     wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                    iconSize={12}
                   />
                   <Bar yAxisId="left" dataKey="total" name="total" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                   <Bar yAxisId="left" dataKey="completed" name="completed" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -153,9 +145,6 @@ export default function Indicadores() {
         <Card className="bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-lg">Top 10 Locais com Mais OS</CardTitle>
-            <CardDescription>
-              Locais que mais abriram ordens de serviço no período. Identifica pontos críticos de manutenção.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[320px] w-full">
@@ -169,7 +158,7 @@ export default function Indicadores() {
                     itemStyle={{ color: "hsl(var(--foreground))" }}
                     formatter={(value: any) => [value, "Total de OS"]}
                   />
-                  <Legend formatter={() => "Quantidade de OS"} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
+                  <Legend formatter={() => "Quantidade de OS"} wrapperStyle={{ fontSize: 11, paddingTop: 8 }} iconSize={12} />
                   <Bar dataKey="total" name="total" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -183,9 +172,6 @@ export default function Indicadores() {
         <Card className="bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-lg">Projeção por Especialidade</CardTitle>
-            <CardDescription>
-              Valor estimado agrupado por tipo de serviço (civil, elétrico, hidráulico, etc.).
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="h-[200px] w-full">
@@ -198,7 +184,7 @@ export default function Indicadores() {
                     contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
                     formatter={(value: any) => [formatCurrency(value), "Valor Estimado"]}
                   />
-                  <Legend formatter={() => "Valor Estimado (R$)"} wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                  <Legend formatter={() => "Valor Estimado (R$)"} wrapperStyle={{ fontSize: 11, paddingTop: 4 }} iconSize={12} />
                   <Bar dataKey="estimatedValue" name="estimatedValue" fill="#eab308" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
@@ -236,9 +222,6 @@ export default function Indicadores() {
         <Card className="bg-card border-border/50">
           <CardHeader>
             <CardTitle className="text-lg">Desempenho por Técnico</CardTitle>
-            <CardDescription>
-              Total de OS, taxa de conclusão e valor estimado por responsável técnico.
-            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border border-border/50 rounded-md bg-card overflow-hidden">

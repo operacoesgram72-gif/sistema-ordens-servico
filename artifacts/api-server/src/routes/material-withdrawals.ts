@@ -1,0 +1,75 @@
+import { Router } from "express";
+import { db } from "@workspace/db";
+import { materialWithdrawalsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
+
+const router = Router();
+
+router.get("/material-withdrawals", async (req, res) => {
+  try {
+    const rows = await db
+      .select()
+      .from(materialWithdrawalsTable)
+      .orderBy(sql`${materialWithdrawalsTable.createdAt} DESC`);
+    res.json(rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+router.post("/material-withdrawals", async (req, res) => {
+  try {
+    const { date, tipoMaterial, quantidade, justificativa, foto, tipo } = req.body;
+    if (!date || !tipoMaterial || !quantidade || !justificativa || !tipo) {
+      res.status(400).json({ error: "Campos obrigatórios faltando" });
+      return;
+    }
+    const [created] = await db
+      .insert(materialWithdrawalsTable)
+      .values({ date, tipoMaterial, quantidade, justificativa, foto: foto ?? null, tipo })
+      .returning();
+    res.status(201).json(created);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+router.patch("/material-withdrawals/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { date, tipoMaterial, quantidade, justificativa, foto, tipo } = req.body;
+    const [updated] = await db
+      .update(materialWithdrawalsTable)
+      .set({
+        ...(date !== undefined && { date }),
+        ...(tipoMaterial !== undefined && { tipoMaterial }),
+        ...(quantidade !== undefined && { quantidade }),
+        ...(justificativa !== undefined && { justificativa }),
+        ...(foto !== undefined && { foto }),
+        ...(tipo !== undefined && { tipo }),
+        updatedAt: new Date(),
+      })
+      .where(eq(materialWithdrawalsTable.id, id))
+      .returning();
+    if (!updated) { res.status(404).json({ error: "Não encontrado" }); return; }
+    res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+router.delete("/material-withdrawals/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    await db.delete(materialWithdrawalsTable).where(eq(materialWithdrawalsTable.id, id));
+    res.status(204).send();
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+export default router;

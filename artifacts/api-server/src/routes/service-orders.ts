@@ -164,6 +164,7 @@ router.post("/service-orders", async (req, res) => {
       title: created.title,
       location: created.location,
       priority: created.priority,
+      description: created.description ?? null,
       technicianName: (enriched as any).technicianName ?? null,
       formatoServico: created.formatoServico ?? null,
       estimatedValue: created.estimatedValue ? Number(created.estimatedValue) : null,
