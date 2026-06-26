@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { Save, Image as ImageIcon, X, CheckCircle2, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,8 @@ export default function RegistrarMateriais() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fotoBase64, setFotoBase64] = useState<string | null>(null);
+  const search = useSearch();
+  const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
 
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10),
@@ -47,7 +49,7 @@ export default function RegistrarMateriais() {
       const res = await fetch(`${BASE_URL}/api/material-withdrawals`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, foto: fotoBase64 }),
+        body: JSON.stringify({ ...form, foto: fotoBase64, unidade: unitFromUrl }),
       });
       if (!res.ok) throw new Error("Erro ao registrar");
       setSubmitted(true);

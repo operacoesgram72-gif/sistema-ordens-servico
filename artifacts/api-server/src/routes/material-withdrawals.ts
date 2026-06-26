@@ -1,15 +1,20 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { materialWithdrawalsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 const router = Router();
 
 router.get("/material-withdrawals", async (req, res) => {
   try {
+    const unidade = req.query.unidade as string | undefined;
+    const conditions: any[] = [];
+    if (unidade) conditions.push(eq(materialWithdrawalsTable.unidade, unidade));
+
     const rows = await db
       .select()
       .from(materialWithdrawalsTable)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(sql`${materialWithdrawalsTable.createdAt} DESC`);
     res.json(rows);
   } catch (err) {
@@ -20,14 +25,14 @@ router.get("/material-withdrawals", async (req, res) => {
 
 router.post("/material-withdrawals", async (req, res) => {
   try {
-    const { date, tipoMaterial, quantidade, justificativa, foto, tipo } = req.body;
+    const { date, tipoMaterial, quantidade, justificativa, foto, tipo, unidade } = req.body;
     if (!date || !tipoMaterial || !quantidade || !justificativa || !tipo) {
       res.status(400).json({ error: "Campos obrigatórios faltando" });
       return;
     }
     const [created] = await db
       .insert(materialWithdrawalsTable)
-      .values({ date, tipoMaterial, quantidade, justificativa, foto: foto ?? null, tipo })
+      .values({ date, tipoMaterial, quantidade, justificativa, foto: foto ?? null, tipo, unidade: unidade || "AM" })
       .returning();
     res.status(201).json(created);
   } catch (err) {

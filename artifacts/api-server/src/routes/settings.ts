@@ -15,6 +15,11 @@ const SETTING_KEYS = [
   "smtpPass",
   "companyName",
   "department",
+  "webhookUrlWhatsapp",
+  "webhookUrlN8n",
+  "emailMonitoringAddress",
+  "emailMonitoringEnabled",
+  "defaultOrigem",
 ];
 
 async function getAllSettings(): Promise<Record<string, string>> {

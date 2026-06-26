@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { Download, Plus, Search, Printer, FileSpreadsheet } from "lucide-react";
+import { Download, Plus, Search, Printer, FileSpreadsheet, Camera } from "lucide-react";
 import { 
   useListServiceOrders, 
   ServiceOrderStatus, 
@@ -15,14 +15,24 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
+import { useUnit } from "@/contexts/unit-context";
+
+type HoveredPhoto = { src: string; x: number; y: number } | null;
+
+function parsePhotos(photosStr: string | null | undefined): string[] {
+  if (!photosStr) return [];
+  try { return JSON.parse(photosStr); } catch { return []; }
+}
 
 export default function Ordens() {
   const [, setLocation] = useLocation();
+  const { unit } = useUnit();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [period, setPeriod] = useState<string>("monthly");
   const [tipo, setTipo] = useState<string>("all");
   const [formato, setFormato] = useState<string>("all");
+  const [hoveredPhoto, setHoveredPhoto] = useState<HoveredPhoto>(null);
 
   const { data: ordens, isLoading } = useListServiceOrders(
     { 
@@ -30,9 +40,10 @@ export default function Ordens() {
       status: status !== "all" ? status : undefined, 
       period: period !== "all" ? (period as any) : undefined,
       tipo: tipo !== "all" ? (tipo as any) : undefined,
-      formatoServico: formato !== "all" ? (formato as any) : undefined
-    },
-    { query: { enabled: true, queryKey: ["service-orders", search, status, period, tipo, formato] } }
+      formatoServico: formato !== "all" ? (formato as any) : undefined,
+      unidade: unit,
+    } as any,
+    { query: { enabled: true, queryKey: ["service-orders", search, status, period, tipo, formato, unit] } }
   );
 
   const formatCurrency = (val?: number) => {
@@ -69,9 +80,7 @@ export default function Ordens() {
     document.body.removeChild(link);
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -87,7 +96,7 @@ export default function Ordens() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print-hide">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Ordens de Serviço</h1>
-          <p className="text-muted-foreground mt-1">Gerenciamento completo das atividades e chamados.</p>
+          <p className="text-muted-foreground mt-1">Unidade: <strong>{unit}</strong> — chamados e atividades.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" onClick={handlePrint} disabled={!ordens?.length}>
@@ -171,6 +180,25 @@ export default function Ordens() {
         </div>
       </Card>
 
+      {/* Photo hover preview (portal-like fixed overlay) */}
+      {hoveredPhoto && (
+        <div
+          style={{
+            position: "fixed",
+            left: hoveredPhoto.x + 14,
+            top: Math.max(8, hoveredPhoto.y - 130),
+            zIndex: 9999,
+            pointerEvents: "none",
+          }}
+        >
+          <img
+            src={hoveredPhoto.src}
+            alt="Preview"
+            className="w-52 h-52 object-cover rounded-xl shadow-2xl border-2 border-border"
+          />
+        </div>
+      )}
+
       <div className="border border-border/50 rounded-md bg-card overflow-x-auto">
         <Table>
           <TableHeader>
@@ -183,13 +211,14 @@ export default function Ordens() {
               <TableHead>Status</TableHead>
               <TableHead>Prioridade</TableHead>
               <TableHead>Técnico</TableHead>
+              <TableHead className="w-[70px]">Fotos</TableHead>
               <TableHead className="text-right">Valor Est.</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
                   <div className="flex items-center justify-center">
                     <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mr-2" />
                     Carregando ordens...
@@ -198,50 +227,76 @@ export default function Ordens() {
               </TableRow>
             ) : ordens?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-32 text-center text-muted-foreground">
-                  Nenhuma ordem de serviço encontrada.
+                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                  Nenhuma ordem de serviço encontrada para a unidade {unit}.
                 </TableCell>
               </TableRow>
-
             ) : (
-              ordens?.map((os) => (
-                <TableRow 
-                  key={os.id} 
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => setLocation(`/ordens/${os.id}`)}
-                >
-                  <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                    {format(new Date(os.createdAt), "dd/MM/yyyy")}
-                  </TableCell>
-                  <TableCell className="font-mono font-medium text-primary">{os.number}</TableCell>
-                  <TableCell>
-                    <div className="font-medium truncate max-w-[200px]">{os.title}</div>
-                    <div className="text-xs text-muted-foreground truncate max-w-[200px]">{os.location}</div>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {os.tipo ? TIPO_LABELS[os.tipo] : "-"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {os.formatoServico ? FORMATO_SERVICO_LABELS[os.formatoServico] : "-"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={STATUS_COLORS[os.status as ServiceOrderStatus]}>
-                      {STATUS_LABELS[os.status as ServiceOrderStatus]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority]}>
-                      {PRIORITY_LABELS[os.priority as ServiceOrderPriority]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {os.technicianName || <span className="text-muted-foreground italic">Não atribuído</span>}
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-mono text-yellow-500">
-                    {formatCurrency(os.estimatedValue)}
-                  </TableCell>
-                </TableRow>
-              ))
+              ordens?.map((os) => {
+                const photos = parsePhotos((os as any).photos);
+                const firstPhoto = photos[0];
+                return (
+                  <TableRow 
+                    key={os.id} 
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => setLocation(`/ordens/${os.id}`)}
+                  >
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {format(new Date(os.createdAt), "dd/MM/yyyy")}
+                    </TableCell>
+                    <TableCell className="font-mono font-medium text-primary">{os.number}</TableCell>
+                    <TableCell>
+                      <div className="font-medium truncate max-w-[200px]">{os.title}</div>
+                      <div className="text-xs text-muted-foreground truncate max-w-[200px]">{os.location}</div>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {os.tipo ? TIPO_LABELS[os.tipo] : "-"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {os.formatoServico ? FORMATO_SERVICO_LABELS[os.formatoServico] : "-"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={STATUS_COLORS[os.status as ServiceOrderStatus]}>
+                        {STATUS_LABELS[os.status as ServiceOrderStatus]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority]}>
+                        {PRIORITY_LABELS[os.priority as ServiceOrderPriority]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {os.technicianName || <span className="text-muted-foreground italic">Não atribuído</span>}
+                    </TableCell>
+                    <TableCell>
+                      {firstPhoto ? (
+                        <div
+                          className="relative inline-block cursor-pointer"
+                          onClick={e => e.stopPropagation()}
+                          onMouseEnter={e => setHoveredPhoto({ src: firstPhoto, x: e.clientX, y: e.clientY })}
+                          onMouseLeave={() => setHoveredPhoto(null)}
+                        >
+                          <img
+                            src={firstPhoto}
+                            alt="foto"
+                            className="w-9 h-9 rounded object-cover border border-border"
+                          />
+                          {photos.length > 1 && (
+                            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">
+                              {photos.length}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <Camera className="w-4 h-4 text-muted-foreground/30 mx-auto" />
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-mono text-yellow-500">
+                      {formatCurrency(os.estimatedValue)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>

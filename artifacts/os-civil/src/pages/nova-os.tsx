@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
+import { useUnit } from "@/contexts/unit-context";
 
 const MARKET_RATES: Record<string, number> = {
   civil: 280,
@@ -28,6 +29,15 @@ const MARKET_RATES: Record<string, number> = {
   mecanica: 320,
   eletrica: 290,
   outros: 180,
+};
+
+const ORIGEM_LABELS: Record<string, string> = {
+  manual: "Manual",
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+  n8n: "n8n / Automação",
+  api: "API",
+  outro: "Outro",
 };
 
 const formSchema = z.object({
@@ -40,6 +50,7 @@ const formSchema = z.object({
   formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "outros"]).optional(),
   technicianName: z.string().optional(),
   photos: z.string().optional(),
+  origem: z.string().optional(),
 });
 
 type MediaFile = { src: string; type: "image" | "video"; name: string };
@@ -50,6 +61,7 @@ export default function NovaOS() {
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const { unit } = useUnit();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -60,6 +72,7 @@ export default function NovaOS() {
       priority: "media",
       technicianName: "",
       photos: "",
+      origem: "manual",
     },
   });
 
@@ -120,7 +133,9 @@ export default function NovaOS() {
           formatoServico: values.formatoServico,
           technicianName: values.technicianName || undefined,
           photos: values.photos || undefined,
-        },
+          unidade: unit,
+          origem: values.origem || "manual",
+        } as any,
       },
       {
         onSuccess: () => {
@@ -144,7 +159,7 @@ export default function NovaOS() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Nova Ordem de Serviço</h1>
-          <p className="text-muted-foreground mt-1">O ID é gerado automaticamente ao salvar.</p>
+          <p className="text-muted-foreground mt-1">Unidade: <strong>{unit}</strong> · ID gerado automaticamente ao salvar.</p>
         </div>
       </div>
 
@@ -304,6 +319,30 @@ export default function NovaOS() {
                         </FormControl>
                         <SelectContent>
                           {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                            <SelectItem key={val} value={val}>{label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Origem */}
+                <FormField
+                  control={form.control}
+                  name="origem"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Origem da OS</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Object.entries(ORIGEM_LABELS).map(([val, label]) => (
                             <SelectItem key={val} value={val}>{label}</SelectItem>
                           ))}
                         </SelectContent>

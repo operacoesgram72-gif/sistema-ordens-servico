@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useGetDashboardIndicators } from "@workspace/api-client-react";
+import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,9 +14,10 @@ export default function Indicadores() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const { unit } = useUnit();
 
-  const { data: indicators, isLoading } = useGetDashboardIndicators({ year: selectedYear }, {
-    query: { enabled: true }
+  const { data: indicators, isLoading } = useGetDashboardIndicators({ year: selectedYear, unidade: unit } as any, {
+    query: { enabled: true, queryKey: ["dashboard-indicators", selectedYear, unit] }
   });
 
   const formatCurrency = (value: number) =>

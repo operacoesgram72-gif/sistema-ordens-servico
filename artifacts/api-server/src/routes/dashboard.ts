@@ -23,31 +23,38 @@ function getFormatoAvg(formato: string | null): number {
 // GET /dashboard/summary
 router.get("/dashboard/summary", async (req, res) => {
   try {
+    const unidade = req.query.unidade as string | undefined;
+    const unitCond = unidade ? [eq(serviceOrdersTable.unidade, unidade)] : [];
+
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
-    const [open] = await db.select({ count: count() }).from(serviceOrdersTable).where(eq(serviceOrdersTable.status, "aberta"));
-    const [inProg] = await db.select({ count: count() }).from(serviceOrdersTable).where(eq(serviceOrdersTable.status, "em_andamento"));
-    const [done] = await db.select({ count: count() }).from(serviceOrdersTable).where(eq(serviceOrdersTable.status, "concluida"));
-    const [cancelled] = await db.select({ count: count() }).from(serviceOrdersTable).where(eq(serviceOrdersTable.status, "cancelada"));
-    const [today] = await db.select({ count: count() }).from(serviceOrdersTable).where(gte(serviceOrdersTable.createdAt, startOfDay));
-    const [month] = await db.select({ count: count() }).from(serviceOrdersTable).where(gte(serviceOrdersTable.createdAt, startOfMonth));
-    const [year] = await db.select({ count: count() }).from(serviceOrdersTable).where(gte(serviceOrdersTable.createdAt, startOfYear));
+    const [open] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "aberta")));
+    const [inProg] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "em_andamento")));
+    const [done] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "concluida")));
+    const [cancelled] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "cancelada")));
+    const [today] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, gte(serviceOrdersTable.createdAt, startOfDay)));
+    const [month] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, gte(serviceOrdersTable.createdAt, startOfMonth)));
+    const [year] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, gte(serviceOrdersTable.createdAt, startOfYear)));
 
     const categories = await db
       .select({ category: serviceOrdersTable.category, count: count() })
       .from(serviceOrdersTable)
+      .where(unitCond.length ? and(...unitCond) : undefined)
       .groupBy(serviceOrdersTable.category);
 
     const priorities = await db
       .select({ priority: serviceOrdersTable.priority, count: count() })
       .from(serviceOrdersTable)
+      .where(unitCond.length ? and(...unitCond) : undefined)
       .groupBy(serviceOrdersTable.priority);
 
     // Sum of estimated values (stored or derived from formato)
-    const allOrders = await db.select({ estimatedValue: serviceOrdersTable.estimatedValue, formatoServico: serviceOrdersTable.formatoServico }).from(serviceOrdersTable);
+    const allOrders = await db.select({ estimatedValue: serviceOrdersTable.estimatedValue, formatoServico: serviceOrdersTable.formatoServico })
+      .from(serviceOrdersTable)
+      .where(unitCond.length ? and(...unitCond) : undefined);
     const totalEstimatedValue = allOrders.reduce((acc, o) => {
       if (o.estimatedValue !== null && o.estimatedValue !== undefined) return acc + Number(o.estimatedValue);
       return acc + getFormatoAvg(o.formatoServico);
@@ -136,8 +143,15 @@ router.get("/dashboard/stats", async (req, res) => {
 router.get("/dashboard/indicators", async (req, res) => {
   try {
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
+    const unidade = req.query.unidade as string | undefined;
     const startOfYear = new Date(year, 0, 1);
     const endOfYear = new Date(year + 1, 0, 1);
+
+    const indicatorConditions: any[] = [
+      gte(serviceOrdersTable.createdAt, startOfYear),
+      sql`${serviceOrdersTable.createdAt} < ${endOfYear}`,
+    ];
+    if (unidade) indicatorConditions.push(eq(serviceOrdersTable.unidade, unidade));
 
     const allOrders = await db
       .select({
@@ -150,7 +164,7 @@ router.get("/dashboard/indicators", async (req, res) => {
         createdAt: serviceOrdersTable.createdAt,
       })
       .from(serviceOrdersTable)
-      .where(and(gte(serviceOrdersTable.createdAt, startOfYear), sql`${serviceOrdersTable.createdAt} < ${endOfYear}`));
+      .where(and(...indicatorConditions));
 
     // Fetch technicians for names
     const techs = await db.select().from(techniciansTable);

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { PackageOpen, Plus, Trash2, Pencil, Check, X, Image as ImageIcon } from "lucide-react";
+import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,7 @@ const emptyForm = (): FormState => ({
 
 export default function RetiradaMateriais() {
   const { toast } = useToast();
+  const { unit } = useUnit();
   const [records, setRecords] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -52,7 +54,7 @@ export default function RetiradaMateriais() {
 
   const fetchAll = async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/material-withdrawals`);
+      const res = await fetch(`${BASE_URL}/api/material-withdrawals?unidade=${unit}`);
       if (res.ok) setRecords(await res.json());
     } catch {
       toast({ title: "Erro ao carregar registros", variant: "destructive" });
@@ -61,7 +63,7 @@ export default function RetiradaMateriais() {
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => { fetchAll(); }, [unit]);
 
   const handleField = (field: keyof FormState, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -114,7 +116,7 @@ export default function RetiradaMateriais() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, unidade: unit }),
       });
       if (!res.ok) throw new Error();
       toast({ title: editingId ? "Registro atualizado!" : "Registro criado!" });

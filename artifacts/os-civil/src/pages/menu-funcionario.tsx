@@ -1,8 +1,15 @@
-import { Link } from "wouter";
-import { ClipboardList, Wind, PackageOpen } from "lucide-react";
+import { Link, useSearch } from "wouter";
+import { ClipboardList, Wind, PackageOpen, ArrowLeft, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { UNITS, type Unit } from "@/contexts/unit-context";
 
 export default function MenuFuncionario() {
+  const search = useSearch();
+  const params = new URLSearchParams(search);
+  const unitFromUrl = (params.get("u") || "AM") as Unit;
+  const unitInfo = UNITS.find(u => u.key === unitFromUrl) || UNITS[0];
+
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
       <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
@@ -15,8 +22,16 @@ export default function MenuFuncionario() {
           <div className="font-bold text-sm leading-tight">Grupo Rede Amazônica</div>
           <div className="text-xs text-muted-foreground">Departamento: Operações</div>
         </div>
-        <div className="ml-auto">
-          <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+        <div className="ml-auto flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <MapPin className="w-3.5 h-3.5 text-primary" />
+            <span>Unidade</span>
+            <Badge variant="outline" className="font-mono text-primary border-primary/50 text-xs px-2">
+              {unitFromUrl}
+            </Badge>
+            <span className="hidden sm:inline text-muted-foreground/60">— {unitInfo.name}</span>
+          </div>
+          <span className="text-xs font-semibold text-primary uppercase tracking-widest hidden md:inline">
             Painel de Serviços
           </span>
         </div>
@@ -32,7 +47,7 @@ export default function MenuFuncionario() {
           </div>
 
           <div className="space-y-3">
-            <Link href="/registrar/os">
+            <Link href={`/registrar/os?u=${unitFromUrl}`}>
               <Card className="bg-card border-border/50 hover:border-primary/60 hover:bg-primary/5 transition-all cursor-pointer group">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
@@ -46,7 +61,7 @@ export default function MenuFuncionario() {
               </Card>
             </Link>
 
-            <Link href="/pmoc">
+            <Link href={`/pmoc`}>
               <Card className="bg-card border-border/50 hover:border-primary/60 hover:bg-primary/5 transition-all cursor-pointer group">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
@@ -60,7 +75,7 @@ export default function MenuFuncionario() {
               </Card>
             </Link>
 
-            <Link href="/registrar/materiais">
+            <Link href={`/registrar/materiais?u=${unitFromUrl}`}>
               <Card className="bg-card border-border/50 hover:border-primary/60 hover:bg-primary/5 transition-all cursor-pointer group">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
@@ -73,6 +88,13 @@ export default function MenuFuncionario() {
                 </CardContent>
               </Card>
             </Link>
+          </div>
+
+          <div className="pt-2 text-center">
+            <a href="javascript:history.back()" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Voltar
+            </a>
           </div>
         </div>
       </div>

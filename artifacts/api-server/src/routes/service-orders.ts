@@ -62,6 +62,9 @@ router.get("/service-orders", async (req, res) => {
 
     const conditions: any[] = [];
 
+    const unidade = req.query.unidade as string | undefined;
+    if (unidade) conditions.push(eq(serviceOrdersTable.unidade, unidade));
+
     if (q.status) conditions.push(eq(serviceOrdersTable.status, q.status));
     if (q.category) conditions.push(eq(serviceOrdersTable.category, q.category));
     if (q.priority) conditions.push(eq(serviceOrdersTable.priority, q.priority));
@@ -123,6 +126,8 @@ router.get("/service-orders", async (req, res) => {
 // POST /service-orders
 router.post("/service-orders", async (req, res) => {
   try {
+    const unidade = (req.body.unidade as string) || "AM";
+    const origem = (req.body.origem as string) || "manual";
     const body = CreateServiceOrderBody.parse(req.body);
     const number = generateNumber();
 
@@ -152,6 +157,8 @@ router.post("/service-orders", async (req, res) => {
         estimatedValue: estimatedValue !== null ? String(estimatedValue) : null,
         scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
         status: "aberta",
+        unidade,
+        origem,
       })
       .returning();
 

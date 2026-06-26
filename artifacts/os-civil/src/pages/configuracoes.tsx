@@ -117,6 +117,10 @@ export default function Configuracoes() {
     smtpPort: "",
     smtpUser: "",
     smtpPass: "",
+    webhookUrlWhatsapp: "",
+    webhookUrlN8n: "",
+    emailMonitoringAddress: "",
+    emailMonitoringEnabled: "false",
   });
 
   const [connections, setConnections] = useState<SavedConnection[]>([]);
@@ -132,6 +136,10 @@ export default function Configuracoes() {
         smtpPort: (settings as any).smtpPort ?? "",
         smtpUser: (settings as any).smtpUser ?? "",
         smtpPass: (settings as any).smtpPass ?? "",
+        webhookUrlWhatsapp: (settings as any).webhookUrlWhatsapp ?? "",
+        webhookUrlN8n: (settings as any).webhookUrlN8n ?? "",
+        emailMonitoringAddress: (settings as any).emailMonitoringAddress ?? "",
+        emailMonitoringEnabled: (settings as any).emailMonitoringEnabled ?? "false",
       });
     }
   }, [settings]);
@@ -332,6 +340,109 @@ export default function Configuracoes() {
               {testing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               {testing ? "Enviando..." : "Testar Envio"}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notificações WhatsApp / n8n */}
+      <Card className="bg-card border-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Send className="w-5 h-5 text-primary" />
+            Notificações por WhatsApp / n8n
+          </CardTitle>
+          <CardDescription>
+            Configure webhooks para disparar mensagens automáticas no WhatsApp ou fluxos de automação via n8n quando uma OS for registrada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2">
+              <span>💬</span> URL do Webhook — WhatsApp
+            </Label>
+            <Input
+              placeholder="https://api.z-api.io/instances/INSTANCE/token/TOKEN/send-text"
+              value={form.webhookUrlWhatsapp}
+              onChange={(e) => setForm(f => ({ ...f, webhookUrlWhatsapp: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Use Z-API, Evolution API ou outro gateway. A OS será enviada como JSON no body do POST.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2">
+              <span>🔄</span> URL do Webhook — n8n / Zapier
+            </Label>
+            <Input
+              placeholder="https://n8n.suaempresa.com/webhook/os-civil"
+              value={form.webhookUrlN8n}
+              onChange={(e) => setForm(f => ({ ...f, webhookUrlN8n: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Toda nova OS criada enviará um POST com os dados completos para este endpoint.
+            </p>
+          </div>
+          <div className="rounded-md bg-muted/50 border border-border/60 p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground">Payload enviado (exemplo):</p>
+            <pre className="font-mono text-[11px] leading-relaxed overflow-x-auto whitespace-pre-wrap">{`{
+  "event": "nova_os",
+  "numero": "OS-00042",
+  "local": "Andar 3, Bloco B",
+  "unidade": "AM",
+  "prioridade": "urgente",
+  "criado_em": "2026-06-26T14:00:00Z"
+}`}</pre>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Monitoramento de E-mail */}
+      <Card className="bg-card border-border/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Mail className="w-5 h-5 text-primary" />
+            Monitoramento de E-mail (Entrada)
+          </CardTitle>
+          <CardDescription>
+            Monitore uma caixa de entrada e converta e-mails recebidos automaticamente em ordens de serviço.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-3 rounded-md border border-border/60 bg-muted/30">
+            <div>
+              <p className="text-sm font-medium">Monitoramento Ativo</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Liga/desliga a criação automática de OS por e-mail</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setForm(f => ({ ...f, emailMonitoringEnabled: f.emailMonitoringEnabled === "true" ? "false" : "true" }))}
+              className={`w-11 h-6 rounded-full transition-colors relative shrink-0 ${form.emailMonitoringEnabled === "true" ? "bg-primary" : "bg-muted"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow ${form.emailMonitoringEnabled === "true" ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-2">
+              <Mail className="w-4 h-4" />
+              Endereço de E-mail Monitorado
+            </Label>
+            <Input
+              type="email"
+              placeholder="chamados@redeamazonica.com.br"
+              value={form.emailMonitoringAddress}
+              onChange={(e) => setForm(f => ({ ...f, emailMonitoringAddress: e.target.value }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              E-mails recebidos neste endereço serão parseados e transformados em novas OS com origem "E-mail".
+              Configure seu servidor de e-mail para fazer forward para esta caixa.
+            </p>
+          </div>
+          <div className="rounded-md bg-amber-950/20 border border-amber-700/30 p-3 text-xs text-amber-400/90 flex gap-2">
+            <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-500" />
+            <span>
+              A integração de e-mail requer configuração de IMAP ou webhook de e-mail no seu servidor.
+              Salve as configurações e entre em contato com o administrador do sistema para ativação completa.
+            </span>
           </div>
         </CardContent>
       </Card>

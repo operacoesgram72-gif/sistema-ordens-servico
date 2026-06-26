@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
 import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -49,6 +49,8 @@ export default function RegistrarOS() {
   const createOrder = useCreateServiceOrder();
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const search = useSearch();
+  const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -115,7 +117,9 @@ export default function RegistrarOS() {
           formatoServico: values.formatoServico,
           technicianName: values.technicianName || undefined,
           photos: values.photos || undefined,
-        },
+          unidade: unitFromUrl,
+          origem: "manual",
+        } as any,
       },
       {
         onSuccess: (data) => {
@@ -144,10 +148,16 @@ export default function RegistrarOS() {
           <div className="font-bold text-sm leading-tight">Grupo Rede Amazônica</div>
           <div className="text-xs text-muted-foreground">Departamento: Operações</div>
         </div>
-        <div className="ml-auto">
-          <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs font-semibold text-primary uppercase tracking-widest hidden sm:inline">
             Painel de Serviços
           </span>
+          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/30">
+            {unitFromUrl}
+          </span>
+          <Link href={`/registrar?u=${unitFromUrl}`} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            ← Menu
+          </Link>
         </div>
       </header>
 
