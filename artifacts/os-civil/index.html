@@ -2,24 +2,87 @@
 <html lang="pt-BR" translate="no">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     <title>Painel de Serviços — Grupo Rede Amazônica</title>
     <meta name="description" content="Painel de Serviços — Grupo Rede Amazônica, Departamento de Operações." />
     <meta name="robots" content="index, follow" />
     <meta name="google" content="notranslate" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="OS Civil" />
+    <meta name="application-name" content="OS Civil" />
+    <meta name="msapplication-TileColor" content="#0f172a" />
+    <meta name="msapplication-tap-highlight" content="no" />
+
+    <!-- PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.svg" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.svg" />
+    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.svg" />
+
+    <!-- Splash Screen (iOS) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Open Graph -->
     <meta property="og:title" content="Painel de Serviços — Grupo Rede Amazônica" />
     <meta property="og:description" content="Painel de Serviços — Grupo Rede Amazônica, Departamento de Operações." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Painel de Serviços — Grupo Rede Amazônica" />
     <meta name="twitter:description" content="Painel de Serviços — Grupo Rede Amazônica, Departamento de Operações." />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+      /* Splash screen while JS loads */
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: #0f172a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        transition: opacity 0.4s ease;
+      }
+      #splash.hidden { opacity: 0; pointer-events: none; }
+      #splash img { width: 80px; height: 80px; object-fit: contain; }
+      #splash p { color: #64748b; font-family: Inter, sans-serif; font-size: 13px; margin-top: 16px; }
+    </style>
   </head>
   <body>
+    <div id="splash">
+      <img src="/logo-amazonica.png" alt="Logo" />
+      <p>Carregando…</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+      // Hide splash once React mounts
+      document.addEventListener('DOMContentLoaded', () => {
+        const splash = document.getElementById('splash');
+        if (splash) {
+          setTimeout(() => {
+            splash.classList.add('hidden');
+            setTimeout(() => splash.remove(), 400);
+          }, 600);
+        }
+      });
+    </script>
   </body>
 </html>

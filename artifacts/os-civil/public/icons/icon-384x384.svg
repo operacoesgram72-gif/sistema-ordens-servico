@@ -1,0 +1,5 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 384' width='384' height='384'>
+  <rect width='384' height='384' rx='60' fill='#0f172a'/>
+  <rect x='31' y='31' width='323' height='323' rx='48' fill='#1e293b'/>
+  <text x='192' y='238' font-family='Arial,sans-serif' font-size='165' font-weight='bold' text-anchor='middle' fill='#2563eb'>OS</text>
+</svg>

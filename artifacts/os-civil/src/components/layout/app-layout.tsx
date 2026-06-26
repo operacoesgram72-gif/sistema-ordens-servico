@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp,
   Share2, Copy, BookUser, Settings2, Wind, PackageOpen, CalendarDays, Folder,
+  Menu, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -48,7 +50,11 @@ const navSections = [
   },
 ];
 
-export function AppLayout({ children }: { children: React.ReactNode }) {
+function SidebarContent({
+  onNavClick,
+}: {
+  onNavClick?: () => void;
+}) {
   const [location] = useLocation();
   const { toast } = useToast();
   const { unit, setUnit } = useUnit();
@@ -65,110 +71,165 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     href === "/" ? location === "/" : location === href || location.startsWith(href + "/");
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground dark">
-      {/* Sidebar */}
-      <aside className="w-full md:w-64 border-r border-border bg-card flex flex-col shrink-0">
-
-        {/* Logo + Identidade + Unit Selector */}
-        <div className="px-5 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-3">
-            <img
-              src="/logo-amazonica.png"
-              alt="Logo Rede Amazônica"
-              className="h-10 w-10 object-contain"
-            />
-            <div className="min-w-0">
-              <div className="font-bold text-sm leading-tight text-foreground truncate">
-                Grupo Rede Amazônica
-              </div>
-              <div className="text-xs text-muted-foreground">Departamento: Operações</div>
+    <>
+      {/* Logo + Identidade + Unit Selector */}
+      <div className="px-5 py-4 border-b border-border shrink-0">
+        <div className="flex items-center gap-3">
+          <img
+            src="/logo-amazonica.png"
+            alt="Logo Rede Amazônica"
+            className="h-10 w-10 object-contain"
+          />
+          <div className="min-w-0">
+            <div className="font-bold text-sm leading-tight text-foreground truncate">
+              Grupo Rede Amazônica
             </div>
-          </div>
-
-          {/* Painel label */}
-          <div className="mt-3 pt-3 border-t border-border/60">
-            <span className="text-xs font-semibold text-primary uppercase tracking-widest">
-              Painel de Serviços
-            </span>
-          </div>
-
-          {/* Unit selector */}
-          <div className="mt-2">
-            <p className="text-[10px] text-muted-foreground/60 mb-1.5 uppercase tracking-widest">Unidade</p>
-            <div className="flex flex-wrap gap-1">
-              {UNITS.map((u) => (
-                <button
-                  key={u.key}
-                  onClick={() => setUnit(u.key)}
-                  title={u.name}
-                  className={cn(
-                    "px-2 py-0.5 rounded text-xs font-mono font-bold transition-all border",
-                    unit === u.key
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
-                  )}
-                >
-                  {u.key}
-                </button>
-              ))}
-            </div>
+            <div className="text-xs text-muted-foreground">Departamento: Operações</div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
-          {navSections.map((section) => (
-            <div key={section.label}>
-              <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
-                {section.label}
-              </p>
-              <div className="space-y-0.5">
-                {section.items.map((item) => {
-                  const active = isActive(item.href);
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
-                        active
-                          ? "bg-primary/10 text-primary"
-                          : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                      )}
-                    >
-                      <item.icon className={cn("w-4 h-4 mr-3 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </nav>
+        {/* Painel label */}
+        <div className="mt-3 pt-3 border-t border-border/60">
+          <span className="text-xs font-semibold text-primary uppercase tracking-widest">
+            Painel de Serviços
+          </span>
+        </div>
 
-        {/* Employee link (per-unit) */}
-        <div className="p-3 border-t border-border">
-          <div className="rounded-md bg-muted/50 border border-border/70 p-3 space-y-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              <Share2 className="w-3.5 h-3.5" />
-              Link Funcionários — <span className="text-primary">{unit}</span>
-            </div>
-            <p className="text-xs text-muted-foreground leading-snug">
-              Os funcionários da unidade <strong>{unit}</strong> usam este link para registrar chamados.
+        {/* Unit selector */}
+        <div className="mt-2">
+          <p className="text-[10px] text-muted-foreground/60 mb-1.5 uppercase tracking-widest">Unidade</p>
+          <div className="flex flex-wrap gap-1">
+            {UNITS.map((u) => (
+              <button
+                key={u.key}
+                onClick={() => setUnit(u.key)}
+                title={u.name}
+                className={cn(
+                  "px-2 py-0.5 rounded text-xs font-mono font-bold transition-all border",
+                  unit === u.key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
+                )}
+              >
+                {u.key}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
+        {navSections.map((section) => (
+          <div key={section.label}>
+            <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              {section.label}
             </p>
-            <button
-              onClick={copyLink}
-              className="w-full flex items-center justify-center gap-2 text-xs bg-primary/10 hover:bg-primary/20 text-primary font-medium py-2 px-3 rounded-md transition-colors"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              Copiar link — {unit}
-            </button>
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const active = isActive(item.href);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={onNavClick}
+                    className={cn(
+                      "flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                      active
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    )}
+                  >
+                    <item.icon className={cn("w-4 h-4 mr-3 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
+        ))}
+      </nav>
+
+      {/* Employee link (per-unit) */}
+      <div className="p-3 border-t border-border">
+        <div className="rounded-md bg-muted/50 border border-border/70 p-3 space-y-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            <Share2 className="w-3.5 h-3.5" />
+            Link Funcionários — <span className="text-primary">{unit}</span>
+          </div>
+          <p className="text-xs text-muted-foreground leading-snug">
+            Os funcionários da unidade <strong>{unit}</strong> usam este link para registrar chamados.
+          </p>
+          <button
+            onClick={copyLink}
+            className="w-full flex items-center justify-center gap-2 text-xs bg-primary/10 hover:bg-primary/20 text-primary font-medium py-2 px-3 rounded-md transition-colors"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Copiar link — {unit}
+          </button>
         </div>
+      </div>
+    </>
+  );
+}
+
+export function AppLayout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground dark">
+
+      {/* ── MOBILE TOP BAR (hidden on md+) ── */}
+      <header className="md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0 safe-top">
+        <button
+          onClick={() => setMobileOpen(true)}
+          aria-label="Abrir menu"
+          className="p-2 -ml-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <img src="/logo-amazonica.png" alt="Logo" className="h-7 w-7 object-contain" />
+          <span className="font-bold text-sm text-foreground">OS Civil</span>
+        </div>
+        {/* spacer to center the logo */}
+        <div className="w-9" />
+      </header>
+
+      {/* ── MOBILE DRAWER BACKDROP ── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── MOBILE DRAWER SIDEBAR ── */}
+      <aside
+        className={cn(
+          "md:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-card border-r border-border flex flex-col shrink-0 transition-transform duration-300 ease-in-out",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          aria-label="Fechar menu"
+          className="absolute top-3 right-3 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <SidebarContent onNavClick={() => setMobileOpen(false)} />
       </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+      {/* ── DESKTOP SIDEBAR (hidden on mobile) ── */}
+      <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col shrink-0">
+        <SidebarContent />
+      </aside>
+
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 flex flex-col min-w-0 md:h-screen md:overflow-hidden">
         <div className="flex-1 overflow-y-auto">
           {children}
         </div>
