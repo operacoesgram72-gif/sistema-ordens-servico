@@ -1,0 +1,73 @@
+# ADAPTAÇÃO PARA APLICATIVO SEM ALTERAR O SISTEMA EXISTENTE
+
+Quero que este projeto seja preparado para funcionar como um aplicativo Android e iOS, mantendo integralmente o sistema atual.
+
+## REGRAS OBRIGATÓRIAS
+
+* NÃO alterar nenhuma regra de negócio.
+* NÃO alterar nenhuma funcionalidade existente.
+* NÃO modificar o banco de dados.
+* NÃO alterar APIs.
+* NÃO alterar rotas.
+* NÃO alterar autenticação.
+* NÃO alterar a estrutura do projeto além do necessário para suportar mobile.
+* NÃO substituir bibliotecas já utilizadas, exceto se houver incompatibilidade comprovada.
+* NÃO modificar a aparência da versão Desktop.
+* A versão Desktop deve permanecer exatamente como está hoje.
+* Não remover nenhum componente existente.
+
+## O QUE DEVE SER FEITO
+
+Adicionar apenas recursos para dispositivos móveis, preservando totalmente a experiência Desktop.
+
+### Responsividade
+
+* Detectar automaticamente quando a largura da tela for menor que 768px.
+* Aplicar layout exclusivo para celulares.
+* Manter o layout atual para Desktop.
+* Transformar o menu lateral em menu hambúrguer somente no celular.
+* Ajustar espaçamentos apenas na versão mobile.
+* Ajustar tamanho de fontes apenas na versão mobile.
+* Ajustar cards para largura total apenas na versão mobile.
+* Tornar formulários confortáveis para toque.
+* Adaptar tabelas para telas pequenas sem afetar a visualização Desktop.
+* Garantir que gráficos sejam responsivos.
+
+### PWA
+
+Adicionar suporte completo a Progressive Web App:
+
+* manifest.json
+* service worker
+* instalação pelo navegador
+* ícones do aplicativo
+* splash screen
+* modo tela cheia
+
+### Capacitor
+
+Preparar o projeto para Capacitor sem alterar sua estrutura atual.
+
+Adicionar:
+
+* configuração do Capacitor
+* Android
+* iOS
+* arquivos necessários para geração futura de APK
+
+## IMPORTANTE
+
+Toda alteração deve ser feita utilizando media queries, componentes responsivos ou layouts condicionais.
+
+A versão Desktop deve permanecer visualmente idêntica à atual.
+
+Nenhuma funcionalidade existente pode ser removida, simplificada ou reescrita.
+
+Antes de modificar qualquer arquivo existente, verificar se a alteração impactará o Desktop. Se impactar, utilizar uma solução específica apenas para Mobile.
+
+Ao final, apresentar um relatório contendo:
+
+* arquivos modificados;
+* arquivos criados;
+* justificativa de cada alteração;
+* confirmação de que a versão Desktop permaneceu inalterada.
