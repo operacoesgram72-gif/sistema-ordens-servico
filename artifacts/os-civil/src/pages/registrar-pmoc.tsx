@@ -11,7 +11,7 @@ export default function RegistrarPmoc() {
   const unitInfo = UNITS.find(u => u.key === unitFromUrl) || UNITS[0];
   const [, setLocation] = useLocation();
 
-  const goBack = () => setLocation(`/registrar?u=${unitFromUrl}`);
+  const goBack = () => setTimeout(() => setLocation(`/registrar?u=${unitFromUrl}`), 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
