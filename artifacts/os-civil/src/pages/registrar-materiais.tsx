@@ -76,7 +76,7 @@ export default function RegistrarMateriais() {
       <div className="flex-1 flex items-start justify-center px-4 py-8">
         <div className="w-full max-w-2xl space-y-6">
           <div className="flex items-center gap-3">
-            <Link href="/registrar">
+            <Link href={`/registrar?u=${unitFromUrl}`}>
               <button className="text-muted-foreground hover:text-foreground transition-colors">
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -99,7 +99,7 @@ export default function RegistrarMateriais() {
                   <Button onClick={() => { setSubmitted(false); setForm({ date: new Date().toISOString().slice(0, 10), tipoMaterial: "", quantidade: "", justificativa: "", tipo: "retirada" }); setFotoBase64(null); }} variant="outline" className="flex-1">
                     Novo Registro
                   </Button>
-                  <Link href="/registrar">
+                  <Link href={`/registrar?u=${unitFromUrl}`}>
                     <Button className="flex-1 w-full">Voltar ao Menu</Button>
                   </Link>
                 </div>

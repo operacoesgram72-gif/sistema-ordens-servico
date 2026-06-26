@@ -1,0 +1,89 @@
+Correção de Erro de Navegação - Menu dos Funcionários
+
+Foi identificado um erro durante a navegação no sistema.
+
+Cenário do problema
+
+Fluxo executado:
+
+Acessar o Menu dos Funcionários.
+Clicar em Inserir Ordem de Serviço.
+Após abrir a tela de Nova Ordem de Serviço, clicar no botão Voltar.
+
+Ao realizar esse procedimento, o sistema apresenta o seguinte erro:
+
+Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.
+
+Objetivo
+
+Identificar a causa raiz desse erro e corrigi-lo de forma definitiva, preservando todas as funcionalidades existentes.
+
+O que deve ser analisado
+
+Realizar uma revisão completa dos seguintes pontos:
+
+Rotas do React Router;
+Navegação entre páginas;
+Ciclo de vida dos componentes (Mount e Unmount);
+Hooks (useEffect);
+Eventos de navegação;
+Componentes reutilizados;
+Modais;
+Tooltips;
+Popovers;
+Menus;
+Manipulação do DOM;
+Estado global (caso exista);
+Componentes que são desmontados durante a navegação.
+Correções obrigatórias
+
+Verificar se existe qualquer manipulação manual do DOM utilizando funções como:
+
+removeChild()
+appendChild()
+remove()
+replaceChild()
+innerHTML
+
+Caso exista, substituir pela forma correta utilizando apenas o ciclo de vida do React.
+
+Navegação
+
+O botão Voltar não deverá utilizar manipulação manual do navegador ou do DOM.
+
+A navegação deverá ocorrer utilizando apenas o React Router.
+
+Caso necessário, utilizar rotas específicas para retornar ao Menu dos Funcionários, evitando conflitos com o histórico do navegador.
+
+Verificação Preventiva
+
+Além do fluxo informado, revisar todos os demais botões de navegação do sistema para garantir que o mesmo erro não ocorra em:
+
+PMOC e Bebedouros;
+Retirada de Materiais e Ferramentas;
+Calendário;
+Gestão de Arquivos;
+Lista de Ordens de Serviço;
+Qualquer outro módulo acessado pelo menu de Funcionários.
+Compatibilidade
+
+A correção não poderá:
+
+remover funcionalidades existentes;
+alterar permissões;
+modificar o layout;
+alterar o banco de dados;
+alterar rotas já utilizadas por outros módulos.
+Validação Final
+
+Após a correção, realizar testes completos de navegação entre todas as páginas do sistema.
+
+Confirmar que:
+
+o botão Voltar funciona corretamente;
+nenhuma tela apresenta erros de JavaScript;
+nenhuma funcionalidade foi removida;
+nenhuma funcionalidade existente deixou de funcionar;
+o sistema permanece estável tanto para Administradores quanto para Funcionários.
+
+Caso sejam encontrados outros erros semelhantes relacionados à navegação ou desmontagem de componentes, corrigi-los automaticamente antes de finalizar a implementação.

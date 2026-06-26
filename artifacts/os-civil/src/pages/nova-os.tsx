@@ -51,6 +51,7 @@ const formSchema = z.object({
   technicianName: z.string().optional(),
   photos: z.string().optional(),
   origem: z.string().optional(),
+  temPte: z.enum(["sim", "nao"]).optional(),
 });
 
 type MediaFile = { src: string; type: "image" | "video"; name: string };
@@ -61,6 +62,7 @@ export default function NovaOS() {
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const { unit } = useUnit();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -120,12 +122,15 @@ export default function NovaOS() {
       .filter(Boolean)
       .join(" — ") || `Serviço em ${values.location}`;
 
+    const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
+    const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
+
     createOrder.mutate(
       {
         data: {
           title: autoTitle,
           location: values.location,
-          description: values.description || undefined,
+          description,
           category: values.category,
           priority: values.priority,
           scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
@@ -176,7 +181,7 @@ export default function NovaOS() {
                   render={({ field }) => (
                     <FormItem className="md:col-span-2 md:w-1/2 flex flex-col">
                       <FormLabel className="text-sm font-semibold">Data do Serviço</FormLabel>
-                      <Popover>
+                      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger asChild>
                           <FormControl>
                             <Button
@@ -199,7 +204,10 @@ export default function NovaOS() {
                           <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={field.onChange}
+                            onSelect={(date) => {
+                              field.onChange(date);
+                              setCalendarOpen(false);
+                            }}
                             disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             initialFocus
                             className="[--cell-size:2.75rem] text-base"
@@ -362,6 +370,44 @@ export default function NovaOS() {
                       <FormControl>
                         <Input placeholder="Nome do técnico responsável" {...field} />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Tem PTE */}
+                <FormField
+                  control={form.control}
+                  name="temPte"
+                  render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Tem PTE?</FormLabel>
+                      <div className="flex items-center gap-4 mt-1">
+                        {[
+                          { value: "sim", label: "Sim" },
+                          { value: "nao", label: "Não" },
+                        ].map((opt) => (
+                          <label
+                            key={opt.value}
+                            className={cn(
+                              "flex items-center gap-2 px-4 py-2 rounded-md border cursor-pointer transition-colors select-none",
+                              field.value === opt.value
+                                ? "border-primary bg-primary/10 text-primary font-semibold"
+                                : "border-border text-muted-foreground hover:border-primary/50"
+                            )}
+                          >
+                            <input
+                              type="radio"
+                              name="temPte"
+                              value={opt.value}
+                              checked={field.value === opt.value}
+                              onChange={() => field.onChange(opt.value)}
+                              className="sr-only"
+                            />
+                            {opt.label}
+                          </label>
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

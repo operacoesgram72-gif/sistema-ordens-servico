@@ -2,8 +2,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays } from "lucide-react";
-import { Link, useSearch } from "wouter";
+import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays, ArrowLeft } from "lucide-react";
+import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
@@ -41,16 +41,24 @@ const formSchema = z.object({
   formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "outros"]).optional(),
   technicianName: z.string().optional(),
   photos: z.string().optional(),
+  temPte: z.enum(["sim", "nao"]).optional(),
 });
 
 export default function RegistrarOS() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
+  const [, setLocation] = useLocation();
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const search = useSearch();
   const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
+
+  const goBack = () => {
+    setCalendarOpen(false);
+    setLocation(`/registrar?u=${unitFromUrl}`);
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -62,6 +70,7 @@ export default function RegistrarOS() {
       priority: "media",
       technicianName: "",
       photos: "",
+      temPte: undefined,
     },
   });
 
@@ -103,13 +112,16 @@ export default function RegistrarOS() {
       .filter(Boolean)
       .join(" — ") || `Serviço em ${values.location}`;
 
+    const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
+    const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
+
     createOrder.mutate(
       {
         data: {
           title: autoTitle,
           location: values.location,
           department: values.department || undefined,
-          description: values.description || undefined,
+          description,
           category: values.category,
           priority: values.priority,
           scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
@@ -155,9 +167,14 @@ export default function RegistrarOS() {
           <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/30">
             {unitFromUrl}
           </span>
-          <Link href={`/registrar?u=${unitFromUrl}`} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-            ← Menu
-          </Link>
+          <button
+            type="button"
+            onClick={goBack}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Menu
+          </button>
         </div>
       </header>
 
@@ -184,12 +201,14 @@ export default function RegistrarOS() {
                   <Button onClick={() => setSubmitted(null)} variant="outline" className="flex-1">
                     Registrar Novo Chamado
                   </Button>
-                  <Link href="/pmoc">
-                    <Button className="flex-1 gap-2 w-full">
-                      <CalendarDays className="w-4 h-4" />
-                      Ver Cronograma PMOC
-                    </Button>
-                  </Link>
+                  <Button
+                    type="button"
+                    className="flex-1 gap-2"
+                    onClick={goBack}
+                  >
+                    <CalendarDays className="w-4 h-4" />
+                    Voltar ao Menu
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -216,7 +235,7 @@ export default function RegistrarOS() {
                           render={({ field }) => (
                             <FormItem className="md:col-span-2 md:w-1/2 flex flex-col justify-end">
                               <FormLabel>Data Prevista</FormLabel>
-                              <Popover>
+                              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                                 <PopoverTrigger asChild>
                                   <FormControl>
                                     <Button
@@ -232,7 +251,10 @@ export default function RegistrarOS() {
                                   <Calendar
                                     mode="single"
                                     selected={field.value}
-                                    onSelect={field.onChange}
+                                    onSelect={(date) => {
+                                      field.onChange(date);
+                                      setCalendarOpen(false);
+                                    }}
                                     disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                     initialFocus
                                     className="[--cell-size:2.75rem] text-base"
@@ -347,6 +369,41 @@ export default function RegistrarOS() {
                               <FormControl>
                                 <Input placeholder="Nome do técnico (opcional)" {...field} />
                               </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Tem PTE */}
+                        <FormField
+                          control={form.control}
+                          name="temPte"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel>Tem PTE?</FormLabel>
+                              <div className="flex items-center gap-4 mt-1">
+                                {["sim", "nao"].map((v) => (
+                                  <label
+                                    key={v}
+                                    className={cn(
+                                      "flex items-center gap-2 px-4 py-2 rounded-md border cursor-pointer transition-colors select-none",
+                                      field.value === v
+                                        ? "border-primary bg-primary/10 text-primary font-semibold"
+                                        : "border-border text-muted-foreground hover:border-primary/50"
+                                    )}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="temPte"
+                                      value={v}
+                                      checked={field.value === v}
+                                      onChange={() => field.onChange(v)}
+                                      className="sr-only"
+                                    />
+                                    {v === "sim" ? "Sim" : "Não"}
+                                  </label>
+                                ))}
+                              </div>
                               <FormMessage />
                             </FormItem>
                           )}

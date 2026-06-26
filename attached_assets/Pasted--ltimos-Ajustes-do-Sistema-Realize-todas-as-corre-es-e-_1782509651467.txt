@@ -1,0 +1,119 @@
+Últimos Ajustes do Sistema
+
+Realize todas as correções e melhorias abaixo sem remover, alterar ou comprometer qualquer funcionalidade já existente. Todas as implementações deverão ser complementares ao sistema atual, preservando o banco de dados, as permissões, as integrações e a estrutura existente.
+
+1. Correção do Erro de Navegação - Menu dos Funcionários
+Problema
+
+Ao executar o fluxo abaixo:
+
+Acessar o Menu dos Funcionários;
+Clicar em Inserir Ordem de Serviço;
+Após abrir a tela Nova Ordem de Serviço, clicar em Voltar.
+
+O sistema apresenta o erro:
+
+Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.
+
+Objetivo
+
+Identificar a causa raiz desse erro e corrigi-lo definitivamente.
+
+Revisar
+Rotas do React Router;
+Navegação entre páginas;
+Ciclo de vida dos componentes (Mount e Unmount);
+Hooks (useEffect);
+Eventos de navegação;
+Componentes reutilizados;
+Modais;
+Tooltips;
+Popovers;
+Menus;
+Manipulação direta do DOM;
+Estado global (caso exista);
+Componentes desmontados durante a navegação.
+Correções obrigatórias
+
+Verificar se existe qualquer utilização de:
+
+removeChild()
+appendChild()
+remove()
+replaceChild()
+innerHTML
+
+Caso exista, substituir pela abordagem correta utilizando apenas o ciclo de vida do React.
+
+O botão Voltar deverá utilizar somente o React Router, sem manipulação manual do navegador ou do DOM.
+
+Caso necessário, criar uma rota específica para retornar ao Menu dos Funcionários.
+
+Revisão preventiva
+
+Verificar também a navegação dos módulos:
+
+PMOC e Bebedouros;
+Retirada de Materiais e Ferramentas;
+Calendário;
+Gestão de Arquivos;
+Lista de Ordens de Serviço;
+Demais módulos acessados pelos funcionários.
+Validação
+
+Confirmar que:
+
+o botão Voltar funciona corretamente;
+não existem erros JavaScript;
+nenhuma funcionalidade deixou de funcionar;
+Administradores e Funcionários utilizam normalmente o sistema.
+
+Caso sejam encontrados outros erros semelhantes, corrigi-los automaticamente.
+
+2. Correção do Link Exclusivo dos Funcionários
+2.1 Corrigir o título da página
+
+Ao acessar a tela de cadastro pelo link dos funcionários, atualmente aparece:
+
+Registrar Ordem de Jay
+
+Esse comportamento está incorreto.
+
+O título deverá permanecer fixo.
+
+Utilizar:
+
+Registrar Ordem de Serviço
+
+ou
+
+Nova Ordem de Serviço
+
+Não utilizar nenhuma variável dinâmica, nome do usuário ou parâmetro da URL.
+
+2.2 Corrigir a tela PMOC e Bebedouros
+
+Quando o funcionário clicar em PMOC e Bebedouros, o sistema está carregando toda a interface administrativa.
+
+Isso está incorreto.
+
+O funcionário deverá visualizar apenas:
+
+título da página;
+tabela do cronograma;
+funcionalidades permitidas;
+botão para retornar ao Menu dos Funcionários.
+
+Não deverá aparecer:
+
+Painel de Serviços;
+Dashboard;
+Menu lateral;
+Indicadores;
+Calendário;
+Lista de OS;
+Equipes;
+Gestão de Arquivos;
+Configurações;
+Dados Cadastrais;
+qualquer outra funcionalidade administrativa.

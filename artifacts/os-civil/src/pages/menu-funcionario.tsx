@@ -1,5 +1,5 @@
 import { Link, useSearch } from "wouter";
-import { ClipboardList, Wind, PackageOpen, ArrowLeft, MapPin } from "lucide-react";
+import { ClipboardList, Wind, PackageOpen, MapPin } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UNITS, type Unit } from "@/contexts/unit-context";
@@ -61,7 +61,7 @@ export default function MenuFuncionario() {
               </Card>
             </Link>
 
-            <Link href={`/pmoc`}>
+            <Link href={`/registrar/pmoc?u=${unitFromUrl}`}>
               <Card className="bg-card border-border/50 hover:border-primary/60 hover:bg-primary/5 transition-all cursor-pointer group">
                 <CardContent className="p-5 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
@@ -88,13 +88,6 @@ export default function MenuFuncionario() {
                 </CardContent>
               </Card>
             </Link>
-          </div>
-
-          <div className="pt-2 text-center">
-            <a href="javascript:history.back()" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Voltar
-            </a>
           </div>
         </div>
       </div>

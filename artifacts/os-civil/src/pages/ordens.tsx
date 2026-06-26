@@ -73,11 +73,10 @@ export default function Ordens() {
     const blob = new Blob(["\uFEFF" + content], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `ordens-servico-${format(new Date(), "yyyy-MM-dd")}.xls`);
-    document.body.appendChild(link);
+    link.href = url;
+    link.download = `ordens-servico-${format(new Date(), "yyyy-MM-dd")}.xls`;
     link.click();
-    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
   };
 
   const handlePrint = () => window.print();

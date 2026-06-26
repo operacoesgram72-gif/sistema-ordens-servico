@@ -628,6 +628,10 @@ export default function Configuracoes() {
           )}
         </Button>
       </div>
+
+      <div className="pt-6 border-t border-border/30 text-center">
+        <p className="text-xs text-muted-foreground/50">Autoria: Junior Melo.</p>
+      </div>
     </div>
   );
 }

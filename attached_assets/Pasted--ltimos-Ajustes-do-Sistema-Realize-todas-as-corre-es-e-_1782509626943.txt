@@ -1,0 +1,220 @@
+Últimos Ajustes do Sistema
+
+Realize todas as correções e melhorias abaixo sem remover, alterar ou comprometer qualquer funcionalidade já existente. Todas as implementações deverão ser complementares ao sistema atual, preservando o banco de dados, as permissões, as integrações e a estrutura existente.
+
+1. Correção do Erro de Navegação - Menu dos Funcionários
+Problema
+
+Ao executar o fluxo abaixo:
+
+Acessar o Menu dos Funcionários;
+Clicar em Inserir Ordem de Serviço;
+Após abrir a tela Nova Ordem de Serviço, clicar em Voltar.
+
+O sistema apresenta o erro:
+
+Failed to execute 'removeChild' on 'Node': The node to be removed is not a child of this node.
+
+Objetivo
+
+Identificar a causa raiz desse erro e corrigi-lo definitivamente.
+
+Revisar
+Rotas do React Router;
+Navegação entre páginas;
+Ciclo de vida dos componentes (Mount e Unmount);
+Hooks (useEffect);
+Eventos de navegação;
+Componentes reutilizados;
+Modais;
+Tooltips;
+Popovers;
+Menus;
+Manipulação direta do DOM;
+Estado global (caso exista);
+Componentes desmontados durante a navegação.
+Correções obrigatórias
+
+Verificar se existe qualquer utilização de:
+
+removeChild()
+appendChild()
+remove()
+replaceChild()
+innerHTML
+
+Caso exista, substituir pela abordagem correta utilizando apenas o ciclo de vida do React.
+
+O botão Voltar deverá utilizar somente o React Router, sem manipulação manual do navegador ou do DOM.
+
+Caso necessário, criar uma rota específica para retornar ao Menu dos Funcionários.
+
+Revisão preventiva
+
+Verificar também a navegação dos módulos:
+
+PMOC e Bebedouros;
+Retirada de Materiais e Ferramentas;
+Calendário;
+Gestão de Arquivos;
+Lista de Ordens de Serviço;
+Demais módulos acessados pelos funcionários.
+Validação
+
+Confirmar que:
+
+o botão Voltar funciona corretamente;
+não existem erros JavaScript;
+nenhuma funcionalidade deixou de funcionar;
+Administradores e Funcionários utilizam normalmente o sistema.
+
+Caso sejam encontrados outros erros semelhantes, corrigi-los automaticamente.
+
+2. Correção do Link Exclusivo dos Funcionários
+2.1 Corrigir o título da página
+
+Ao acessar a tela de cadastro pelo link dos funcionários, atualmente aparece:
+
+Registrar Ordem de Jay
+
+Esse comportamento está incorreto.
+
+O título deverá permanecer fixo.
+
+Utilizar:
+
+Registrar Ordem de Serviço
+
+ou
+
+Nova Ordem de Serviço
+
+Não utilizar nenhuma variável dinâmica, nome do usuário ou parâmetro da URL.
+
+2.2 Corrigir a tela PMOC e Bebedouros
+
+Quando o funcionário clicar em PMOC e Bebedouros, o sistema está carregando toda a interface administrativa.
+
+Isso está incorreto.
+
+O funcionário deverá visualizar apenas:
+
+título da página;
+tabela do cronograma;
+funcionalidades permitidas;
+botão para retornar ao Menu dos Funcionários.
+
+Não deverá aparecer:
+
+Painel de Serviços;
+Dashboard;
+Menu lateral;
+Indicadores;
+Calendário;
+Lista de OS;
+Equipes;
+Gestão de Arquivos;
+Configurações;
+Dados Cadastrais;
+qualquer outra funcionalidade administrativa.
+3. Criar um Layout Exclusivo para Funcionários
+
+O sistema deverá possuir dois layouts independentes.
+
+Layout Administrativo
+
+Utilizado apenas por Administradores e Gestores.
+
+Deverá permanecer exatamente como está.
+
+Layout Funcionário
+
+Utilizado exclusivamente pelo link dos funcionários.
+
+Permitir acesso somente às seguintes páginas:
+
+Menu do Funcionário;
+Inserir Ordem de Serviço;
+PMOC e Bebedouros;
+Retirada de Materiais e Ferramentas.
+
+Nenhuma outra funcionalidade deverá ficar visível.
+
+4. Controle de Permissões
+
+O sistema deverá identificar automaticamente o tipo de acesso.
+
+Quando o acesso ocorrer pelo link dos funcionários:
+
+carregar somente o Layout Funcionário;
+ocultar completamente os menus administrativos;
+impedir acesso às rotas administrativas, mesmo digitando a URL manualmente.
+5. Preservação do Sistema
+
+Essas alterações deverão apenas corrigir o comportamento do acesso dos funcionários.
+
+Não alterar:
+
+Layout Administrativo;
+permissões dos gestores;
+banco de dados;
+estrutura das Ordens de Serviço;
+funcionalidades existentes.
+
+Ao finalizar, validar:
+
+título correto da Ordem de Serviço;
+PMOC exibindo apenas a tabela para funcionários;
+menus administrativos disponíveis somente para administradores;
+funcionamento correto do link exclusivo dos funcionários.
+6. Novo Campo na Ordem de Serviço
+
+Dentro da tela Nova Ordem de Serviço, adicionar um novo campo.
+
+Título:
+
+Tem PTE?
+
+Tipo do campo:
+
+Caixa de seleção contendo:
+
+Sim;
+Não.
+
+Esse campo deverá ser salvo junto à Ordem de Serviço e ficar disponível para futuras consultas, filtros e relatórios.
+
+7. Autoria do Sistema
+
+Na aba Configurações, no final da página, inserir discretamente a informação:
+
+Autoria: Junior Melo
+
+Essa informação deverá permanecer fixa, sem interferir nas demais configurações do sistema.
+
+Requisitos Obrigatórios
+
+Todas as solicitações acima deverão ser implementadas preservando integralmente o funcionamento atual do sistema.
+
+É proibido:
+
+remover funcionalidades existentes;
+alterar layouts não solicitados;
+modificar permissões existentes;
+alterar o banco de dados sem necessidade;
+quebrar integrações;
+modificar rotas que já estejam funcionando.
+
+Antes de concluir, realizar uma validação completa do sistema, garantindo que:
+
+todas as páginas carreguem corretamente;
+todas as permissões continuem funcionando;
+todos os formulários operem normalmente;
+todas as rotas estejam funcionais;
+não existam erros de Front-end ou Back-end;
+não existam erros de JavaScript;
+não ocorram regressões em funcionalidades existentes.
+
+Caso seja identificado qualquer erro durante a implementação, corrigi-lo automaticamente antes de finalizar.
+
+Objetivo final: entregar todas as melhorias solicitadas mantendo o sistema totalmente estável, seguro, funcional e compatível para Administradores e Funcionários, sem perda de dados, sem alterações não solicitadas e sem impacto nas funcionalidades já existentes.

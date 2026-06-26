@@ -20,6 +20,7 @@ import Pmoc from "@/pages/pmoc";
 import RetiradaMateriais from "@/pages/retirada-materiais";
 import Calendario from "@/pages/calendario";
 import Arquivos from "@/pages/arquivos";
+import RegistrarPmoc from "@/pages/registrar-pmoc";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Switch>
             <Route path="/registrar/os" component={RegistrarOS} />
+            <Route path="/registrar/pmoc" component={RegistrarPmoc} />
             <Route path="/registrar/materiais" component={RegistrarMateriais} />
             <Route path="/registrar" component={MenuFuncionario} />
             <Route component={ManagementRouter} />
