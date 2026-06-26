@@ -73,16 +73,7 @@
           navigator.serviceWorker.register('/sw.js').catch(() => {});
         });
       }
-      // Hide splash once React mounts
-      document.addEventListener('DOMContentLoaded', () => {
-        const splash = document.getElementById('splash');
-        if (splash) {
-          setTimeout(() => {
-            splash.classList.add('hidden');
-            setTimeout(() => splash.remove(), 400);
-          }, 600);
-        }
-      });
+      // Splash hide is triggered by main.tsx after React mounts (see hideSplash global)
     </script>
   </body>
 </html>
