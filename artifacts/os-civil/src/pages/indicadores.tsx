@@ -8,13 +8,19 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart, Line, Legend,
 } from "recharts";
-import { ClipboardList, CheckCircle2, DollarSign, TrendingUp } from "lucide-react";
+import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar } from "lucide-react";
+
+const MONTHS = [
+  "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export default function Indicadores() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState<number>(0);
   const [years, setYears] = useState<number[]>([currentYear]);
   const { unit } = useUnit();
 
@@ -49,28 +55,47 @@ export default function Indicadores() {
 
   if (!indicators) return <div className="p-8">Nenhum dado encontrado.</div>;
 
-  const totalOs = indicators.byMonth.reduce((acc: number, curr: any) => acc + curr.total, 0);
-  const totalCompleted = indicators.byMonth.reduce((acc: number, curr: any) => acc + curr.completed, 0);
-  const avgValue = totalOs > 0 ? indicators.totalValue / totalOs : 0;
+  const filteredMonths = selectedMonth === 0
+    ? indicators.byMonth
+    : indicators.byMonth.filter((_: any, i: number) => i === selectedMonth - 1);
+
+  const totalOs = filteredMonths.reduce((acc: number, curr: any) => acc + curr.total, 0);
+  const totalCompleted = filteredMonths.reduce((acc: number, curr: any) => acc + curr.completed, 0);
+  const totalValue = filteredMonths.reduce((acc: number, curr: any) => acc + (curr.value ?? 0), 0);
+  const completionRate = totalOs > 0 ? (totalCompleted / totalOs) * 100 : 0;
+  const avgValue = totalOs > 0 ? totalValue / totalOs : 0;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Indicadores de Desempenho</h1>
-          <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do ano selecionado.</p>
+          <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do período selecionado.</p>
         </div>
-        <div className="w-full md:w-48">
+        <div className="flex gap-2">
           <Select
             value={selectedYear.toString()}
             onValueChange={(val) => setSelectedYear(parseInt(val))}
           >
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o ano" />
+            <SelectTrigger className="w-28">
+              <SelectValue placeholder="Ano" />
             </SelectTrigger>
             <SelectContent>
               {years.map((y) => (
                 <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={selectedMonth.toString()}
+            onValueChange={(val) => setSelectedMonth(parseInt(val))}
+          >
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="Mês" />
+            </SelectTrigger>
+            <SelectContent>
+              {MONTHS.map((m, i) => (
+                <SelectItem key={i} value={i.toString()}>{m}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -82,7 +107,9 @@ export default function Indicadores() {
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-2">
               <ClipboardList className="w-4 h-4 text-primary" />
-              <div className="text-sm font-medium text-muted-foreground">Total de OS no Ano</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                {selectedMonth === 0 ? "Total de OS no Ano" : `Total — ${MONTHS[selectedMonth]}`}
+              </div>
             </div>
             <div className="text-3xl font-bold font-mono text-primary">{totalOs}</div>
           </CardContent>
@@ -99,19 +126,42 @@ export default function Indicadores() {
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-amber-500" />
-              <div className="text-sm font-medium text-muted-foreground">Valor Total Estimado</div>
+              <Target className="w-4 h-4 text-blue-400" />
+              <div className="text-sm font-medium text-muted-foreground">Taxa de Conclusão</div>
             </div>
-            <div className="text-2xl font-bold font-mono text-amber-500">{formatCurrency(indicators.totalValue)}</div>
+            <div className="text-3xl font-bold font-mono text-blue-400">{completionRate.toFixed(1)}%</div>
           </CardContent>
         </Card>
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="w-4 h-4 text-amber-500" />
+              <div className="text-sm font-medium text-muted-foreground">Valor Total Estimado</div>
+            </div>
+            <div className="text-2xl font-bold font-mono text-amber-500">{formatCurrency(totalValue)}</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="bg-card border-border/50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-violet-500" />
-              <div className="text-sm font-medium text-muted-foreground">Média por OS</div>
+              <div className="text-sm font-medium text-muted-foreground">Ticket Médio por OS</div>
             </div>
             <div className="text-2xl font-bold font-mono text-violet-500">{formatCurrency(avgValue)}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border/50">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <div className="text-sm font-medium text-muted-foreground">Período Selecionado</div>
+            </div>
+            <div className="text-lg font-bold">
+              {selectedYear}{selectedMonth > 0 ? ` — ${MONTHS[selectedMonth]}` : " (ano completo)"}
+            </div>
           </CardContent>
         </Card>
       </div>

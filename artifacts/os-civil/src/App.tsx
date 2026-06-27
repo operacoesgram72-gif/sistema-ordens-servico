@@ -1,5 +1,5 @@
 import { Suspense, lazy } from "react";
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -43,6 +43,37 @@ function PageFallback() {
   );
 }
 
+function MaintenancePage() {
+  return (
+    <div className="min-h-screen bg-background text-foreground dark flex flex-col items-center justify-center gap-6 p-8">
+      <div className="flex flex-col items-center gap-4 text-center max-w-sm">
+        <img src="/logo-amazonica.png" alt="Logo" className="h-16 w-16 object-contain opacity-70" />
+        <div>
+          <h1 className="text-2xl font-bold">Sistema em Manutenção</h1>
+          <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+            O sistema está temporariamente indisponível para manutenção programada.
+            Por favor, aguarde e tente novamente em alguns instantes.
+          </p>
+        </div>
+        <div className="text-xs text-muted-foreground/50 mt-4">GRAM Operações — Grupo Rede Amazônica</div>
+      </div>
+    </div>
+  );
+}
+
+function StandaloneGuard() {
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as any).standalone === true;
+  const isCreatorMode = window.location.search.includes("modo=criador");
+  const isOffline = !isCreatorMode && (() => {
+    try { return localStorage.getItem("gram_system_online") === "false"; } catch { return false; }
+  })();
+  if (isOffline) return <MaintenancePage />;
+  if (isStandalone) return <Redirect to="/registrar" />;
+  return <ManagementRouter />;
+}
+
 function ManagementRouter() {
   return (
     <UnitProvider>
@@ -80,7 +111,7 @@ function App() {
               <Route path="/registrar/pmoc" component={RegistrarPmoc} />
               <Route path="/registrar/materiais" component={RegistrarMateriais} />
               <Route path="/registrar" component={MenuFuncionario} />
-              <Route component={ManagementRouter} />
+              <Route component={StandaloneGuard} />
             </Switch>
           </Suspense>
         </WouterRouter>

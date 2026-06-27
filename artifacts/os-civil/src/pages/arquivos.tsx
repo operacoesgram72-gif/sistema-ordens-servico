@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Folder, FolderPlus, File, Plus, Trash2, Upload,
-  ChevronRight, FileText, Image as ImageIcon, Sheet,
+  ChevronRight, FileText, Image as ImageIcon, Sheet, ArrowLeft,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -154,6 +154,14 @@ export default function Arquivos() {
     <div className="p-4 md:p-6 space-y-4 max-w-full">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Voltar
+          </button>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <Folder className="w-7 h-7 text-primary" />
             Gestão de Arquivos

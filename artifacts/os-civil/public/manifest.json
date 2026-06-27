@@ -2,7 +2,7 @@
   "name": "GRAM Operações",
   "short_name": "GRAM",
   "description": "Painel de Serviços do Departamento de Operações — Grupo Rede Amazônica",
-  "start_url": "/",
+  "start_url": "/registrar",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0f172a",

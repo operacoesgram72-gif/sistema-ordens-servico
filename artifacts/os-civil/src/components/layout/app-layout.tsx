@@ -150,6 +150,11 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
             Copiar link — {unit}
           </button>
         </div>
+        <div className="mt-3 pt-3 border-t border-border/40 text-center">
+          <p className="text-[10px] text-muted-foreground/50 leading-snug">
+            Desenvolvido por <span className="text-muted-foreground/70 font-medium">Aristoteles Melo</span>
+          </p>
+        </div>
       </div>
     </>
   );

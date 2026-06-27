@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Save, Bell, Share2, Copy, CheckCircle2, Mail, Server, Info,
   Send, XCircle, Loader2, ExternalLink, Plug, Plus, Trash2, Eye, EyeOff,
+  ChevronDown, ChevronUp, Shield, Power,
 } from "lucide-react";
 import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -128,6 +129,27 @@ export default function Configuracoes() {
   const [connForm, setConnForm] = useState({ label: "", apiKey: "", endpointUrl: "" });
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
+  const isCreatorMode = typeof window !== "undefined" && window.location.search.includes("modo=criador");
+  const [systemOnline, setSystemOnline] = useState<boolean>(() => {
+    try { return localStorage.getItem("gram_system_online") !== "false"; } catch { return true; }
+  });
+
+  const [sectOpen, setSectOpen] = useState<Record<string, boolean>>({
+    notif: true, smtp: false, webhook: false, monitoring: false, sharing: true,
+    integrations: false, creator: true,
+  });
+  const toggleSect = (key: string) => setSectOpen(p => ({ ...p, [key]: !p[key] }));
+
+  const handleSystemToggle = () => {
+    const next = !systemOnline;
+    setSystemOnline(next);
+    try { localStorage.setItem("gram_system_online", next ? "true" : "false"); } catch {}
+    toast({
+      title: next ? "Sistema ativado" : "Sistema em manutenção",
+      description: next ? "O sistema voltou ao ar normalmente." : "O sistema foi colocado em modo de manutenção.",
+    });
+  };
+
   useEffect(() => {
     if (settings) {
       setForm({
@@ -224,16 +246,22 @@ export default function Configuracoes() {
 
       {/* Notificações por E-mail */}
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Bell className="w-5 h-5 text-primary" />
-            Notificações por E-mail
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("notif")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-primary" />
+              Notificações por E-mail
+            </span>
+            {sectOpen.notif ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </CardTitle>
           <CardDescription>
             Receba um e-mail automático sempre que uma nova OS for registrada.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        {sectOpen.notif && <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
@@ -249,21 +277,27 @@ export default function Configuracoes() {
               Cada vez que um funcionário registrar uma OS, esse e-mail receberá um aviso com os detalhes.
             </p>
           </div>
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Configuração SMTP */}
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Server className="w-5 h-5 text-primary" />
-            Configuração de Envio (SMTP)
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("smtp")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Server className="w-5 h-5 text-primary" />
+              Configuração de Envio (SMTP)
+            </span>
+            {sectOpen.smtp ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </CardTitle>
           <CardDescription>
             Dados do servidor de e-mail para envio das notificações.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        {sectOpen.smtp && <CardContent className="space-y-4">
           <div className="rounded-md bg-primary/5 border border-primary/20 p-4 space-y-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-primary">
               <Info className="w-4 h-4 shrink-0" />
@@ -341,21 +375,27 @@ export default function Configuracoes() {
               {testing ? "Enviando..." : "Testar Envio"}
             </Button>
           </div>
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Notificações WhatsApp / n8n */}
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Send className="w-5 h-5 text-primary" />
-            Notificações por WhatsApp / n8n
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("webhook")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-primary" />
+              Notificações por WhatsApp / n8n
+            </span>
+            {sectOpen.webhook ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </CardTitle>
           <CardDescription>
             Configure webhooks para disparar mensagens automáticas no WhatsApp ou fluxos de automação via n8n quando uma OS for registrada.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        {sectOpen.webhook && <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label className="flex items-center gap-2">
               <span>💬</span> URL do Webhook — WhatsApp
@@ -393,21 +433,27 @@ export default function Configuracoes() {
   "criado_em": "2026-06-26T14:00:00Z"
 }`}</pre>
           </div>
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Monitoramento de E-mail */}
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Mail className="w-5 h-5 text-primary" />
-            Monitoramento de E-mail (Entrada)
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("monitoring")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-primary" />
+              Monitoramento de E-mail (Entrada)
+            </span>
+            {sectOpen.monitoring ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </CardTitle>
           <CardDescription>
             Monitore uma caixa de entrada e converta e-mails recebidos automaticamente em ordens de serviço.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        {sectOpen.monitoring && <CardContent className="space-y-4">
           <div className="flex items-center justify-between p-3 rounded-md border border-border/60 bg-muted/30">
             <div>
               <p className="text-sm font-medium">Monitoramento Ativo</p>
@@ -444,21 +490,27 @@ export default function Configuracoes() {
               Salve as configurações e entre em contato com o administrador do sistema para ativação completa.
             </span>
           </div>
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Compartilhamento */}
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Share2 className="w-5 h-5 text-primary" />
-            Link de Registro para Funcionários
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("sharing")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Share2 className="w-5 h-5 text-primary" />
+              Link de Registro para Funcionários
+            </span>
+            {sectOpen.sharing ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </CardTitle>
           <CardDescription>
             Envie este link para os funcionários abrirem chamados sem acesso ao painel de gestão.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        {sectOpen.sharing && <CardContent className="space-y-3">
           <div className="flex items-center gap-2">
             <Input value={shareUrl} readOnly className="font-mono text-sm bg-muted/50" />
             <Button variant="outline" onClick={copyLink} className="shrink-0">
@@ -468,21 +520,27 @@ export default function Configuracoes() {
           <p className="text-xs text-muted-foreground">
             O funcionário preenche o formulário e recebe um número de protocolo. Nenhuma informação de gestão é visível nessa página.
           </p>
-        </CardContent>
+        </CardContent>}
       </Card>
 
       {/* Integrações */}
       <Card className="bg-card border-border/50">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Plug className="w-5 h-5 text-primary" />
-            Integrações e Conexões
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("integrations")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Plug className="w-5 h-5 text-primary" />
+              Integrações e Conexões
+            </span>
+            {sectOpen.integrations ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
           </CardTitle>
           <CardDescription>
             Conecte o sistema a outras plataformas para compartilhamento, análise e automação.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        {sectOpen.integrations && <CardContent className="space-y-6">
 
           {/* Conexões ativas */}
           {connections.length > 0 && (
@@ -615,8 +673,54 @@ export default function Configuracoes() {
               </div>
             </div>
           ))}
-        </CardContent>
+        </CardContent>}
       </Card>
+
+      {/* Creator Control Panel — visible only via ?modo=criador */}
+      {isCreatorMode && (
+        <Card className="bg-card border-border/50 border-violet-600/40">
+          <CardHeader
+            className="cursor-pointer select-none"
+            onClick={() => toggleSect("creator")}
+          >
+            <CardTitle className="flex items-center justify-between text-lg">
+              <span className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-violet-500" />
+                Painel do Criador
+              </span>
+              {sectOpen.creator ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+            </CardTitle>
+            <CardDescription>
+              Controles exclusivos do administrador raiz do sistema.
+            </CardDescription>
+          </CardHeader>
+          {sectOpen.creator && <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-md border border-border/60 bg-muted/30">
+              <div className="flex items-center gap-3">
+                <Power className={`w-5 h-5 ${systemOnline ? "text-emerald-500" : "text-red-500"}`} />
+                <div>
+                  <p className="text-sm font-semibold">{systemOnline ? "Sistema Online" : "Sistema em Manutenção"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {systemOnline
+                      ? "O sistema está ativo e acessível normalmente."
+                      : "O sistema está bloqueado. Apenas o criador consegue acessar."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSystemToggle}
+                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${systemOnline ? "bg-emerald-500" : "bg-red-500"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow ${systemOnline ? "translate-x-6" : "translate-x-0"}`} />
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground/60">
+              URL de acesso ao painel do criador: <span className="font-mono">{shareUrl.replace("/registrar", "/configuracoes")}?modo=criador</span>
+            </p>
+          </CardContent>}
+        </Card>
+      )}
 
       {/* Save button */}
       <div className="flex justify-end pt-2">
@@ -630,7 +734,7 @@ export default function Configuracoes() {
       </div>
 
       <div className="pt-6 border-t border-border/30 text-center">
-        <p className="text-xs text-muted-foreground/50">Autoria: Junior Melo.</p>
+        <p className="text-xs text-muted-foreground/50">Desenvolvido por <strong>Aristoteles Melo</strong> — GRAM Operações.</p>
       </div>
     </div>
   );

@@ -5,7 +5,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays } from "lucide-react";
 import { PRIORITY_LABELS } from "@/lib/constants";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const PIE_COLORS = {
   baixa: "hsl(142 70% 45%)",
@@ -28,7 +30,18 @@ export default function Dashboard() {
   const [filterMonth, setFilterMonth] = useState<string>("0");
   const [filterDay, setFilterDay] = useState<string>("0");
 
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+  const [years, setYears] = useState<number[]>(
+    Array.from({ length: 5 }, (_, i) => currentYear - i)
+  );
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/service-orders/available-years`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: number[] | null) => {
+        if (Array.isArray(data) && data.length > 0) setYears(data);
+      })
+      .catch(() => {});
+  }, []);
   const daysInMonth = filterMonth !== "0"
     ? new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
     : 31;

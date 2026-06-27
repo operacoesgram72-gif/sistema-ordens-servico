@@ -18,6 +18,7 @@ import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS, TIPO_LA
 import { useUnit } from "@/contexts/unit-context";
 
 type HoveredPhoto = { src: string; x: number; y: number } | null;
+type LightboxState = { photos: string[]; index: number } | null;
 
 function parsePhotos(photosStr: string | null | undefined): string[] {
   if (!photosStr) return [];
@@ -33,6 +34,7 @@ export default function Ordens() {
   const [tipo, setTipo] = useState<string>("all");
   const [formato, setFormato] = useState<string>("all");
   const [hoveredPhoto, setHoveredPhoto] = useState<HoveredPhoto>(null);
+  const [lightbox, setLightbox] = useState<LightboxState>(null);
 
   const { data: ordens, isLoading } = useListServiceOrders(
     { 
@@ -198,6 +200,54 @@ export default function Ordens() {
         </div>
       )}
 
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+            onClick={() => setLightbox(null)}
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          {lightbox.photos.length > 1 && (
+            <>
+              <button
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/40 rounded-full p-2 transition-colors"
+                onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, index: (l.index - 1 + l.photos.length) % l.photos.length } : null); }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <button
+                className="absolute right-12 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/40 rounded-full p-2 transition-colors"
+                onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, index: (l.index + 1) % l.photos.length } : null); }}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </>
+          )}
+          <img
+            src={lightbox.photos[lightbox.index]}
+            alt={`Foto ${lightbox.index + 1}`}
+            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+          {lightbox.photos.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {lightbox.photos.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, index: i } : null); }}
+                  className={`w-2 h-2 rounded-full transition-colors ${i === lightbox.index ? "bg-white" : "bg-white/40"}`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="border border-border/50 rounded-md bg-card overflow-x-auto">
         <Table>
           <TableHeader>
@@ -270,15 +320,15 @@ export default function Ordens() {
                     <TableCell>
                       {firstPhoto ? (
                         <div
-                          className="relative inline-block cursor-pointer"
-                          onClick={e => e.stopPropagation()}
+                          className="relative inline-block cursor-pointer transition-transform duration-150 hover:scale-110 hover:z-10"
+                          onClick={e => { e.stopPropagation(); setLightbox({ photos, index: 0 }); }}
                           onMouseEnter={e => setHoveredPhoto({ src: firstPhoto, x: e.clientX, y: e.clientY })}
                           onMouseLeave={() => setHoveredPhoto(null)}
                         >
                           <img
                             src={firstPhoto}
                             alt="foto"
-                            className="w-9 h-9 rounded object-cover border border-border"
+                            className="w-9 h-9 rounded object-cover border-2 border-border shadow-sm"
                           />
                           {photos.length > 1 && (
                             <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold leading-none">

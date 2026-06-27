@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays, ArrowLeft } from "lucide-react";
+import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays, ArrowLeft, Camera, Video } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -430,20 +430,23 @@ export default function RegistrarOS() {
 
                         {/* Fotos */}
                         <div className="md:col-span-2 space-y-3">
-                          <Label>Fotos do Local / Problema</Label>
-                          <div className="flex items-center gap-4">
+                          <Label>Fotos / Vídeos do Local</Label>
+                          <div className="flex flex-wrap items-center gap-3">
                             <Button variant="outline" type="button" onClick={() => document.getElementById("photo-upload-pub")?.click()}>
                               <ImageIcon className="w-4 h-4 mr-2" />
-                              Anexar Fotos
+                              Galeria
                             </Button>
-                            <input
-                              id="photo-upload-pub"
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              className="hidden"
-                              onChange={handleFileChange}
-                            />
+                            <Button variant="outline" type="button" onClick={() => document.getElementById("photo-camera-pub")?.click()}>
+                              <Camera className="w-4 h-4 mr-2" />
+                              Tirar Foto
+                            </Button>
+                            <Button variant="outline" type="button" onClick={() => document.getElementById("video-camera-pub")?.click()}>
+                              <Video className="w-4 h-4 mr-2" />
+                              Gravar Vídeo
+                            </Button>
+                            <input id="photo-upload-pub" type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
+                            <input id="photo-camera-pub" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
+                            <input id="video-camera-pub" type="file" accept="video/*" capture="environment" className="hidden" onChange={handleFileChange} />
                           </div>
                           {photosBase64.length > 0 && (
                             <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mt-3">

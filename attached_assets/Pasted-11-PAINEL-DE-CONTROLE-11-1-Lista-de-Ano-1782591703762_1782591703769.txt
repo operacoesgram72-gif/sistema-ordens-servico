@@ -1,0 +1,92 @@
+11 - PAINEL DE CONTROLE
+-------------------------------------------------------
+
+11.1 - Lista de Anos
+
+No filtro de anos do Painel de Controle:
+
+- Remover todos os anos que não possuem registros.
+- Exibir apenas os anos que realmente possuem Ordens de Serviço cadastradas.
+- Atualizar automaticamente quando um novo ano possuir seu primeiro registro.
+- Não utilizar lista fixa (hardcoded).
+
+-------------------------------------------------------
+12 - INDICADORES
+-------------------------------------------------------
+
+Melhorar a tela de Indicadores.
+
+Adicionar filtros semelhantes aos existentes no Painel de Controle.
+
+Permitir visualizar os indicadores por:
+
+• Diário
+• Mensal
+• Anual
+
+Cada filtro deverá atualizar automaticamente:
+
+- Quantidade de OS
+- PMOC
+- Bebedouros
+- Materiais
+- Serviços concluídos
+- Serviços em andamento
+- Serviços pendentes
+
+Os filtros poderão ser combinados com:
+
+- Ano
+- Mês
+- Técnico
+- Status
+
+Sem alterar os indicadores existentes.
+
+-------------------------------------------------------
+13 - PERMISSÃO PARA ALTERAÇÃO DE STATUS
+-------------------------------------------------------
+
+Alterar as permissões das Ordens de Serviço.
+
+Somente usuários com perfil de Gestor poderão alterar o Status da OS.
+
+Funcionários poderão apenas:
+
+- Criar OS
+- Atualizar informações permitidas
+- Inserir fotos
+- Inserir vídeos
+- Inserir anexos
+- Executar atividades
+
+O campo Status deverá permanecer bloqueado para Funcionários.
+
+Caso tentem alterar via URL ou API, impedir a alteração.
+
+Aplicar validação também no servidor.
+
+-------------------------------------------------------
+14 - MELHORIA DA SPLASH SCREEN
+-------------------------------------------------------
+
+Melhorar completamente a tela inicial do aplicativo.
+
+Atualmente a logo aparece dentro de um fundo preto arredondado, causando uma aparência pouco profissional.
+
+Objetivo:
+
+- Remover o fundo preto atual.
+- Manter apenas a logomarca em alta resolução.
+- Centralizar corretamente.
+- Corrigir a proporção da imagem.
+- Aplicar transparência (quando disponível).
+- Utilizar um fundo sólido com a identidade visual da empresa (azul escuro ou outro definido no tema).
+- Adicionar uma animação discreta de fade + leve zoom.
+- Exibir uma barra de progresso moderna ou um indicador de carregamento elegante.
+- Evitar qualquer distorção da logomarca.
+- Manter abertura rápida e fluida.
+
+A Splash Screen deve ter aparência semelhante à de aplicativos profissionais como Microsoft, Google ou Nubank.
+
+Ao finalizar, verificar a aparência em diferentes tamanhos de tela Android para garantir que a logomarca permaneça centralizada e proporcional.

@@ -403,28 +403,6 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Origem */}
-                <FormField
-                  control={form.control}
-                  name="origem"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Origem da OS</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {Object.entries(ORIGEM_LABELS).map(([val, label]) => (
-                            <SelectItem key={val} value={val}>{label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 {/* Técnico Responsável */}
                 <FormField
                   control={form.control}
