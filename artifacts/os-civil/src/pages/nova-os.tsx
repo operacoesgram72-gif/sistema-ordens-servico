@@ -3,11 +3,18 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, ArrowLeft, Save, X, Paperclip, TrendingUp, Film } from "lucide-react";
+import {
+  CalendarIcon, ArrowLeft, Save, X, Paperclip, TrendingUp, Film,
+  MapPin, Camera, LocateFixed, Loader2,
+} from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { useCreateServiceOrder, getListServiceOrdersQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import {
+  useCreateServiceOrder,
+  getListServiceOrdersQueryKey,
+  getGetDashboardSummaryQueryKey,
+} from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
 import { useUnit } from "@/contexts/unit-context";
+import { useCamera, useGps, useVibration } from "@/hooks/use-native";
 
 const MARKET_RATES: Record<string, number> = {
   civil: 280,
@@ -63,7 +71,11 @@ export default function NovaOS() {
   const createOrder = useCreateServiceOrder();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(false);
   const { unit } = useUnit();
+  const { capture } = useCamera();
+  const { getLocation } = useGps();
+  const { vibrate } = useVibration();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,6 +121,42 @@ export default function NovaOS() {
     }
   };
 
+  const handleCameraCapture = () => {
+    capture((dataUrl, mimeType) => {
+      const newFile: MediaFile = {
+        src: dataUrl,
+        type: mimeType.startsWith("video/") ? "video" : "image",
+        name: `foto-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`,
+      };
+      const updated = [...mediaFiles, newFile];
+      setMediaFiles(updated);
+      form.setValue("photos", JSON.stringify(updated.map((f) => f.src)));
+    });
+  };
+
+  const handleGpsCapture = async () => {
+    setGpsLoading(true);
+    try {
+      const coords = await getLocation();
+      const currentLocation = form.getValues("location");
+      const gpsText = `GPS: ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)} (±${coords.accuracy}m)`;
+      const newLocation = currentLocation
+        ? `${currentLocation} — ${gpsText}`
+        : gpsText;
+      form.setValue("location", newLocation, { shouldValidate: true });
+      toast({ title: "Localização capturada", description: `Precisão: ±${coords.accuracy} metros` });
+      vibrate(150);
+    } catch (err: any) {
+      toast({
+        title: "Erro de GPS",
+        description: err?.message ?? "Não foi possível obter a localização.",
+        variant: "destructive",
+      });
+    } finally {
+      setGpsLoading(false);
+    }
+  };
+
   const removeMedia = (index: number) => {
     const updated = mediaFiles.filter((_, i) => i !== index);
     setMediaFiles(updated);
@@ -118,9 +166,9 @@ export default function NovaOS() {
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     const tipoLabel = values.tipo ? TIPO_LABELS[values.tipo] : "";
     const formatoLabel = values.formatoServico ? FORMATO_SERVICO_LABELS[values.formatoServico] : "";
-    const autoTitle = [formatoLabel, tipoLabel, values.location]
-      .filter(Boolean)
-      .join(" — ") || `Serviço em ${values.location}`;
+    const autoTitle =
+      [formatoLabel, tipoLabel, values.location].filter(Boolean).join(" — ") ||
+      `Serviço em ${values.location}`;
 
     const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
     const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
@@ -147,6 +195,7 @@ export default function NovaOS() {
           toast({ title: "OS criada com sucesso", description: "A ordem de serviço foi registrada." });
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          vibrate([100, 100, 300]);
           setLocation("/ordens");
         },
         onError: () => {
@@ -164,7 +213,9 @@ export default function NovaOS() {
         </Button>
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Nova Ordem de Serviço</h1>
-          <p className="text-muted-foreground mt-1">Unidade: <strong>{unit}</strong> · ID gerado automaticamente ao salvar.</p>
+          <p className="text-muted-foreground mt-1">
+            Unidade: <strong>{unit}</strong> · ID gerado automaticamente ao salvar.
+          </p>
         </div>
       </div>
 
@@ -194,9 +245,13 @@ export default function NovaOS() {
                               )}
                             >
                               <CalendarIcon className="mr-3 h-4 w-4 text-primary shrink-0" />
-                              {field.value
-                                ? <span className="text-primary font-semibold">{format(field.value, "dd/MM/yyyy")}</span>
-                                : <span className="text-muted-foreground">Escolha uma data...</span>}
+                              {field.value ? (
+                                <span className="text-primary font-semibold">
+                                  {format(field.value, "dd/MM/yyyy")}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">Escolha uma data...</span>
+                              )}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>
@@ -219,16 +274,33 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Local */}
+                {/* Local + GPS Button */}
                 <FormField
                   control={form.control}
                   name="location"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Local</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ex: Andar 3, Bloco B, Corredor Principal" {...field} />
-                      </FormControl>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="Ex: Andar 3, Bloco B, Corredor Principal" {...field} />
+                        </FormControl>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleGpsCapture}
+                          disabled={gpsLoading}
+                          title="Capturar localização GPS"
+                          className="shrink-0"
+                        >
+                          {gpsLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <LocateFixed className="w-4 h-4 text-primary" />
+                          )}
+                        </Button>
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -243,9 +315,7 @@ export default function NovaOS() {
                       <FormLabel>Tipo de Serviço</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {Object.entries(TIPO_LABELS).map(([val, label]) => (
@@ -258,7 +328,7 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Formato do Serviço + estimativa automática */}
+                {/* Formato do Serviço */}
                 <FormField
                   control={form.control}
                   name="formatoServico"
@@ -267,9 +337,7 @@ export default function NovaOS() {
                       <FormLabel>Formato do Serviço</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {Object.entries(FORMATO_SERVICO_LABELS).map(([val, label]) => (
@@ -281,7 +349,10 @@ export default function NovaOS() {
                       {estimativaAuto !== null && (
                         <div className="flex items-center gap-2 mt-1.5 text-sm text-primary">
                           <TrendingUp className="w-3.5 h-3.5" />
-                          <span>Estimativa de mercado: <strong>R$ {estimativaAuto.toLocaleString("pt-BR")}</strong></span>
+                          <span>
+                            Estimativa de mercado:{" "}
+                            <strong>R$ {estimativaAuto.toLocaleString("pt-BR")}</strong>
+                          </span>
                         </div>
                       )}
                     </FormItem>
@@ -297,9 +368,7 @@ export default function NovaOS() {
                       <FormLabel>Categoria</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
@@ -321,9 +390,7 @@ export default function NovaOS() {
                       <FormLabel>Prioridade</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
@@ -345,9 +412,7 @@ export default function NovaOS() {
                       <FormLabel>Origem da OS</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {Object.entries(ORIGEM_LABELS).map(([val, label]) => (
@@ -432,10 +497,10 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Anexos (imagens e vídeos) */}
+                {/* Anexos */}
                 <div className="md:col-span-2 space-y-3">
                   <Label>Anexos (Imagens e Vídeos)</Label>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3 flex-wrap">
                     <Button
                       variant="outline"
                       type="button"
@@ -443,9 +508,21 @@ export default function NovaOS() {
                       className="gap-2"
                     >
                       <Paperclip className="w-4 h-4" />
-                      Anexar Mídia
+                      Arquivo
                     </Button>
-                    <span className="text-xs text-muted-foreground">Imagens e vídeos suportados</span>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={handleCameraCapture}
+                      className="gap-2 md:hidden"
+                      title="Tirar foto com câmera"
+                    >
+                      <Camera className="w-4 h-4" />
+                      Câmera
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Imagens e vídeos suportados
+                    </span>
                     <input
                       id="media-upload"
                       type="file"
@@ -458,13 +535,18 @@ export default function NovaOS() {
                   {mediaFiles.length > 0 && (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
                       {mediaFiles.map((file, idx) => (
-                        <div key={idx} className="relative group rounded-md overflow-hidden border border-border bg-muted/20">
+                        <div
+                          key={idx}
+                          className="relative group rounded-md overflow-hidden border border-border bg-muted/20"
+                        >
                           {file.type === "image" ? (
                             <img src={file.src} alt="Preview" className="w-full h-24 object-cover" />
                           ) : (
                             <div className="w-full h-24 flex flex-col items-center justify-center gap-1 text-muted-foreground">
                               <Film className="w-6 h-6 text-primary" />
-                              <span className="text-[10px] text-center px-1 truncate w-full text-center leading-tight">{file.name}</span>
+                              <span className="text-[10px] text-center px-1 truncate w-full leading-tight">
+                                {file.name}
+                              </span>
                             </div>
                           )}
                           <button
@@ -482,8 +564,15 @@ export default function NovaOS() {
               </div>
 
               <div className="flex justify-end pt-4 border-t border-border/50">
-                <Button type="submit" disabled={createOrder.isPending} size="lg" className="w-full md:w-auto">
-                  {createOrder.isPending ? "Salvando..." : (
+                <Button
+                  type="submit"
+                  disabled={createOrder.isPending}
+                  size="lg"
+                  className="w-full md:w-auto"
+                >
+                  {createOrder.isPending ? (
+                    "Salvando..."
+                  ) : (
                     <>
                       <Save className="w-4 h-4 mr-2" />
                       Criar Ordem de Serviço

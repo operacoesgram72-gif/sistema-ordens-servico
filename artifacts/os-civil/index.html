@@ -33,32 +33,24 @@
     <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512x512.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
     <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
-    <link rel="apple-touch-icon" sizes="144x144" href="/icons/icon-144x144.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
 
     <!-- Open Graph -->
     <meta property="og:title" content="GRAM Operações" />
     <meta property="og:description" content="Painel de Serviços — Grupo Rede Amazônica, Departamento de Operações." />
     <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="GRAM Operações" />
-    <meta name="twitter:description" content="Painel de Serviços — Grupo Rede Amazônica, Departamento de Operações." />
 
-    <!-- Fonts: preconnect first, then load only weight 400+500+600+700 -->
+    <!-- Fonts: non-blocking load -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
-      media="print"
-      onload="this.media='all'"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet" media="print" onload="this.media='all'" />
     <noscript>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     </noscript>
 
     <style>
-      /* Splash screen shown before JS executes */
+      /* ── Splash screen ── */
       #splash {
         position: fixed;
         inset: 0;
@@ -68,18 +60,63 @@
         align-items: center;
         justify-content: center;
         z-index: 9999;
-        transition: opacity 0.35s ease;
+        transition: opacity 0.5s ease;
+        gap: 0;
       }
-      #splash img { width: 72px; height: 72px; object-fit: contain; border-radius: 16px; }
-      #splash p { color: #64748b; font-family: Inter, system-ui, sans-serif; font-size: 13px; margin-top: 14px; letter-spacing: 0.02em; }
-      #splash small { color: #334155; font-family: Inter, system-ui, sans-serif; font-size: 11px; margin-top: 4px; }
+      #splash-logo {
+        width: 96px;
+        height: 96px;
+        object-fit: contain;
+        border-radius: 0;
+        animation: splashPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+      #splash-name {
+        margin-top: 20px;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 20px;
+        font-weight: 700;
+        color: #f1f5f9;
+        letter-spacing: 0.03em;
+        animation: splashFade 0.5s ease 0.2s both;
+      }
+      #splash-sub {
+        margin-top: 6px;
+        font-family: Inter, system-ui, sans-serif;
+        font-size: 12px;
+        color: #475569;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        animation: splashFade 0.5s ease 0.35s both;
+      }
+      #splash-bar {
+        margin-top: 40px;
+        width: 48px;
+        height: 3px;
+        border-radius: 99px;
+        background: linear-gradient(90deg, #1e40af, #3b82f6, #1e40af);
+        background-size: 200% 100%;
+        animation: splashFade 0.5s ease 0.4s both, shimmer 1.4s linear infinite;
+      }
+      @keyframes splashPop {
+        from { opacity: 0; transform: scale(0.7); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+      @keyframes splashFade {
+        from { opacity: 0; transform: translateY(8px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
     </style>
   </head>
   <body>
     <div id="splash">
-      <img src="/logo-amazonica.png" alt="Logo" />
-      <p>GRAM Operações</p>
-      <small>Grupo Rede Amazônica</small>
+      <img id="splash-logo" src="/logo-amazonica.png" alt="GRAM Operações" />
+      <div id="splash-name">GRAM Operações</div>
+      <div id="splash-sub">Grupo Rede Amazônica</div>
+      <div id="splash-bar"></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

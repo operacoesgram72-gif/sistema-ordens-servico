@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay, addMonths, subMonths,
@@ -81,7 +81,7 @@ export default function Calendario() {
             Ordens de serviço agendadas e registradas por data — Unidade: <strong>{unit}</strong>
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" size="icon" onClick={() => setCurrentDate(d => subMonths(d, 1))}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
@@ -93,6 +93,10 @@ export default function Calendario() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Hoje
+          </Button>
+          <Button size="sm" onClick={() => setLocation("/ordens/nova")} className="gap-2 hidden sm:flex">
+            <Plus className="w-4 h-4" />
+            Nova OS
           </Button>
         </div>
       </div>
@@ -175,6 +179,15 @@ export default function Calendario() {
       <p className="text-xs text-muted-foreground">
         💡 Clique em qualquer OS no calendário para ver os detalhes · OS mostradas na data de agendamento ou criação
       </p>
+
+      {/* Floating Action Button (mobile only) */}
+      <button
+        onClick={() => setLocation("/ordens/nova")}
+        aria-label="Nova Ordem de Serviço"
+        className="fab sm:hidden"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
     </div>
   );
 }

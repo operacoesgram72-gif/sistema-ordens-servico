@@ -1,0 +1,265 @@
+## 4.1
+
+Alterar o título exibido no aplicativo.
+
+Hoje aparece:
+
+"OS Civil"
+
+Alterar para:
+
+"Ordem de Serviço"
+
+Apenas no aplicativo.
+
+---
+
+## 4.2
+
+Verificar suporte para anexar vídeos nas Ordens de Serviço.
+
+Caso ainda não exista:
+
+Adicionar upload de vídeos.
+
+---
+
+## 4.3
+
+Corrigir anexos.
+
+Ao inserir:
+
+- PDF
+- Foto
+- Documento
+
+o arquivo deve permanecer listado na OS.
+
+Hoje alguns arquivos não aparecem após anexados.
+
+Corrigir.
+
+---
+
+## 4.4
+
+Aumentar limite máximo de upload.
+
+Permitir anexos maiores.
+
+Definir tamanho adequado para:
+
+- Fotos
+- PDFs
+- Vídeos
+
+Sem comprometer desempenho.
+
+---
+
+## 4.5
+
+Retirada de Materiais
+
+Na tabela onde aparecem os materiais retirados:
+
+Adicionar para usuários Gestores:
+
+- Editar
+- Excluir
+
+Respeitando permissões.
+
+Funcionários continuam apenas visualizando.
+
+---
+
+## 4.6
+
+Indicadores
+
+Corrigir lista de anos.
+
+Hoje aparecem anos desnecessários.
+
+Mostrar apenas anos que possuem registros cadastrados.
+
+---
+
+## 4.7
+
+Relatórios automáticos
+
+Criar geração automática mensal.
+
+No último dia do mês gerar relatório contendo:
+
+- quantidade de OS
+- concluídas
+- abertas
+- canceladas
+- PMOC
+- materiais retirados
+- indicadores
+
+Permitir exportação em PDF.
+
+---
+
+## 4.8
+
+Calendário
+
+Adicionar botão flutuante "+".
+
+Permitir criar:
+
+- Ordem de Serviço
+- Observação
+- Evento
+- Lembrete
+
+Diretamente pelo calendário.
+
+---
+
+## 4.9
+
+Registros excluídos
+
+Quando uma:
+
+- OS
+- PMOC
+- Material
+
+for apagada,
+
+ela NÃO deve aparecer:
+
+- nas tabelas
+- indicadores
+- pesquisas
+- relatórios
+
+Utilizar exclusão lógica quando necessário.
+
+---
+
+## 4.10
+
+Permissões Mobile
+
+Existe um erro.
+
+Quando o link do Funcionário é aberto no celular,
+
+ele direciona para área do Gestor.
+
+Corrigir imediatamente.
+
+Cada usuário deve acessar somente sua própria área conforme seu perfil.
+
+---
+
+## 4.11
+
+Splash Screen
+
+Melhorar aparência.
+
+Hoje a logo aparece comprimida dentro de um quadrado arredondado.
+
+Ajustar para padrão profissional.
+
+Desejo:
+
+- logo centralizada
+- proporção correta
+- sem distorção
+- fundo limpo
+- animação suave
+- abertura semelhante a aplicativos profissionais.
+
+---
+
+# 5 - FUNCIONAMENTO OFFLINE
+
+Implementar funcionamento offline completo.
+
+Adicionar:
+
+- IndexedDB
+- Cache Storage
+- Background Sync
+- Sincronização automática
+
+Permitir:
+
+- criar OS offline
+- editar OS offline
+- PMOC offline
+- retirada de materiais offline
+- anexar fotos offline
+
+Quando internet retornar:
+
+Sincronizar automaticamente.
+
+Evitar registros duplicados.
+
+Mostrar status:
+
+Online
+
+Offline
+
+Sincronizando
+
+Sincronizado
+
+Mostrar quantidade de registros pendentes.
+
+Nunca permitir perda de dados.
+
+---
+
+# 6 - PWA
+
+Confirmar funcionamento:
+
+- instalação Android
+- instalação iPhone
+- Service Worker
+- Manifest
+- Splash Screen
+- Ícones
+- Cache
+
+---
+
+# 7 - DESEMPENHO
+
+Implementar:
+
+- Lazy Loading
+- Code Splitting
+- Otimização do Bundle
+- Compressão de imagens
+- Cache inteligente
+- Pré-carregamento apenas do necessário
+
+---
+
+# 8 - RELATÓRIO FINAL
+
+Ao concluir apresentar:
+
+- Arquivos criados.
+- Arquivos modificados.
+- Justificativa de cada alteração.
+- Recursos implementados.
+- Recursos corrigidos.
+- Confirmar que a versão Desktop permaneceu inalterada.
+- Confirmar que nenhuma funcionalidade existente foi removida.

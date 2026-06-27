@@ -291,7 +291,7 @@ export default function Ordens() {
                       )}
                     </TableCell>
                     <TableCell className="text-right text-sm font-mono text-yellow-500">
-                      {formatCurrency(os.estimatedValue)}
+                      {formatCurrency(os.estimatedValue ?? undefined)}
                     </TableCell>
                   </TableRow>
                 );

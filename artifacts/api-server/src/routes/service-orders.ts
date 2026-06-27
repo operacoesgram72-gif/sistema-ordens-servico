@@ -182,6 +182,22 @@ router.post("/service-orders", async (req, res) => {
   }
 });
 
+// GET /service-orders/available-years — years that have at least one record
+router.get("/service-orders/available-years", async (req, res) => {
+  try {
+    const result = await db.execute(
+      sql`SELECT DISTINCT EXTRACT(YEAR FROM created_at)::int AS year FROM service_orders ORDER BY year DESC`
+    );
+    const years = (result.rows as any[])
+      .map((r) => Number(r.year))
+      .filter((y) => !isNaN(y));
+    res.json(years.length ? years : [new Date().getFullYear()]);
+  } catch (err) {
+    req.log.error(err);
+    res.json([new Date().getFullYear()]);
+  }
+});
+
 // GET /service-orders/:id
 router.get("/service-orders/:id", async (req, res) => {
   try {
