@@ -11,6 +11,26 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "DB Push to Supabase"
+
+[[workflows.workflow]]
+name = "DB Push to Supabase"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node -e \"const v = process.env.DATABASE_URL; console.log('value:', JSON.stringify(v)); console.log('truthy:', !!v);\" 2>&1; echo '=== CHECK DONE ==='"
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
