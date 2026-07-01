@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { salvarOrdemDeServico } from "@/lib/supabase";
 import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,6 +99,7 @@ function loadRows(storageKey: string, fallback: PmocRow[]): PmocRow[] {
 function saveRows(storageKey: string, rows: PmocRow[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(rows));
+    salvarOrdemDeServico({ formulario: "pmoc", dados: { storageKey, totalRows: rows.length } });
   } catch {}
 }
 

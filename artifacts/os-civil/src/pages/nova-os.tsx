@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { salvarOrdemDeServico } from "@/lib/supabase";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -191,7 +192,8 @@ export default function NovaOS() {
         } as any,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data: any) => {
+          salvarOrdemDeServico({ formulario: "nova-os", dados: data ?? {} });
           toast({ title: "OS criada com sucesso", description: "A ordem de serviço foi registrada." });
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });

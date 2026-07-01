@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { salvarOrdemDeServico } from "@/lib/supabase";
 import { Link, useSearch } from "wouter";
 import { Save, Image as ImageIcon, X, CheckCircle2, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -52,6 +53,7 @@ export default function RegistrarMateriais() {
         body: JSON.stringify({ ...form, foto: fotoBase64, unidade: unitFromUrl }),
       });
       if (!res.ok) throw new Error("Erro ao registrar");
+      salvarOrdemDeServico({ formulario: "retirada-materiais", dados: { ...form, foto: fotoBase64, unidade: unitFromUrl } });
       setSubmitted(true);
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar. Tente novamente.", variant: "destructive" });
