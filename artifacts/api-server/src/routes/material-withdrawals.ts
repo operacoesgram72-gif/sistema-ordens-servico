@@ -10,7 +10,6 @@ router.get("/material-withdrawals", async (req, res) => {
     const unidade = req.query.unidade as string | undefined;
     const conditions: any[] = [];
     if (unidade) conditions.push(eq(materialWithdrawalsTable.unidade, unidade));
-
     const rows = await db
       .select()
       .from(materialWithdrawalsTable)
@@ -25,14 +24,30 @@ router.get("/material-withdrawals", async (req, res) => {
 
 router.post("/material-withdrawals", async (req, res) => {
   try {
-    const { date, tipoMaterial, quantidade, justificativa, foto, tipo, unidade } = req.body;
+    const {
+      date,
+      tipoMaterial,
+      quantidade,
+      justificativa,
+      foto,
+      tipo,
+      unidade,
+    } = req.body;
     if (!date || !tipoMaterial || !quantidade || !justificativa || !tipo) {
       res.status(400).json({ error: "Campos obrigatórios faltando" });
       return;
     }
     const [created] = await db
       .insert(materialWithdrawalsTable)
-      .values({ date, tipoMaterial, quantidade, justificativa, foto: foto ?? null, tipo, unidade: unidade || "AM" })
+      .values({
+        date,
+        tipoMaterial,
+        quantidade,
+        justificativa,
+        foto: foto ?? null,
+        tipo,
+        unidade: unidade || "AM",
+      })
       .returning();
     res.status(201).json(created);
   } catch (err) {
@@ -44,7 +59,8 @@ router.post("/material-withdrawals", async (req, res) => {
 router.patch("/material-withdrawals/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { date, tipoMaterial, quantidade, justificativa, foto, tipo } = req.body;
+    const { date, tipoMaterial, quantidade, justificativa, foto, tipo } =
+      req.body;
     const [updated] = await db
       .update(materialWithdrawalsTable)
       .set({
@@ -58,7 +74,10 @@ router.patch("/material-withdrawals/:id", async (req, res) => {
       })
       .where(eq(materialWithdrawalsTable.id, id))
       .returning();
-    if (!updated) { res.status(404).json({ error: "Não encontrado" }); return; }
+    if (!updated) {
+      res.status(404).json({ error: "Não encontrado" });
+      return;
+    }
     res.json(updated);
   } catch (err) {
     req.log.error(err);
@@ -69,7 +88,9 @@ router.patch("/material-withdrawals/:id", async (req, res) => {
 router.delete("/material-withdrawals/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    await db.delete(materialWithdrawalsTable).where(eq(materialWithdrawalsTable.id, id));
+    await db
+      .delete(materialWithdrawalsTable)
+      .where(eq(materialWithdrawalsTable.id, id));
     res.status(204).send();
   } catch (err) {
     req.log.error(err);
