@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { salvarOrdemDeServico } from "@/lib/supabase";
+import { salvarArquivo } from "@/lib/supabase";
 import {
   Folder, FolderPlus, File, Plus, Trash2, Upload,
   ChevronRight, FileText, Image as ImageIcon, Sheet, ArrowLeft,
@@ -92,7 +92,7 @@ export default function Arquivos() {
         body: JSON.stringify({ unidade: unit, parentId: currentFolder, name: newFolderName.trim(), isFolder: 1 }),
       });
       if (!res.ok) throw new Error();
-      salvarOrdemDeServico({ formulario: "arquivos-pasta", dados: { unidade: unit, parentId: currentFolder, name: newFolderName.trim() } });
+      salvarArquivo({ unidade: unit, parentId: currentFolder ?? undefined, name: newFolderName.trim(), isFolder: 1 });
       setNewFolderName("");
       setShowNewFolder(false);
       fetchEntries();
@@ -127,7 +127,7 @@ export default function Arquivos() {
               fileSize: file.size,
             }),
           });
-          salvarOrdemDeServico({ formulario: "arquivos-upload", dados: { unidade: unit, parentId: currentFolder, name: file.name, fileType: file.type, fileSize: file.size } });
+          salvarArquivo({ unidade: unit, parentId: currentFolder ?? undefined, name: file.name, isFolder: 0, fileType: file.type, fileSize: file.size });
           fetchEntries();
           toast({ title: `${file.name} enviado!` });
         } catch {
