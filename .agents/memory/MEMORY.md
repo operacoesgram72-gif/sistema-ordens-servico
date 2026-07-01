@@ -1,0 +1,1 @@
+- [Supabase DB connection via env vars](supabase-db-connection.md) — secrets not injected into workflows; use SUPABASE_DB_PASSWORD env var + VITE_SUPABASE_URL to build connection string

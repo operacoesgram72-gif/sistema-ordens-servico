@@ -10,28 +10,36 @@ dns.setDefaultResultOrder("ipv6first");
 const { Pool } = pg;
 
 function buildDatabaseUrl(): string {
+  // Prefer explicit DATABASE_URL if available
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
-  // Construct from individual PG* vars, encoding special chars correctly
-  const host = process.env.PGHOST;
-  const port = process.env.PGPORT ?? "5432";
-  const database = process.env.PGDATABASE ?? "postgres";
-  const user = process.env.PGUSER ?? "";
-  const password = process.env.PGPASSWORD ?? "";
 
-  if (!host) {
+  // Build from individual vars — SUPABASE_DB_PASSWORD is the shared env var
+  // VITE_SUPABASE_URL gives us the project ref (e.g. ubxwxjruivuvjednkctd)
+  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? "";
+  const match = supabaseUrl.match(/https:\/\/([^.]+)\.supabase\.co/);
+  const projectRef = match ? match[1] : null;
+
+  const password = process.env.SUPABASE_DB_PASSWORD ?? "";
+  const pgHost = process.env.PGHOST ?? (projectRef ? `db.${projectRef}.supabase.co` : "");
+  const pgPort = process.env.PGPORT ?? "5432";
+  const pgUser = process.env.PGUSER ?? "postgres";
+  const pgDatabase = process.env.PGDATABASE ?? "postgres";
+  const pgPassword = process.env.PGPASSWORD ?? password;
+
+  if (!pgHost) {
     throw new Error(
-      "No database connection configured. Set DATABASE_URL or PGHOST.",
+      "No database connection configured. Set DATABASE_URL or SUPABASE_DB_PASSWORD + VITE_SUPABASE_URL.",
     );
   }
 
   const u = new URL("postgresql://x");
-  u.hostname = host;
-  u.port = port;
-  u.pathname = `/${database}`;
-  u.username = user;
-  u.password = password;
+  u.hostname = pgHost;
+  u.port = pgPort;
+  u.pathname = `/${pgDatabase}`;
+  u.username = pgUser;
+  u.password = pgPassword;
   u.searchParams.set("sslmode", "require");
   return u.href;
 }
