@@ -55,7 +55,7 @@ router.patch("/technicians/:id", async (req, res) => {
       .where(eq(techniciansTable.id, id))
       .returning();
 
-    if (!updated) return res.status(404).json({ error: "Não encontrado" });
+    if (!updated) { res.status(404).json({ error: "Não encontrado" }); return; }
     res.json({ ...updated, createdAt: updated.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);

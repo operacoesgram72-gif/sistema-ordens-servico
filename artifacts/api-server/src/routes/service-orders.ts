@@ -206,7 +206,7 @@ router.get("/service-orders/:id", async (req, res) => {
       .select()
       .from(serviceOrdersTable)
       .where(eq(serviceOrdersTable.id, id));
-    if (!row) return res.status(404).json({ error: "Não encontrada" });
+    if (!row) { res.status(404).json({ error: "Não encontrada" }); return; }
     const [enriched] = await enrichWithTechnician([row]);
     res.json(enriched);
   } catch (err) {
@@ -238,7 +238,7 @@ router.patch("/service-orders/:id", async (req, res) => {
       .where(eq(serviceOrdersTable.id, id))
       .returning();
 
-    if (!updated) return res.status(404).json({ error: "Não encontrada" });
+    if (!updated) { res.status(404).json({ error: "Não encontrada" }); return; }
     const [enriched] = await enrichWithTechnician([updated]);
     res.json(enriched);
   } catch (err) {
@@ -275,7 +275,7 @@ router.patch("/service-orders/:id/status", async (req, res) => {
       .where(eq(serviceOrdersTable.id, id))
       .returning();
 
-    if (!updated) return res.status(404).json({ error: "Não encontrada" });
+    if (!updated) { res.status(404).json({ error: "Não encontrada" }); return; }
     const [enriched] = await enrichWithTechnician([updated]);
     res.json(enriched);
   } catch (err) {
@@ -304,7 +304,7 @@ router.post("/service-orders/:id/sign", async (req, res) => {
       .where(eq(serviceOrdersTable.id, id))
       .returning();
 
-    if (!updated) return res.status(404).json({ error: "Não encontrada" });
+    if (!updated) { res.status(404).json({ error: "Não encontrada" }); return; }
     const [enriched] = await enrichWithTechnician([updated]);
     res.json(enriched);
   } catch (err) {

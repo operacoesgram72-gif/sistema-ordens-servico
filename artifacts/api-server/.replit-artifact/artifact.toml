@@ -10,7 +10,7 @@ name = "API Server"
 paths = ["/api"]
 
 [services.development]
-run = "sh -c 'export DATABASE_URL=\"postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$PGDATABASE?sslmode=require\" && pnpm --filter @workspace/api-server run dev'"
+run = "node -e \"const u=new URL('postgresql://x');u.username=process.env.PGUSER||'';u.password=process.env.PGPASSWORD||'';u.hostname=process.env.PGHOST||'localhost';u.port=process.env.PGPORT||'5432';u.pathname='/'+(process.env.PGDATABASE||'postgres');u.searchParams.set('sslmode','require');process.env.DATABASE_URL=u.href;const {execFileSync}=require('child_process');execFileSync('pnpm',['--filter','@workspace/api-server','run','dev'],{stdio:'inherit',env:process.env})\""
 
 [services.production]
 

@@ -53,7 +53,7 @@ router.patch("/contacts/:id", async (req, res) => {
       .set({ ...body, updatedAt: new Date() })
       .where(eq(contactsTable.id, id))
       .returning();
-    if (!updated) return res.status(404).json({ error: "Não encontrado" });
+    if (!updated) { res.status(404).json({ error: "Não encontrado" }); return; }
     res.json(formatContact(updated));
   } catch (err) {
     req.log.error(err);

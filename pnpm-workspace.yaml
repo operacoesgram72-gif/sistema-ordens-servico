@@ -158,3 +158,6 @@ overrides:
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
   esbuild: "0.27.3"
+  # Force single pg version so drizzle-orm resolves consistently across workspace
+  pg: "8.20.0"
+  "@types/pg": "8.20.0"
