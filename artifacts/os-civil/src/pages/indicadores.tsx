@@ -17,10 +17,18 @@ const MONTHS = [
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
+function todayISO() {
+  const d = new Date();
+  const tzOffset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tzOffset).toISOString().slice(0, 10);
+}
+
 export default function Indicadores() {
   const currentYear = new Date().getFullYear();
+  const [periodMode, setPeriodMode] = useState<"ano" | "mes" | "dia">("ano");
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
+  const [selectedDate, setSelectedDate] = useState<string>(todayISO());
   const [years, setYears] = useState<number[]>([currentYear]);
   const { unit } = useUnit();
 
@@ -37,9 +45,20 @@ export default function Indicadores() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unit]);
 
+  const isDiaMode = periodMode === "dia";
+
   const { data: indicators, isLoading } = useGetDashboardIndicators(
-    { year: selectedYear, unidade: unit } as any,
-    { query: { enabled: true, queryKey: ["dashboard-indicators", selectedYear, unit] } }
+    (isDiaMode
+      ? { year: selectedYear, unidade: unit, date: selectedDate }
+      : { year: selectedYear, unidade: unit }) as any,
+    {
+      query: {
+        enabled: true,
+        queryKey: isDiaMode
+          ? ["dashboard-indicators", selectedYear, unit, "dia", selectedDate]
+          : ["dashboard-indicators", selectedYear, unit],
+      },
+    }
   );
 
   const formatCurrency = (value: number) =>
@@ -72,33 +91,63 @@ export default function Indicadores() {
           <h1 className="text-3xl font-bold tracking-tight">Indicadores de Desempenho</h1>
           <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do período selecionado.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Select
-            value={selectedYear.toString()}
-            onValueChange={(val) => setSelectedYear(parseInt(val))}
+            value={periodMode}
+            onValueChange={(val) => {
+              const mode = val as "ano" | "mes" | "dia";
+              setPeriodMode(mode);
+              if (mode !== "mes") setSelectedMonth(0);
+            }}
           >
             <SelectTrigger className="w-28">
-              <SelectValue placeholder="Ano" />
+              <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
-              {years.map((y) => (
-                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
-              ))}
+              <SelectItem value="ano">Ano</SelectItem>
+              <SelectItem value="mes">Mês</SelectItem>
+              <SelectItem value="dia">Dia</SelectItem>
             </SelectContent>
           </Select>
-          <Select
-            value={selectedMonth.toString()}
-            onValueChange={(val) => setSelectedMonth(parseInt(val))}
-          >
-            <SelectTrigger className="w-36">
-              <SelectValue placeholder="Mês" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => (
-                <SelectItem key={i} value={i.toString()}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {isDiaMode ? (
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+            />
+          ) : (
+            <>
+              <Select
+                value={selectedYear.toString()}
+                onValueChange={(val) => setSelectedYear(parseInt(val))}
+              >
+                <SelectTrigger className="w-28">
+                  <SelectValue placeholder="Ano" />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((y) => (
+                    <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {periodMode === "mes" && (
+                <Select
+                  value={selectedMonth.toString()}
+                  onValueChange={(val) => setSelectedMonth(parseInt(val))}
+                >
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.slice(1).map((m, i) => (
+                      <SelectItem key={i + 1} value={(i + 1).toString()}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
+          )}
         </div>
       </div>
 
@@ -108,7 +157,11 @@ export default function Indicadores() {
             <div className="flex items-center gap-2 mb-2">
               <ClipboardList className="w-4 h-4 text-primary" />
               <div className="text-sm font-medium text-muted-foreground">
-                {selectedMonth === 0 ? "Total de OS no Ano" : `Total — ${MONTHS[selectedMonth]}`}
+                {isDiaMode
+                  ? `Total — ${selectedDate.split("-").reverse().join("/")}`
+                  : selectedMonth === 0
+                  ? "Total de OS no Ano"
+                  : `Total — ${MONTHS[selectedMonth]}`}
               </div>
             </div>
             <div className="text-3xl font-bold font-mono text-primary">{totalOs}</div>
@@ -160,7 +213,9 @@ export default function Indicadores() {
               <div className="text-sm font-medium text-muted-foreground">Período Selecionado</div>
             </div>
             <div className="text-lg font-bold">
-              {selectedYear}{selectedMonth > 0 ? ` — ${MONTHS[selectedMonth]}` : " (ano completo)"}
+              {isDiaMode
+                ? selectedDate.split("-").reverse().join("/")
+                : `${selectedYear}${selectedMonth > 0 ? ` — ${MONTHS[selectedMonth]}` : " (ano completo)"}`}
             </div>
           </CardContent>
         </Card>

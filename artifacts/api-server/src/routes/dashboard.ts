@@ -144,12 +144,27 @@ router.get("/dashboard/indicators", async (req, res) => {
   try {
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
     const unidade = req.query.unidade as string | undefined;
-    const startOfYear = new Date(year, 0, 1);
-    const endOfYear = new Date(year + 1, 0, 1);
+    const dateParam = req.query.date as string | undefined;
+    let rangeStart: Date;
+    let rangeEnd: Date;
+    if (dateParam) {
+      const parsed = new Date(`${dateParam}T00:00:00`);
+      if (!isNaN(parsed.getTime())) {
+        rangeStart = parsed;
+        rangeEnd = new Date(parsed);
+        rangeEnd.setDate(rangeEnd.getDate() + 1);
+      } else {
+        rangeStart = new Date(year, 0, 1);
+        rangeEnd = new Date(year + 1, 0, 1);
+      }
+    } else {
+      rangeStart = new Date(year, 0, 1);
+      rangeEnd = new Date(year + 1, 0, 1);
+    }
 
     const indicatorConditions: any[] = [
-      gte(serviceOrdersTable.createdAt, startOfYear),
-      sql`${serviceOrdersTable.createdAt} < ${endOfYear}`,
+      gte(serviceOrdersTable.createdAt, rangeStart),
+      sql`${serviceOrdersTable.createdAt} < ${rangeEnd}`,
     ];
     if (unidade) indicatorConditions.push(eq(serviceOrdersTable.unidade, unidade));
 

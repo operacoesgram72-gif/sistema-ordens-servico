@@ -175,6 +175,7 @@ router.post("/service-orders", async (req, res) => {
       technicianName: (enriched as any).technicianName ?? null,
       formatoServico: created.formatoServico ?? null,
       estimatedValue: created.estimatedValue ? Number(created.estimatedValue) : null,
+      photos: created.photos ?? null,
     }).catch(() => {}); // already handled internally
   } catch (err) {
     req.log.error(err);

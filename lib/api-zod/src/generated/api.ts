@@ -297,7 +297,8 @@ export const GetDashboardStatsResponse = zod.array(GetDashboardStatsResponseItem
  * @summary Indicadores por local, mês e responsável com projeção de valor
  */
 export const GetDashboardIndicatorsQueryParams = zod.object({
-  "year": zod.coerce.number().optional()
+  "year": zod.coerce.number().optional(),
+  "date": zod.coerce.string().optional().describe('Filtra indicadores para um dia específico (YYYY-MM-DD)')
 })
 
 export const GetDashboardIndicatorsResponse = zod.object({
@@ -402,6 +403,85 @@ export const UpdateContactResponse = zod.object({
  * @summary Deletar contato
  */
 export const DeleteContactParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+/**
+ * @summary Listar fornecedores
+ */
+export const ListSuppliersResponseItem = zod.object({
+  "id": zod.number(),
+  "cnpjCpf": zod.string().nullish(),
+  "razaoSocial": zod.string().nullish(),
+  "endereco": zod.string().nullish(),
+  "uf": zod.string().nullish(),
+  "cidade": zod.string().nullish(),
+  "contato": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "atendente": zod.string().nullish(),
+  "localizacaoLink": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+export const ListSuppliersResponse = zod.array(ListSuppliersResponseItem)
+
+
+/**
+ * @summary Cadastrar fornecedor
+ */
+export const CreateSupplierBody = zod.object({
+  "cnpjCpf": zod.string().optional(),
+  "razaoSocial": zod.string().optional(),
+  "endereco": zod.string().optional(),
+  "uf": zod.string().optional(),
+  "cidade": zod.string().optional(),
+  "contato": zod.string().optional(),
+  "email": zod.string().optional(),
+  "atendente": zod.string().optional(),
+  "localizacaoLink": zod.string().optional()
+})
+
+
+/**
+ * @summary Atualizar fornecedor
+ */
+export const UpdateSupplierParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateSupplierBody = zod.object({
+  "cnpjCpf": zod.string().optional(),
+  "razaoSocial": zod.string().optional(),
+  "endereco": zod.string().optional(),
+  "uf": zod.string().optional(),
+  "cidade": zod.string().optional(),
+  "contato": zod.string().optional(),
+  "email": zod.string().optional(),
+  "atendente": zod.string().optional(),
+  "localizacaoLink": zod.string().optional()
+})
+
+export const UpdateSupplierResponse = zod.object({
+  "id": zod.number(),
+  "cnpjCpf": zod.string().nullish(),
+  "razaoSocial": zod.string().nullish(),
+  "endereco": zod.string().nullish(),
+  "uf": zod.string().nullish(),
+  "cidade": zod.string().nullish(),
+  "contato": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "atendente": zod.string().nullish(),
+  "localizacaoLink": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Deletar fornecedor
+ */
+export const DeleteSupplierParams = zod.object({
   "id": zod.coerce.number()
 })
 

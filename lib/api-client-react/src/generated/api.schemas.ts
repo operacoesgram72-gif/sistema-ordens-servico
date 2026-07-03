@@ -397,6 +397,42 @@ export interface ContactInput {
   notes?: string;
 }
 
+export interface Supplier {
+  id: number;
+  /** @nullable */
+  cnpjCpf?: string | null;
+  /** @nullable */
+  razaoSocial?: string | null;
+  /** @nullable */
+  endereco?: string | null;
+  /** @nullable */
+  uf?: string | null;
+  /** @nullable */
+  cidade?: string | null;
+  /** @nullable */
+  contato?: string | null;
+  /** @nullable */
+  email?: string | null;
+  /** @nullable */
+  atendente?: string | null;
+  /** @nullable */
+  localizacaoLink?: string | null;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface SupplierInput {
+  cnpjCpf?: string;
+  razaoSocial?: string;
+  endereco?: string;
+  uf?: string;
+  cidade?: string;
+  contato?: string;
+  email?: string;
+  atendente?: string;
+  localizacaoLink?: string;
+}
+
 export interface SettingsData {
   /** Email para receber notificações de novas OS */
   notificationEmail?: string;
@@ -445,5 +481,9 @@ export const GetDashboardStatsPeriod = {
 
 export type GetDashboardIndicatorsParams = {
 year?: number;
+/**
+ * Filtra indicadores para um dia específico (YYYY-MM-DD)
+ */
+date?: string;
 };
 

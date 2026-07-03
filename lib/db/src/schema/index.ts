@@ -4,3 +4,4 @@ export * from "./contacts";
 export * from "./settings";
 export * from "./material-withdrawals";
 export * from "./file-entries";
+export * from "./suppliers";

@@ -8,4 +8,8 @@
 
 export type GetDashboardIndicatorsParams = {
 year?: number;
+/**
+ * Filtra indicadores para um dia específico (YYYY-MM-DD)
+ */
+date?: string;
 };

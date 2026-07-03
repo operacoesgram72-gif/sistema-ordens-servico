@@ -16,6 +16,7 @@ const RegistrarOS       = lazy(() => import("@/pages/registrar-os"));
 const RegistrarMateriais = lazy(() => import("@/pages/registrar-materiais"));
 const MenuFuncionario   = lazy(() => import("@/pages/menu-funcionario"));
 const Cadastros         = lazy(() => import("@/pages/cadastros"));
+const Fornecedores      = lazy(() => import("@/pages/fornecedores"));
 const Configuracoes     = lazy(() => import("@/pages/configuracoes"));
 const Pmoc              = lazy(() => import("@/pages/pmoc"));
 const RetiradaMateriais = lazy(() => import("@/pages/retirada-materiais"));
@@ -87,6 +88,7 @@ function ManagementRouter() {
             <Route path="/tecnicos" component={Tecnicos} />
             <Route path="/indicadores" component={Indicadores} />
             <Route path="/cadastros" component={Cadastros} />
+            <Route path="/fornecedores" component={Fornecedores} />
             <Route path="/configuracoes" component={Configuracoes} />
             <Route path="/pmoc" component={Pmoc} />
             <Route path="/retirada-materiais" component={RetiradaMateriais} />

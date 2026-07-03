@@ -1,0 +1,65 @@
+Solicitação de Alteração no Sistema
+
+Realizar apenas as alterações descritas abaixo. Não modificar nenhuma outra funcionalidade do sistema que já esteja funcionando.
+
+1. Anexo de mídias e fotos
+
+Na opção "Anexar Mídia/Fotos", permitir que o usuário selecione e envie quantos arquivos desejar, sem limitação para apenas um arquivo.
+
+Requisitos:
+
+Permitir seleção múltipla de imagens e/ou mídias.
+Exibir todos os arquivos anexados.
+Manter a funcionalidade atual sem prejuízo ao restante do sistema.
+2. Nova aba: Fornecedores
+
+Criar uma nova aba no menu principal, posicionada logo abaixo de "Dados Cadastrais", com o nome:
+
+Fornecedores
+
+Nesta aba deverá existir um cadastro de fornecedores contendo os seguintes campos:
+
+CNPJ/CPF
+Razão Social
+Endereço
+UF
+Cidade
+Contato
+E-mail
+Atendente
+Localização (Link)
+Campo Localização
+
+O campo Localização deverá aceitar um link (Google Maps ou qualquer outro mapa).
+
+Quando o usuário clicar neste campo ou em um botão correspondente, o sistema deverá abrir diretamente o local informado em uma nova guia do navegador.
+
+Regras do cadastro
+Nenhum campo deve ser obrigatório.
+O usuário poderá preencher apenas os campos que desejar.
+Deve ser possível:
+Cadastrar;
+Editar;
+Excluir fornecedores.
+Os dados devem permanecer salvos normalmente.
+Compartilhamento
+
+Dentro da aba Fornecedores, criar uma opção de Compartilhamento, permitindo compartilhar livremente as informações cadastradas.
+
+IMPORTANTE
+
+NÃO ALTERAR MAIS NADA NO SISTEMA QUE JÁ ESTEJA FUNCIONANDO.
+
+Repito:
+
+Não modificar layouts existentes.
+Não alterar regras de negócio atuais.
+Não corrigir ou refatorar funcionalidades que não foram solicitadas.
+Não remover recursos.
+Não modificar banco de dados, rotas ou componentes que já estejam funcionando, exceto o estritamente necessário para implementar as solicitações acima.
+Garantir total compatibilidade com todas as funcionalidades existentes.
+Continuidade da execução
+
+Caso os créditos do Replit sejam encerrados durante a implementação, o código deverá permanecer íntegro, sem deixar arquivos incompletos, erros, falhas ou funcionalidades quebradas.
+
+As alterações devem ser implementadas de forma segura, preservando 100% do funcionamento atual do sistema.

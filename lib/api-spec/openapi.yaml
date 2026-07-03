@@ -13,6 +13,7 @@ tags:
   - name: dashboard
   - name: contacts
   - name: settings
+  - name: suppliers
 
 paths:
   /healthz:
@@ -257,6 +258,11 @@ paths:
           in: query
           schema:
             type: integer
+        - name: date
+          in: query
+          description: Filtra indicadores para um dia específico (YYYY-MM-DD)
+          schema:
+            type: string
       responses:
         "200":
           description: Indicadores
@@ -325,6 +331,76 @@ paths:
       operationId: deleteContact
       tags: [contacts]
       summary: Deletar contato
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deletado
+
+  /suppliers:
+    get:
+      operationId: listSuppliers
+      tags: [suppliers]
+      summary: Listar fornecedores
+      responses:
+        "200":
+          description: Lista de fornecedores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Supplier"
+    post:
+      operationId: createSupplier
+      tags: [suppliers]
+      summary: Cadastrar fornecedor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupplierInput"
+      responses:
+        "201":
+          description: Fornecedor criado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+
+  /suppliers/{id}:
+    patch:
+      operationId: updateSupplier
+      tags: [suppliers]
+      summary: Atualizar fornecedor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SupplierInput"
+      responses:
+        "200":
+          description: Fornecedor atualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+    delete:
+      operationId: deleteSupplier
+      tags: [suppliers]
+      summary: Deletar fornecedor
       parameters:
         - name: id
           in: path
@@ -862,6 +938,59 @@ components:
         birthDate:
           type: string
         notes:
+          type: string
+
+    Supplier:
+      type: object
+      required:
+        - id
+        - createdAt
+      properties:
+        id:
+          type: integer
+        cnpjCpf:
+          type: ["string", "null"]
+        razaoSocial:
+          type: ["string", "null"]
+        endereco:
+          type: ["string", "null"]
+        uf:
+          type: ["string", "null"]
+        cidade:
+          type: ["string", "null"]
+        contato:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        atendente:
+          type: ["string", "null"]
+        localizacaoLink:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    SupplierInput:
+      type: object
+      properties:
+        cnpjCpf:
+          type: string
+        razaoSocial:
+          type: string
+        endereco:
+          type: string
+        uf:
+          type: string
+        cidade:
+          type: string
+        contato:
+          type: string
+        email:
+          type: string
+        atendente:
+          type: string
+        localizacaoLink:
           type: string
 
     SettingsData:

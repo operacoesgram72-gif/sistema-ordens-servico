@@ -43,6 +43,8 @@ export * from './signatureInput';
 export * from './statPoint';
 export * from './statusUpdate';
 export * from './statusUpdateStatus';
+export * from './supplier';
+export * from './supplierInput';
 export * from './technician';
 export * from './technicianIndicator';
 export * from './technicianInput';

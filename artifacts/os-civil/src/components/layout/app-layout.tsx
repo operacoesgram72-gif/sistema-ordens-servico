@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp,
   Share2, Copy, BookUser, Settings2, Wind, PackageOpen, CalendarDays, Folder,
-  Menu, X, Wifi, WifiOff,
+  Menu, X, Wifi, WifiOff, Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,7 @@ const navSections = [
       { href: "/arquivos", label: "Arquivos", icon: Folder },
       { href: "/tecnicos", label: "Equipes", icon: Users },
       { href: "/cadastros", label: "Dados Cadastrais", icon: BookUser },
+      { href: "/fornecedores", label: "Fornecedores", icon: Truck },
     ],
   },
   {

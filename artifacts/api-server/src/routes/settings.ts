@@ -101,7 +101,11 @@ router.post("/settings/test-email", async (req, res) => {
 });
 
 // Internal helper: attempt to send email and return result (never throws)
-async function attemptSendEmail(mail: { subject: string; html: string }): Promise<
+async function attemptSendEmail(mail: {
+  subject: string;
+  html: string;
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
+}): Promise<
   { ok: true } | { ok: false; error: string }
 > {
   const settings = await getAllSettings();
@@ -138,6 +142,7 @@ async function attemptSendEmail(mail: { subject: string; html: string }): Promis
       to,
       subject: mail.subject,
       html: mail.html,
+      attachments: mail.attachments,
     });
 
     logger.info({ to, host, port }, "Email sent successfully");
@@ -160,6 +165,32 @@ async function attemptSendEmail(mail: { subject: string; html: string }): Promis
   }
 }
 
+// Parses the "photos" field (JSON-stringified array of base64 data URIs) into
+// nodemailer attachment objects, preserving the original upload order.
+function parsePhotoAttachments(photos?: string | null): { filename: string; content: Buffer; contentType: string }[] {
+  if (!photos) return [];
+  try {
+    const list = JSON.parse(photos);
+    if (!Array.isArray(list)) return [];
+    const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
+    list.forEach((entry, idx) => {
+      if (typeof entry !== "string") return;
+      const match = entry.match(/^data:(.+);base64,(.*)$/);
+      if (!match) return;
+      const [, mime, base64] = match;
+      const ext = mime.split("/")[1]?.split("+")[0] || "bin";
+      attachments.push({
+        filename: `anexo-${idx + 1}.${ext}`,
+        content: Buffer.from(base64, "base64"),
+        contentType: mime,
+      });
+    });
+    return attachments;
+  } catch {
+    return [];
+  }
+}
+
 // Exported utility: send OS notification email (non-blocking, never throws)
 export async function sendOsNotification(os: {
   number: string;
@@ -170,6 +201,7 @@ export async function sendOsNotification(os: {
   technicianName?: string | null;
   formatoServico?: string | null;
   estimatedValue?: number | null;
+  photos?: string | null;
 }) {
   const valor = os.estimatedValue
     ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(os.estimatedValue)
@@ -177,6 +209,11 @@ export async function sendOsNotification(os: {
 
   const descriptionRow = os.description
     ? `<tr><td style="padding:6px 0;color:#666;vertical-align:top">Descrição</td><td style="white-space:pre-wrap">${os.description}</td></tr>`
+    : "";
+
+  const attachments = parsePhotoAttachments(os.photos);
+  const photosRow = attachments.length
+    ? `<tr><td style="padding:6px 0;color:#666">Fotos anexadas</td><td>${attachments.length} arquivo(s) em anexo</td></tr>`
     : "";
 
   const result = await attemptSendEmail({
@@ -196,6 +233,7 @@ export async function sendOsNotification(os: {
             <tr><td style="padding:6px 0;color:#666">Técnico</td><td>${os.technicianName || "Não atribuído"}</td></tr>
             ${descriptionRow}
             <tr><td style="padding:6px 0;color:#666">Valor Estimado</td><td style="color:#f59e0b;font-weight:bold">${valor}</td></tr>
+            ${photosRow}
           </table>
         </div>
         <div style="background:#f9f9f9;padding:12px 20px;font-size:12px;color:#999">
@@ -203,6 +241,7 @@ export async function sendOsNotification(os: {
         </div>
       </div>
     `,
+    attachments,
   });
 
   if (!result.ok) {
