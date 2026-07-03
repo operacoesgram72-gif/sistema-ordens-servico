@@ -15,6 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 type SupplierForm = {
   cnpjCpf: string;
   razaoSocial: string;
@@ -112,32 +114,31 @@ export default function Fornecedores() {
     });
   };
 
-  const handleShare = async (s: any) => {
-    const text = [
-      `Fornecedor: ${s.razaoSocial || "-"}`,
-      s.cnpjCpf ? `CNPJ/CPF: ${s.cnpjCpf}` : null,
-      s.endereco ? `Endereço: ${s.endereco}` : null,
-      s.cidade || s.uf ? `Cidade/UF: ${[s.cidade, s.uf].filter(Boolean).join(" / ")}` : null,
-      s.contato ? `Contato: ${s.contato}` : null,
-      s.email ? `E-mail: ${s.email}` : null,
-      s.atendente ? `Atendente: ${s.atendente}` : null,
-      s.localizacaoLink ? `Localização: ${s.localizacaoLink}` : null,
-    ].filter(Boolean).join("\n");
-
+  const shareLink = async (url: string, title: string) => {
     if (navigator.share) {
       try {
-        await navigator.share({ title: `Fornecedor: ${s.razaoSocial || ""}`, text });
+        await navigator.share({ title, url });
         return;
       } catch {
         // user cancelled or share failed, fall back to clipboard
       }
     }
     try {
-      await navigator.clipboard.writeText(text);
-      toast({ title: "Dados copiados para a área de transferência!" });
+      await navigator.clipboard.writeText(url);
+      toast({ title: "Link copiado para a área de transferência!" });
     } catch {
       toast({ title: "Não foi possível compartilhar.", variant: "destructive" });
     }
+  };
+
+  const handleShare = (s: any) => {
+    const url = `${window.location.origin}${BASE_URL}/fornecedores/publico/${s.id}`;
+    shareLink(url, `Fornecedor: ${s.razaoSocial || ""}`);
+  };
+
+  const handleShareList = () => {
+    const url = `${window.location.origin}${BASE_URL}/fornecedores/publico`;
+    shareLink(url, "Relação de Fornecedores");
   };
 
   return (
@@ -147,10 +148,16 @@ export default function Fornecedores() {
           <h1 className="text-3xl font-bold tracking-tight">Fornecedores</h1>
           <p className="text-muted-foreground mt-1">Cadastro e gestão de fornecedores.</p>
         </div>
-        <Button onClick={openNew}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Fornecedor
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleShareList}>
+            <Share2 className="w-4 h-4 mr-2" />
+            Compartilhar Lista
+          </Button>
+          <Button onClick={openNew}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Fornecedor
+          </Button>
+        </div>
       </div>
 
       <Card className="p-4 bg-card border-border/50">

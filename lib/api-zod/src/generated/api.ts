@@ -444,6 +444,29 @@ export const CreateSupplierBody = zod.object({
 
 
 /**
+ * @summary Buscar fornecedor por ID
+ */
+export const GetSupplierParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetSupplierResponse = zod.object({
+  "id": zod.number(),
+  "cnpjCpf": zod.string().nullish(),
+  "razaoSocial": zod.string().nullish(),
+  "endereco": zod.string().nullish(),
+  "uf": zod.string().nullish(),
+  "cidade": zod.string().nullish(),
+  "contato": zod.string().nullish(),
+  "email": zod.string().nullish(),
+  "atendente": zod.string().nullish(),
+  "localizacaoLink": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string().optional()
+})
+
+
+/**
  * @summary Atualizar fornecedor
  */
 export const UpdateSupplierParams = zod.object({

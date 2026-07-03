@@ -20,6 +20,19 @@ router.get("/suppliers", async (req, res) => {
   }
 });
 
+// GET /suppliers/:id (public read-only lookup, used by supplier share links)
+router.get("/suppliers/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [row] = await db.select().from(suppliersTable).where(eq(suppliersTable.id, id));
+    if (!row) { res.status(404).json({ error: "Não encontrado" }); return; }
+    res.json(formatSupplier(row));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 // POST /suppliers
 router.post("/suppliers", async (req, res) => {
   try {

@@ -17,6 +17,8 @@ const RegistrarMateriais = lazy(() => import("@/pages/registrar-materiais"));
 const MenuFuncionario   = lazy(() => import("@/pages/menu-funcionario"));
 const Cadastros         = lazy(() => import("@/pages/cadastros"));
 const Fornecedores      = lazy(() => import("@/pages/fornecedores"));
+const FornecedorPublico   = lazy(() => import("@/pages/fornecedor-publico"));
+const FornecedoresPublico = lazy(() => import("@/pages/fornecedores-publico"));
 const Configuracoes     = lazy(() => import("@/pages/configuracoes"));
 const Pmoc              = lazy(() => import("@/pages/pmoc"));
 const RetiradaMateriais = lazy(() => import("@/pages/retirada-materiais"));
@@ -113,6 +115,8 @@ function App() {
               <Route path="/registrar/pmoc" component={RegistrarPmoc} />
               <Route path="/registrar/materiais" component={RegistrarMateriais} />
               <Route path="/registrar" component={MenuFuncionario} />
+              <Route path="/fornecedores/publico/:id" component={FornecedorPublico} />
+              <Route path="/fornecedores/publico" component={FornecedoresPublico} />
               <Route component={StandaloneGuard} />
             </Switch>
           </Suspense>

@@ -374,6 +374,25 @@ paths:
                 $ref: "#/components/schemas/Supplier"
 
   /suppliers/{id}:
+    get:
+      operationId: getSupplier
+      tags: [suppliers]
+      summary: Buscar fornecedor por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Fornecedor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Supplier"
+        "404":
+          description: Não encontrado
     patch:
       operationId: updateSupplier
       tags: [suppliers]
