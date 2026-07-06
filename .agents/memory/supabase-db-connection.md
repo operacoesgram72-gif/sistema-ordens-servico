@@ -1,33 +1,31 @@
 ---
-name: Supabase DB connection via env vars
-description: How the API server connects to Supabase — secrets are NOT auto-injected into Replit workflows, so DATABASE_URL can't be a secret.
+name: Supabase DB Connection
+description: How the Supabase database connection is configured and the quirks discovered in this Replit environment.
 ---
 
-# Supabase DB Connection — GRAM Operações
+## Rules
 
-## The rule
+- **Always rely on `DATABASE_URL` secret** — the user sets it in Replit Secrets with the full Supabase connection string (pooler or direct). The code checks it first.
+- `??` does NOT catch empty strings (`""`). Use `||` when env vars can be set-but-empty (PGHOST, PGPORT, etc. from Replit's managed secrets are defined but empty in this project).
+- The Supabase direct DB host (`db.<ref>.supabase.co`) is **IPv6-only** in this project's region. IPv6 TCP connections are **not supported** in this Replit container (`EAFNOSUPPORT`). **Do not try to connect to the direct host.**
+- The Supabase session pooler (`aws-0-*.pooler.supabase.com`) can be reached over IPv4, but the project's region must match — wrong region gives `tenant/user not found`.
+- The current `lib/db/src/index.ts` uses **top-level await** (valid in ESM `.mjs` output) to build the pool. Priority: `DATABASE_URL` → direct host (if IPv4) → pooler discovery → PG* vars.
 
-Replit **secrets** are NOT automatically injected into workflow processes. Only **env vars** (set via `setEnvVars`) are available in workflows. `DATABASE_URL` and all `PG*` vars are secrets → they arrive as empty strings in the workflow process.
+**Why:** the Supabase direct DB resolved to IPv6 only and `connect EAFNOSUPPORT` was the error. The pool must connect via IPv4 (pooler) or a full `DATABASE_URL` that points to the pooler.
 
-## How to apply
+**How to apply:** When the API server fails with `EAFNOSUPPORT` or `getaddrinfo ENOTFOUND`, check that `DATABASE_URL` secret has a valid pooler connection string from the Supabase dashboard (Settings → Database → Connection string → Session/Transaction pooler).
 
-`lib/db/src/index.ts` builds the connection string at runtime:
-1. Tries `process.env.DATABASE_URL` first (works if moved from secret to env var)
-2. Falls back to: `PGHOST` (or derived from `VITE_SUPABASE_URL` project ref → `db.<ref>.supabase.co`) + `PGUSER` (default `postgres`) + `SUPABASE_DB_PASSWORD` (shared env var) + `PGDATABASE` (default `postgres`) + `PGPORT` (default `5432`)
-3. Always sets `ssl: { rejectUnauthorized: false }` in the Pool config
+## Schema migrations
 
-## Working config (as of July 2026)
+- `drizzle-kit push` needs a TTY and fails in this environment.
+- Run migrations as raw SQL via `node scripts/migrate.mjs` (uses `DATABASE_URL` from env).
+- The script uses `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` and `CREATE TABLE IF NOT EXISTS` — safe to re-run.
+- Always add new columns/tables to both the Drizzle schema files AND `scripts/migrate.mjs`.
 
-- `VITE_SUPABASE_URL` = `https://ubxwxjruivuvjednkctd.supabase.co` (env var, shared)
-- `VITE_SUPABASE_ANON_KEY` = publishable key (env var, shared)  
-- `SUPABASE_DB_PASSWORD` = Supabase DB password (env var, shared) — set by user
-- Supabase project ref: `ubxwxjruivuvjednkctd`
-- DB host: `db.ubxwxjruivuvjednkctd.supabase.co`
+## Current working db/index.ts approach
 
-**Why:** The artifact.toml originally tried to construct DATABASE_URL from PG* vars in the run command, but those PG* vars are secrets and arrive empty. The fix was to use SUPABASE_DB_PASSWORD as a regular env var and derive the host from the already-available VITE_SUPABASE_URL.
-
-## Applying schema changes (DDL)
-
-`pnpm --filter @workspace/db run push` (drizzle-kit) prompts interactively and fails with "Interactive prompts require a TTY terminal" in this environment — piped stdin doesn't satisfy it. The `database` skill's `executeSql` tool also fails here (`invalid sslmode value: "no-verify"`) because it doesn't understand this Supabase connection string format.
-
-**How to apply new tables/columns:** write a one-off Node script (`.mjs`) that reuses the exact pg `Pool` connection logic from `lib/db/src/index.ts` (IPv6-first DNS, `ssl: { rejectUnauthorized: false }`, `SUPABASE_DB_PASSWORD`/`VITE_SUPABASE_URL`-derived host) and run raw `CREATE TABLE IF NOT EXISTS ...` SQL directly via `pool.query(...)`. Place/run the script from inside `lib/db` (or another workspace package) so `node` can resolve the `pg` import from that package's `node_modules` — running it from a bare `/tmp` path fails with `ERR_MODULE_NOT_FOUND`. Delete the script after running it.
+Uses top-level await (ESM) to:
+1. Check `DATABASE_URL` (non-empty) → use it directly
+2. Try direct host for IPv4 → skip if IPv6-only  
+3. Discover pooler by trying common regions with `dns.promises.resolve4`
+4. Fall back to PG* env vars

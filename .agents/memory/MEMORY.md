@@ -1,2 +1,2 @@
-- [Supabase DB connection via env vars](supabase-db-connection.md) — secrets not injected into workflows; use SUPABASE_DB_PASSWORD env var + VITE_SUPABASE_URL to build connection string
-- [Schema changes on this Supabase DB](supabase-db-connection.md) — `drizzle-kit push` needs a TTY and fails here; run raw SQL via a one-off script using the same pg Pool config instead
+- [Supabase DB connection via env vars](supabase-db-connection.md) — DATABASE_URL secret must be set to pooler URL; direct host is IPv6-only (EAFNOSUPPORT in this container)
+- [Schema changes on this Supabase DB](supabase-db-connection.md) — drizzle-kit push needs a TTY; run raw SQL via `node scripts/migrate.mjs` instead; script is idempotent

@@ -1,0 +1,134 @@
+/**
+ * One-off migration script — runs idempotent ALTER TABLE / CREATE TABLE
+ * statements to bring the Supabase DB up to the current Drizzle schema.
+ * Run with:  node --env-file=... scripts/migrate.mjs
+ */
+
+import dns from "dns";
+import pg from "pg";
+
+dns.setDefaultResultOrder("ipv6first");
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
+
+const migrations = [
+  // ── suppliers ──────────────────────────────────────────────────────────────
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS unidade text NOT NULL DEFAULT 'AM'`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS cnpj_cpf text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS razao_social text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS endereco text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS uf text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS cidade text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS contato text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS email text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS atendente text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS localizacao_link text`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`,
+  `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+
+  // ── contacts ───────────────────────────────────────────────────────────────
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS unidade text NOT NULL DEFAULT 'AM'`,
+  `ALTER TABLE contacts ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+
+  // ── service_orders ─────────────────────────────────────────────────────────
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS unidade text NOT NULL DEFAULT 'AM'`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS origem text NOT NULL DEFAULT 'manual'`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS tipo text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS formato_servico text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS photos text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS signature text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS signed_by text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS signed_at timestamptz`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS estimated_value numeric`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS scheduled_at timestamptz`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS completed_at timestamptz`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS technician_name_free text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS department text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS notes text`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+
+  // ── technicians ────────────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS technicians (
+    id         serial PRIMARY KEY,
+    name       text NOT NULL,
+    specialty  text NOT NULL,
+    phone      text,
+    email      text,
+    active     boolean NOT NULL DEFAULT true,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+
+  // ── material_withdrawals ───────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS material_withdrawals (
+    id           serial PRIMARY KEY,
+    unidade      text NOT NULL DEFAULT 'AM',
+    nome         text NOT NULL DEFAULT '',
+    date         text NOT NULL,
+    tipo_material text NOT NULL,
+    quantidade   text NOT NULL,
+    justificativa text NOT NULL,
+    foto         text,
+    tipo         text NOT NULL DEFAULT 'retirada',
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE material_withdrawals ADD COLUMN IF NOT EXISTS unidade text NOT NULL DEFAULT 'AM'`,
+  `ALTER TABLE material_withdrawals ADD COLUMN IF NOT EXISTS nome text NOT NULL DEFAULT ''`,
+  `ALTER TABLE material_withdrawals ADD COLUMN IF NOT EXISTS tipo text NOT NULL DEFAULT 'retirada'`,
+  `ALTER TABLE material_withdrawals ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+
+  // ── file_entries ───────────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS file_entries (
+    id          serial PRIMARY KEY,
+    unidade     text NOT NULL DEFAULT 'AM',
+    parent_id   integer,
+    name        text NOT NULL,
+    is_folder   integer NOT NULL DEFAULT 0,
+    file_data   text,
+    file_type   text,
+    file_size   integer,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    updated_at  timestamptz NOT NULL DEFAULT now()
+  )`,
+
+  // ── settings ───────────────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS settings (
+    id         serial PRIMARY KEY,
+    key        text NOT NULL UNIQUE,
+    value      text,
+    label      text,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+
+  // ── links (new table) ──────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS links (
+    id         serial PRIMARY KEY,
+    unidade    text NOT NULL DEFAULT 'AM',
+    nome       text NOT NULL,
+    descricao  text,
+    url        text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+];
+
+const client = await pool.connect();
+try {
+  for (const sql of migrations) {
+    const label = sql.trim().slice(0, 80).replace(/\s+/g, " ");
+    try {
+      await client.query(sql);
+      console.log("✅", label);
+    } catch (err) {
+      console.error("❌", label, "\n  →", err.message);
+    }
+  }
+  console.log("\n✔ Migration complete.");
+} finally {
+  client.release();
+  await pool.end();
+}
