@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Search, Truck, MapPin, Share2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Truck, MapPin, Share2, FileText } from "lucide-react";
 import {
-  useListSuppliers,
   useCreateSupplier,
   useUpdateSupplier,
   useDeleteSupplier,
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -14,8 +13,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useUnit } from "@/contexts/unit-context";
+import { generatePDF } from "@/lib/pdf-utils";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+type Supplier = {
+  id: number;
+  razaoSocial?: string | null;
+  cnpjCpf?: string | null;
+  endereco?: string | null;
+  uf?: string | null;
+  cidade?: string | null;
+  contato?: string | null;
+  email?: string | null;
+  atendente?: string | null;
+  localizacaoLink?: string | null;
+  unidade?: string | null;
+};
 
 type SupplierForm = {
   cnpjCpf: string;
@@ -43,8 +58,16 @@ const empty: SupplierForm = {
 
 export default function Fornecedores() {
   const { toast } = useToast();
+  const { unit } = useUnit();
   const queryClient = useQueryClient();
-  const { data: suppliers, isLoading } = useListSuppliers();
+  const { data: suppliers, isLoading } = useQuery<Supplier[]>({
+    queryKey: ["suppliers", unit],
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/suppliers?unidade=${unit}`);
+      if (!res.ok) throw new Error("Erro ao carregar fornecedores");
+      return res.json();
+    },
+  });
   const createSupplier = useCreateSupplier();
   const updateSupplier = useUpdateSupplier();
   const deleteSupplier = useDeleteSupplier();
@@ -79,10 +102,10 @@ export default function Fornecedores() {
     setDialogOpen(true);
   };
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/suppliers"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["suppliers", unit] });
 
   const handleSave = () => {
-    const payload = {
+    const payload: any = {
       cnpjCpf: form.cnpjCpf || undefined,
       razaoSocial: form.razaoSocial || undefined,
       endereco: form.endereco || undefined,
@@ -92,6 +115,7 @@ export default function Fornecedores() {
       email: form.email || undefined,
       atendente: form.atendente || undefined,
       localizacaoLink: form.localizacaoLink || undefined,
+      unidade: unit,
     };
     if (editingId) {
       updateSupplier.mutate({ id: editingId, data: payload }, {
@@ -116,12 +140,7 @@ export default function Fornecedores() {
 
   const shareLink = async (url: string, title: string) => {
     if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        // user cancelled or share failed, fall back to clipboard
-      }
+      try { await navigator.share({ title, url }); return; } catch {}
     }
     try {
       await navigator.clipboard.writeText(url);
@@ -141,14 +160,42 @@ export default function Fornecedores() {
     shareLink(url, "Relação de Fornecedores");
   };
 
+  const handleExportPDF = () => {
+    generatePDF({
+      title: "Relatório de Fornecedores",
+      subtitle: "Cadastro e gestão de fornecedores",
+      unit,
+      columns: [
+        { header: "Razão Social", key: "razaoSocial", width: "22%" },
+        { header: "CNPJ/CPF", key: "cnpjCpf", width: "14%" },
+        { header: "Cidade/UF", key: "cidadeUf", width: "14%" },
+        { header: "Contato", key: "contato", width: "13%" },
+        { header: "E-mail", key: "email", width: "18%" },
+        { header: "Atendente", key: "atendente", width: "12%" },
+      ],
+      rows: filtered.map(s => ({
+        razaoSocial: s.razaoSocial || "—",
+        cnpjCpf: s.cnpjCpf || "—",
+        cidadeUf: [s.cidade, s.uf].filter(Boolean).join(" / ") || "—",
+        contato: s.contato || "—",
+        email: s.email || "—",
+        atendente: s.atendente || "—",
+      })),
+    });
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Fornecedores</h1>
-          <p className="text-muted-foreground mt-1">Cadastro e gestão de fornecedores.</p>
+          <p className="text-muted-foreground mt-1">Cadastro da unidade <strong>{unit}</strong>.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={handleExportPDF} disabled={!filtered.length}>
+            <FileText className="w-4 h-4 mr-2" />
+            Exportar PDF
+          </Button>
           <Button variant="outline" onClick={handleShareList}>
             <Share2 className="w-4 h-4 mr-2" />
             Compartilhar Lista
@@ -188,7 +235,7 @@ export default function Fornecedores() {
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <Truck className="w-8 h-8 opacity-30" />
-                    <span>Nenhum fornecedor encontrado.</span>
+                    <span>Nenhum fornecedor encontrado para a unidade {unit}.</span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -206,13 +253,7 @@ export default function Fornecedores() {
                   <TableCell>
                     <div className="flex gap-1">
                       {s.localizacaoLink && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          title="Abrir localização"
-                          onClick={() => window.open(s.localizacaoLink!, "_blank", "noopener,noreferrer")}
-                        >
+                        <Button variant="ghost" size="icon" className="h-8 w-8" title="Abrir localização" onClick={() => window.open(s.localizacaoLink!, "_blank", "noopener,noreferrer")}>
                           <MapPin className="w-3.5 h-3.5" />
                         </Button>
                       )}
@@ -290,9 +331,7 @@ export default function Fornecedores() {
       {/* Delete Confirm Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent className="dark bg-card text-foreground border-border max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirmar exclusão</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Confirmar exclusão</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Tem certeza que deseja remover este fornecedor? Esta ação não pode ser desfeita.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>

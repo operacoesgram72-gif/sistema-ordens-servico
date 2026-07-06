@@ -2,16 +2,20 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { suppliersTable } from "@workspace/db";
 import { CreateSupplierBody, UpdateSupplierBody } from "@workspace/api-zod";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 const router = Router();
 
 // GET /suppliers
 router.get("/suppliers", async (req, res) => {
   try {
+    const unidade = req.query.unidade as string | undefined;
+    const conditions: any[] = [];
+    if (unidade) conditions.push(eq(suppliersTable.unidade, unidade));
     const rows = await db
       .select()
       .from(suppliersTable)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(sql`${suppliersTable.razaoSocial} ASC NULLS LAST`);
     res.json(rows.map(formatSupplier));
   } catch (err) {
@@ -37,9 +41,11 @@ router.get("/suppliers/:id", async (req, res) => {
 router.post("/suppliers", async (req, res) => {
   try {
     const body = CreateSupplierBody.parse(req.body);
+    const unidade = (req.body.unidade as string) || "AM";
     const [created] = await db
       .insert(suppliersTable)
       .values({
+        unidade,
         cnpjCpf: body.cnpjCpf ?? null,
         razaoSocial: body.razaoSocial ?? null,
         endereco: body.endereco ?? null,

@@ -1,0 +1,158 @@
+Melhorias e Correções do Sistema
+
+Realize todas as alterações abaixo mantendo a estabilidade do sistema. Não remova funcionalidades existentes que já estejam funcionando. Antes de alterar qualquer componente, verifique dependências para evitar regressões.
+
+Fluxo de Ordem de Serviço (OS)
+No menu Funcionários, ao clicar em Registrar Nova OS, não deve abrir diretamente o formulário.
+
+Deve aparecer uma tela com duas opções:
+
+Abrir OS
+Fechar OS
+Abrir OS
+Deve abrir exatamente o formulário atual de criação de Ordem de Serviço.
+Manter todos os campos e funcionalidades existentes.
+Fechar OS
+Deve abrir a lista de Ordens de Serviço.
+Nesta tela, somente a coluna "Status" poderá ser alterada, permitindo fechar a OS.
+Todos os demais campos devem permanecer bloqueados (somente leitura).
+O usuário não poderá editar nenhuma outra informação da Ordem de Serviço.
+
+Separação de Dados por Estado (UF)
+Corrigir o armazenamento dos dados por Estado.
+
+Atualmente, ao selecionar um Estado (ex.: AC), são exibidos registros pertencentes a outro Estado (ex.: AM).
+
+Isso não pode acontecer.
+
+Cada UF deve possuir:
+
+Banco de dados independente (lógico)
+Registros independentes
+Painel independente
+Relatórios independentes
+Fornecedores independentes
+Ordens de Serviço independentes
+Funcionários independentes
+Materiais independentes
+
+Ou seja:
+
+Os dados cadastrados em uma UF nunca poderão aparecer em outra.
+
+Toda consulta deve considerar obrigatoriamente a UF atualmente selecionada.
+
+Aba Arquivos
+Adicionar uma seção exclusiva chamada, por exemplo:
+
+Links
+
+Nesta área o usuário poderá cadastrar links de:
+
+Google Drive
+OneDrive
+Dropbox
+SharePoint
+iCloud
+Mega
+Outros serviços em nuvem
+
+Cada registro deve possuir:
+
+Nome
+Descrição (opcional)
+URL
+Botão para abrir o link
+
+Exportação em PDF - Fornecedores
+Na tela de Fornecedores, implementar exportação para PDF.
+
+O PDF deve conter:
+
+Logo da empresa
+Cabeçalho organizado
+Data de emissão
+Tabela organizada
+Paginação
+Boa formatação para impressão
+Layout profissional
+
+Exportação em PDF - Dados Cadastrais
+Aplicar o mesmo padrão profissional de exportação em PDF.
+
+Deve conter:
+
+Logo da empresa
+Cabeçalho
+Rodapé
+Organização visual
+Tabelas alinhadas
+Formatação limpa
+
+Cabeçalho, Rodapé e Menu
+Manter sempre fixos na tela.
+
+Os seguintes componentes não devem se mover durante a rolagem:
+
+Cabeçalho
+Rodapé
+Menu lateral
+
+Apenas o conteúdo principal deverá possuir rolagem.
+
+Exportação da Lista de Ordens de Serviço
+Adicionar exportação da Lista de OS para PDF.
+
+O layout deve seguir o mesmo padrão dos demais relatórios:
+
+Logo da empresa
+Cabeçalho
+Rodapé
+Data
+Tabela organizada
+Quebra automática de páginas
+Impressão em padrão profissional
+
+Retirada de Materiais
+Adicionar um novo campo obrigatório:
+
+Nome
+
+Fluxo esperado:
+
+Nome
+Material
+Quantidade
+Data
+Observação (se existir)
+
+Este campo deve ficar salvo juntamente com o registro da retirada.
+
+Requisitos Gerais
+
+Durante toda a implementação:
+
+Não remover funcionalidades existentes.
+Não alterar layouts que já estejam funcionando sem necessidade.
+Não quebrar integrações existentes.
+Garantir compatibilidade com todo o sistema.
+Validar todas as alterações antes de finalizar.
+
+Ao concluir:
+
+Verificar se todas as telas continuam funcionando.
+Verificar navegação.
+Verificar exportações.
+Verificar filtros.
+Verificar cadastro, edição e consulta.
+Verificar persistência dos dados.
+Caso os créditos do Replit terminem durante a execução
+
+Se os créditos se esgotarem antes da conclusão:
+
+Não deixar nenhuma funcionalidade parcialmente implementada.
+Não deixar código incompleto.
+Não deixar componentes quebrados.
+Finalizar de forma segura, preservando 100% das funcionalidades existentes.
+Todas as alterações já iniciadas devem permanecer funcionais e consistentes.
+Priorizar a integridade do sistema em vez de deixar implementações incompletas.

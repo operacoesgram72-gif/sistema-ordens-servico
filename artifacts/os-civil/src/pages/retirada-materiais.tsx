@@ -13,6 +13,7 @@ const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 type Withdrawal = {
   id: number;
+  nome: string;
   date: string;
   tipoMaterial: string;
   quantidade: string;
@@ -23,6 +24,7 @@ type Withdrawal = {
 };
 
 type FormState = {
+  nome: string;
   date: string;
   tipoMaterial: string;
   quantidade: string;
@@ -32,6 +34,7 @@ type FormState = {
 };
 
 const emptyForm = (): FormState => ({
+  nome: "",
   date: new Date().toISOString().slice(0, 10),
   tipoMaterial: "",
   quantidade: "",
@@ -91,6 +94,7 @@ export default function RetiradaMateriais() {
   const openEdit = (r: Withdrawal) => {
     setEditingId(r.id);
     setForm({
+      nome: r.nome || "",
       date: r.date,
       tipoMaterial: r.tipoMaterial,
       quantidade: r.quantidade,
@@ -103,8 +107,8 @@ export default function RetiradaMateriais() {
   };
 
   const handleSave = async () => {
-    if (!form.date || !form.tipoMaterial || !form.quantidade || !form.justificativa) {
-      toast({ title: "Campos obrigatórios", description: "Preencha todos os campos.", variant: "destructive" });
+    if (!form.nome || !form.date || !form.tipoMaterial || !form.quantidade || !form.justificativa) {
+      toast({ title: "Campos obrigatórios", description: "Preencha Nome, Data, Material, Quantidade e Justificativa.", variant: "destructive" });
       return;
     }
     setSaving(true);
@@ -175,6 +179,11 @@ export default function RetiradaMateriais() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2 space-y-1.5">
+                <Label>Nome <span className="text-destructive">*</span></Label>
+                <Input placeholder="Nome do responsável pela retirada..." value={form.nome} onChange={e => handleField("nome", e.target.value)} />
+              </div>
+
               <div className="space-y-1.5">
                 <Label>Data <span className="text-destructive">*</span></Label>
                 <Input type="date" value={form.date} onChange={e => handleField("date", e.target.value)} />
@@ -266,9 +275,10 @@ export default function RetiradaMateriais() {
               Nenhum registro encontrado. Clique em "Novo Registro" para começar.
             </div>
           ) : (
-            <table className="w-full text-sm border-collapse" style={{ minWidth: "800px" }}>
+            <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
               <thead>
                 <tr className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
+                  <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Nome</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Data</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Tipo</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Material/Ferramenta</th>
@@ -281,6 +291,7 @@ export default function RetiradaMateriais() {
               <tbody className="divide-y divide-border/40">
                 {records.map(r => (
                   <tr key={r.id} className="hover:bg-muted/10 transition-colors group">
+                    <td className="px-4 py-3 border-r border-border/30 font-medium">{r.nome || <span className="text-muted-foreground italic">—</span>}</td>
                     <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm">
                       {r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
                     </td>

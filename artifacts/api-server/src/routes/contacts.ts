@@ -2,16 +2,20 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { contactsTable } from "@workspace/db";
 import { CreateContactBody, UpdateContactBody } from "@workspace/api-zod";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 const router = Router();
 
 // GET /contacts
 router.get("/contacts", async (req, res) => {
   try {
+    const unidade = req.query.unidade as string | undefined;
+    const conditions: any[] = [];
+    if (unidade) conditions.push(eq(contactsTable.unidade, unidade));
     const rows = await db
       .select()
       .from(contactsTable)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(sql`${contactsTable.name} ASC`);
     res.json(rows.map(formatContact));
   } catch (err) {
@@ -24,9 +28,11 @@ router.get("/contacts", async (req, res) => {
 router.post("/contacts", async (req, res) => {
   try {
     const body = CreateContactBody.parse(req.body);
+    const unidade = (req.body.unidade as string) || "AM";
     const [created] = await db
       .insert(contactsTable)
       .values({
+        unidade,
         name: body.name,
         cpf: body.cpf ?? null,
         phone: body.phone ?? null,

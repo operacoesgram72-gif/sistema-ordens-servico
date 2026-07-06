@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Plus, Pencil, Trash2, Search, User } from "lucide-react";
-import { useListContacts, useCreateContact, useUpdateContact, useDeleteContact } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { Plus, Pencil, Trash2, Search, User, FileText } from "lucide-react";
+import { useCreateContact, useUpdateContact, useDeleteContact } from "@workspace/api-client-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useUnit } from "@/contexts/unit-context";
+import { generatePDF } from "@/lib/pdf-utils";
 
 type ContactForm = {
   name: string;
@@ -20,6 +22,8 @@ type ContactForm = {
   birthDate: string;
   notes: string;
 };
+
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const empty: ContactForm = { name: "", cpf: "", phone: "", email: "", address: "", birthDate: "", notes: "" };
 
@@ -32,8 +36,16 @@ function formatPhone(val: string) {
 
 export default function Cadastros() {
   const { toast } = useToast();
+  const { unit } = useUnit();
   const queryClient = useQueryClient();
-  const { data: contacts, isLoading } = useListContacts();
+  const { data: contacts, isLoading } = useQuery<any[]>({
+    queryKey: ["contacts", unit],
+    queryFn: async () => {
+      const res = await fetch(`${BASE_URL}/api/contacts?unidade=${unit}`);
+      if (!res.ok) throw new Error("Erro ao carregar contatos");
+      return res.json();
+    },
+  });
   const createContact = useCreateContact();
   const updateContact = useUpdateContact();
   const deleteContact = useDeleteContact();
@@ -65,10 +77,10 @@ export default function Cadastros() {
     setDialogOpen(true);
   };
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["contacts"] });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["contacts", unit] });
 
   const handleSave = () => {
-    const payload = {
+    const payload: any = {
       name: form.name,
       cpf: form.cpf || undefined,
       phone: form.phone || undefined,
@@ -76,6 +88,7 @@ export default function Cadastros() {
       address: form.address || undefined,
       birthDate: form.birthDate || undefined,
       notes: form.notes || undefined,
+      unidade: unit,
     };
     if (editingId) {
       updateContact.mutate({ id: editingId, data: payload }, {
@@ -98,17 +111,47 @@ export default function Cadastros() {
     });
   };
 
+  const handleExportPDF = () => {
+    generatePDF({
+      title: "Dados Cadastrais",
+      subtitle: "Funcionários, contatos e colaboradores",
+      unit,
+      columns: [
+        { header: "Nome", key: "name", width: "20%" },
+        { header: "CPF", key: "cpf", width: "13%" },
+        { header: "Telefone", key: "phone", width: "13%" },
+        { header: "E-mail", key: "email", width: "20%" },
+        { header: "Nascimento", key: "birthDate", width: "11%" },
+        { header: "Endereço", key: "address", width: "23%" },
+      ],
+      rows: filtered.map(c => ({
+        name: c.name,
+        cpf: c.cpf || "—",
+        phone: c.phone || "—",
+        email: c.email || "—",
+        birthDate: c.birthDate ? format(new Date(c.birthDate + "T12:00:00"), "dd/MM/yyyy") : "—",
+        address: c.address || "—",
+      })),
+    });
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dados Cadastrais</h1>
-          <p className="text-muted-foreground mt-1">Funcionários, contatos e colaboradores.</p>
+          <p className="text-muted-foreground mt-1">Funcionários e contatos — unidade <strong>{unit}</strong>.</p>
         </div>
-        <Button onClick={openNew}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Cadastro
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExportPDF} disabled={!filtered.length}>
+            <FileText className="w-4 h-4 mr-2" />
+            Exportar PDF
+          </Button>
+          <Button onClick={openNew}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Cadastro
+          </Button>
+        </div>
       </div>
 
       <Card className="p-4 bg-card border-border/50">
@@ -139,7 +182,7 @@ export default function Cadastros() {
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <User className="w-8 h-8 opacity-30" />
-                    <span>Nenhum cadastro encontrado.</span>
+                    <span>Nenhum cadastro encontrado para a unidade {unit}.</span>
                   </div>
                 </TableCell>
               </TableRow>
@@ -219,9 +262,7 @@ export default function Cadastros() {
       {/* Delete Confirm Dialog */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent className="dark bg-card text-foreground border-border max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Confirmar exclusão</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>Confirmar exclusão</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">Tem certeza que deseja remover este cadastro? Esta ação não pode ser desfeita.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteId(null)}>Cancelar</Button>

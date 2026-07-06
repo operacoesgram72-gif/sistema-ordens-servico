@@ -38,4 +38,4 @@ channel = "stable-25_05"
 [userenv.shared]
 VITE_SUPABASE_URL = "https://ubxwxjruivuvjednkctd.supabase.co"
 VITE_SUPABASE_ANON_KEY = "sb_publishable_GuduItQZWOBy6mUkcRtK9Q_3Fgx_ggI"
-SUPABASE_DB_PASSWORD = "Redeam@2265"
+SUPABASE_DB_PASSWORD = "Redeam@@2265"

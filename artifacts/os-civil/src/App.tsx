@@ -25,6 +25,7 @@ const RetiradaMateriais = lazy(() => import("@/pages/retirada-materiais"));
 const Calendario        = lazy(() => import("@/pages/calendario"));
 const Arquivos          = lazy(() => import("@/pages/arquivos"));
 const RegistrarPmoc     = lazy(() => import("@/pages/registrar-pmoc"));
+const FecharOS          = lazy(() => import("@/pages/fechar-os"));
 const NotFound          = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
@@ -114,6 +115,7 @@ function App() {
               <Route path="/registrar/os" component={RegistrarOS} />
               <Route path="/registrar/pmoc" component={RegistrarPmoc} />
               <Route path="/registrar/materiais" component={RegistrarMateriais} />
+              <Route path="/registrar/fechar-os" component={FecharOS} />
               <Route path="/registrar" component={MenuFuncionario} />
               <Route path="/fornecedores/publico/:id" component={FornecedorPublico} />
               <Route path="/fornecedores/publico" component={FornecedoresPublico} />

@@ -25,6 +25,7 @@ router.get("/material-withdrawals", async (req, res) => {
 router.post("/material-withdrawals", async (req, res) => {
   try {
     const {
+      nome,
       date,
       tipoMaterial,
       quantidade,
@@ -40,6 +41,7 @@ router.post("/material-withdrawals", async (req, res) => {
     const [created] = await db
       .insert(materialWithdrawalsTable)
       .values({
+        nome: nome || "",
         date,
         tipoMaterial,
         quantidade,
@@ -59,11 +61,12 @@ router.post("/material-withdrawals", async (req, res) => {
 router.patch("/material-withdrawals/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { date, tipoMaterial, quantidade, justificativa, foto, tipo } =
+    const { nome, date, tipoMaterial, quantidade, justificativa, foto, tipo } =
       req.body;
     const [updated] = await db
       .update(materialWithdrawalsTable)
       .set({
+        ...(nome !== undefined && { nome }),
         ...(date !== undefined && { date }),
         ...(tipoMaterial !== undefined && { tipoMaterial }),
         ...(quantidade !== undefined && { quantidade }),

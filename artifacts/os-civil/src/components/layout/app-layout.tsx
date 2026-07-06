@@ -179,7 +179,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       {/* ── MOBILE TOP BAR ── */}
       <header
         className={cn(
-          "md:hidden flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0 safe-top",
+          "md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0 safe-top",
           !isOnline && "mt-7"
         )}
       >
@@ -229,12 +229,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* ── DESKTOP SIDEBAR ── */}
-      <aside className="hidden md:flex w-64 border-r border-border bg-card flex-col shrink-0">
+      <aside className="hidden md:flex md:sticky md:top-0 md:h-screen w-64 border-r border-border bg-card flex-col shrink-0">
         <SidebarContent />
       </aside>
 
       {/* ── MAIN CONTENT ── */}
-      <main className="flex-1 flex flex-col min-w-0 md:h-screen md:overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto page-enter">
           {children}
         </div>
