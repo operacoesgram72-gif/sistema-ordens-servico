@@ -41,25 +41,82 @@ function readQueue(): QueueItem[] {
   }
 }
 
-function writeQueue(items: QueueItem[]): void {
+/** Estimated size in bytes of a value after JSON serialisation. */
+function roughByteSize(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
+/**
+ * Maximum bytes a single queued item body is allowed to occupy.
+ * 512 KB is well below the typical 5 MB localStorage quota and leaves
+ * room for the rest of the queue.
+ */
+const MAX_ITEM_BYTES = 512 * 1024;
+
+/**
+ * Write queue to localStorage.
+ * @returns `true` when persisted, `false` when a storage error occurred.
+ */
+function writeQueue(items: QueueItem[]): boolean {
   try {
     localStorage.setItem(QUEUE_KEY, JSON.stringify(items));
+    return true;
   } catch {
-    // Ignore storage quota errors
+    return false;
   }
 }
 
 /**
  * Add an item to the offline queue (without React state — safe to call outside components).
+ *
+ * @returns `{ item, persisted }` — callers MUST check `persisted` and surface
+ *   a destructive toast when it is `false` (storage quota exceeded or unavailable).
  */
-export function enqueueOffline(item: Omit<QueueItem, "id" | "timestamp">): QueueItem {
+export function enqueueOffline(item: Omit<QueueItem, "id" | "timestamp">): { item: QueueItem; persisted: boolean } {
   const fullItem: QueueItem = {
     ...item,
     id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     timestamp: Date.now(),
   };
-  writeQueue([...readQueue(), fullItem]);
-  return fullItem;
+
+  // Guard against very large payloads (e.g. base64 photos) that would bust quota.
+  if (roughByteSize(fullItem.body) > MAX_ITEM_BYTES) {
+    return { item: fullItem, persisted: false };
+  }
+
+  const persisted = writeQueue([...readQueue(), fullItem]);
+  return { item: fullItem, persisted };
+}
+
+/**
+ * Atomically enqueue multiple items.
+ *
+ * All items are pre-validated and written in a **single** localStorage write so
+ * that either all succeed or none are stored — preventing the partial-save state
+ * that would cause silent duplicates on retry.
+ *
+ * @returns `{ items, persisted }` — if `persisted` is `false`, NO items were
+ *   written. Callers MUST surface a destructive toast in that case.
+ */
+export function enqueueOfflineBatch(
+  items: Omit<QueueItem, "id" | "timestamp">[]
+): { items: QueueItem[]; persisted: boolean } {
+  const now = Date.now();
+  const fullItems: QueueItem[] = items.map((item, idx) => ({
+    ...item,
+    id: `q-${now}-${idx}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: now + idx, // ensure stable ordering
+  }));
+
+  // Pre-validate every item before touching storage (all-or-nothing)
+  for (const fullItem of fullItems) {
+    if (roughByteSize(fullItem.body) > MAX_ITEM_BYTES) {
+      return { items: fullItems, persisted: false };
+    }
+  }
+
+  const persisted = writeQueue([...readQueue(), ...fullItems]);
+  return { items: fullItems, persisted };
 }
 
 /**
@@ -129,12 +186,28 @@ export function useOfflineQueue() {
     };
   }, [isOnline]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const enqueue = (item: Omit<QueueItem, "id" | "timestamp">): void => {
-    const fullItem = enqueueOffline(item);
+  /**
+   * Enqueue a single item and update React state.
+   * @returns `true` when persisted successfully, `false` on storage failure.
+   *   Callers MUST show a destructive toast when this returns `false`.
+   */
+  const enqueue = (item: Omit<QueueItem, "id" | "timestamp">): boolean => {
+    const { persisted } = enqueueOffline(item);
     setPendingCount(readQueue().length);
-    // Supress unused var warning — fullItem returned for caller use if needed
-    void fullItem;
+    return persisted;
   };
 
-  return { isOnline, pendingCount, enqueue };
+  /**
+   * Atomically enqueue multiple items and update React state.
+   * All-or-nothing: if any item fails validation or the write fails, NOTHING is stored.
+   * @returns `true` when all items were persisted, `false` on any failure.
+   *   Callers MUST show a destructive toast when this returns `false`.
+   */
+  const enqueueBatch = (items: Omit<QueueItem, "id" | "timestamp">[]): boolean => {
+    const { persisted } = enqueueOfflineBatch(items);
+    setPendingCount(readQueue().length);
+    return persisted;
+  };
+
+  return { isOnline, pendingCount, enqueue, enqueueBatch };
 }

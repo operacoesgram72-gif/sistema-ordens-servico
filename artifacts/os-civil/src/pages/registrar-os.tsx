@@ -144,7 +144,7 @@ export default function RegistrarOS() {
 
     // Offline: queue submission and show deferred success
     if (!isOnline) {
-      enqueue({
+      const persisted = enqueue({
         type: "create-os",
         endpoint: "/api/service-orders",
         method: "POST",
@@ -152,6 +152,14 @@ export default function RegistrarOS() {
         unit: unitFromUrl,
         label: `OS — ${autoTitle}`,
       });
+      if (!persisted) {
+        toast({
+          title: "Não foi possível salvar offline",
+          description: "Memória local insuficiente (fotos podem estar muito grandes). Conecte-se à internet e tente novamente.",
+          variant: "destructive",
+        });
+        return;
+      }
       setSubmittedOffline(true);
       setSubmitted("Em fila — aguardando conexão");
       form.reset();

@@ -21,7 +21,7 @@ export default function RegistrarMateriais() {
   const [loading, setLoading] = useState(false);
   const search = useSearch();
   const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
-  const { isOnline, pendingCount, enqueue } = useOfflineQueue();
+  const { isOnline, pendingCount, enqueue, enqueueBatch } = useOfflineQueue();
 
   const [form, setForm] = useState({
     nome: "",
@@ -75,54 +75,87 @@ export default function RegistrarMateriais() {
 
     const fotoJson = photos.length > 0 ? JSON.stringify(photos) : null;
 
-    // Offline: queue all materials for later sync
+    // Offline: atomically queue ALL materials in a single write — if any item
+    // fails the size/quota check the entire batch is rejected and nothing is
+    // stored, preventing a partial-save state that would cause duplicates on retry.
     if (!isOnline) {
-      for (const mat of validMaterials) {
-        enqueue({
-          type: "create-materiais",
+      const persisted = enqueueBatch(
+        validMaterials.map(mat => ({
+          type: "create-materiais" as const,
           endpoint: "/api/material-withdrawals",
-          method: "POST",
+          method: "POST" as const,
           body: { ...form, tipoMaterial: mat.tipoMaterial, quantidade: mat.quantidade, foto: fotoJson, unidade: unitFromUrl },
           unit: unitFromUrl,
           label: `Retirada — ${mat.tipoMaterial} (${mat.quantidade})`,
+        }))
+      );
+      if (!persisted) {
+        toast({
+          title: "Não foi possível salvar offline",
+          description: "Memória local insuficiente (fotos podem estar muito grandes). Conecte-se à internet e tente novamente.",
+          variant: "destructive",
         });
+        return;
       }
       setSubmittedOffline(true);
       setSubmitted(true);
       return;
     }
 
-    // Online: submit immediately
+    // Online: submit all items, tracking individual results to avoid
+    // encouraging blind retries that would duplicate already-saved records.
     setLoading(true);
+    let successCount = 0;
+    const failedMaterials: typeof validMaterials = [];
     try {
       for (const mat of validMaterials) {
-        const res = await fetch(`${BASE_URL}/api/material-withdrawals`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          const res = await fetch(`${BASE_URL}/api/material-withdrawals`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...form,
+              tipoMaterial: mat.tipoMaterial,
+              quantidade: mat.quantidade,
+              foto: fotoJson,
+              unidade: unitFromUrl,
+            }),
+          });
+          if (!res.ok) throw new Error("Erro ao registrar");
+          // Also persist to Supabase as backup
+          salvarRetiradaMateriais({
             ...form,
             tipoMaterial: mat.tipoMaterial,
             quantidade: mat.quantidade,
             foto: fotoJson,
             unidade: unitFromUrl,
-          }),
-        });
-        if (!res.ok) throw new Error("Erro ao registrar");
-        // Also persist to Supabase as backup
-        salvarRetiradaMateriais({
-          ...form,
-          tipoMaterial: mat.tipoMaterial,
-          quantidade: mat.quantidade,
-          foto: fotoJson,
-          unidade: unitFromUrl,
-        });
+          });
+          successCount++;
+        } catch {
+          failedMaterials.push(mat);
+        }
       }
-      setSubmittedOffline(false);
-      setSubmitted(true);
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível registrar. Tente novamente.", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+
+    if (failedMaterials.length === 0) {
+      // All items saved successfully
+      setSubmittedOffline(false);
+      setSubmitted(true);
+    } else if (successCount === 0) {
+      // Nothing was saved — safe to retry all
+      toast({ title: "Erro", description: "Não foi possível registrar. Tente novamente.", variant: "destructive" });
+    } else {
+      // Partial: some items saved, some not — do NOT encourage a full retry
+      toast({
+        title: `${successCount} de ${validMaterials.length} itens registrados`,
+        description: `Itens não salvos: ${failedMaterials.map(m => m.tipoMaterial).join(", ")}. Registre-os separadamente.`,
+        variant: "destructive",
+      });
+      // Show success screen for the items that did go through
+      setSubmittedOffline(false);
+      setSubmitted(true);
     }
   };
 
