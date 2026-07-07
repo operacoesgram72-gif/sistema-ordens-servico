@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useUnit, UNITS } from "@/contexts/unit-context";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useShare } from "@/contexts/share-context";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -211,6 +212,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const isOnline = useOnlineStatus();
+  const { pendingCount } = useOfflineQueue();
   const [location] = useLocation();
 
   return (
@@ -221,6 +223,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="fixed top-0 inset-x-0 z-[60] flex items-center justify-center gap-2 bg-amber-500/90 text-black text-xs font-semibold py-1.5 px-4 md:pl-64">
           <WifiOff className="w-3.5 h-3.5 shrink-0" />
           Sem conexão — Modo offline
+          {pendingCount > 0 && (
+            <span className="ml-1 rounded-full bg-black/20 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
+              {pendingCount} pendente{pendingCount !== 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       )}
 
