@@ -3,13 +3,14 @@ import { db } from "@workspace/db";
 import { contactsTable } from "@workspace/db";
 import { CreateContactBody, UpdateContactBody } from "@workspace/api-zod";
 import { eq, and, sql } from "drizzle-orm";
+import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
 
 // GET /contacts
 router.get("/contacts", async (req, res) => {
   try {
-    const unidade = req.query.unidade as string | undefined;
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const conditions: any[] = [];
     if (unidade) conditions.push(eq(contactsTable.unidade, unidade));
     const rows = await db

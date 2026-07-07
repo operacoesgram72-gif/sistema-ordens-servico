@@ -3,12 +3,13 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp,
   Share2, Copy, BookUser, Settings2, Wind, PackageOpen, CalendarDays, Folder,
-  Menu, X, Wifi, WifiOff, Truck,
+  Menu, X, Wifi, WifiOff, Truck, Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useUnit, UNITS } from "@/contexts/unit-context";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useShare } from "@/contexts/share-context";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -55,7 +56,8 @@ const navSections = [
 function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   const [location] = useLocation();
   const { toast } = useToast();
-  const { unit, setUnit } = useUnit();
+  const { unit, setUnit, locked } = useUnit();
+  const { isShareMode } = useShare();
 
   const employeeUrl = `${window.location.origin}${BASE_URL}/registrar?u=${unit}`;
 
@@ -83,23 +85,35 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         </div>
         <div className="mt-2">
           <p className="text-[10px] text-muted-foreground/60 mb-1.5 uppercase tracking-widest">Unidade</p>
-          <div className="flex flex-wrap gap-1">
-            {UNITS.map((u) => (
-              <button
-                key={u.key}
-                onClick={() => setUnit(u.key)}
-                title={u.name}
-                className={cn(
-                  "px-2 py-0.5 rounded text-xs font-mono font-bold transition-all border",
-                  unit === u.key
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
-                )}
-              >
-                {u.key}
-              </button>
-            ))}
-          </div>
+          {locked ? (
+            /* Share mode: unit is locked — show it as static badge */
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-primary text-primary-foreground border border-primary">
+                {unit}
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-muted-foreground/60">
+                <Lock className="w-2.5 h-2.5" /> Unidade bloqueada
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {UNITS.map((u) => (
+                <button
+                  key={u.key}
+                  onClick={() => setUnit(u.key)}
+                  title={u.name}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-xs font-mono font-bold transition-all border",
+                    unit === u.key
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
+                  )}
+                >
+                  {u.key}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

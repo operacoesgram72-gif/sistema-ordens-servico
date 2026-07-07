@@ -160,8 +160,40 @@ export default function Configuracoes() {
 
   const [copiedCal, setCopiedCal] = useState(false);
   const [copiedUnit, setCopiedUnit] = useState<string | null>(null);
+  const [copiedMgmt, setCopiedMgmt] = useState<string | null>(null);
+  const [shareUrls, setShareUrls] = useState<{ unit: string; token: string; url: string }[]>([]);
 
-  const calShareUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/calendario?view=1`;
+  const BASE_URL_CONF = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  // Fetch management share URLs from backend (deterministic HMAC tokens, no DB needed)
+  useEffect(() => {
+    const baseUrl = BASE_URL_CONF;
+    fetch(`${baseUrl}/api/share-urls`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: { unit: string; token: string }[]) => {
+        if (!Array.isArray(data)) return;
+        const origin = window.location.origin;
+        setShareUrls(
+          data.map((d) => ({
+            unit: d.unit,
+            token: d.token,
+            url: `${origin}${BASE_URL_CONF}?share=${d.unit}&t=${d.token}`,
+          }))
+        );
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const copyMgmtLink = (unit: string, url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedMgmt(unit);
+      setTimeout(() => setCopiedMgmt(null), 2000);
+      toast({ title: `Link de gestão ${unit} copiado!` });
+    });
+  };
+
+  const calShareUrl = `${window.location.origin}${BASE_URL_CONF}/calendario?view=1`;
   const copyCal = () => {
     navigator.clipboard.writeText(calShareUrl).then(() => {
       setCopiedCal(true);
@@ -640,6 +672,44 @@ export default function Configuracoes() {
             <p className="text-xs text-muted-foreground">
               Qualquer pessoa com este link pode visualizar o calendário de OS sem acesso ao painel de gestão.
             </p>
+          </div>
+
+          {/* Management area share links — per unit, backend-enforced */}
+          <div className="space-y-2 border-t border-border/40 pt-4">
+            <p className="text-sm font-semibold">Compartilhamento da Área de Gestão por Unidade</p>
+            <p className="text-xs text-muted-foreground">
+              Cada link permite acesso somente leitura à área de gestão de uma unidade específica.
+              O acesso é validado no servidor — não é possível visualizar outra unidade alterando a URL.
+              O link da unidade <strong>AM</strong> permite navegar entre todas as unidades.
+            </p>
+            {shareUrls.length === 0 ? (
+              <p className="text-xs text-muted-foreground/60 italic">Carregando links…</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {shareUrls.map(({ unit, url }) => (
+                  <div key={unit} className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                    <span className="text-xs font-mono font-bold text-primary w-8 shrink-0">{unit}</span>
+                    <Input value={url} readOnly className="font-mono text-xs bg-transparent border-0 p-0 h-auto focus-visible:ring-0 text-muted-foreground" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => copyMgmtLink(unit, url)}
+                      title={`Copiar link de gestão ${unit}`}
+                    >
+                      {copiedMgmt === unit
+                        ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                        : <Copy className="w-3.5 h-3.5" />}
+                    </Button>
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" title="Abrir em nova aba">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>}
       </Card>

@@ -14,15 +14,25 @@ export const UNITS: { key: Unit; label: string; name: string }[] = [
 type UnitContextValue = {
   unit: Unit;
   setUnit: (unit: Unit) => void;
+  /** When true, the unit is locked and setUnit is a no-op */
+  locked: boolean;
 };
 
 const UnitContext = createContext<UnitContextValue>({
   unit: "AM",
   setUnit: () => {},
+  locked: false,
 });
 
-export function UnitProvider({ children }: { children: React.ReactNode }) {
+interface UnitProviderProps {
+  children: React.ReactNode;
+  /** When provided, locks the unit to this value and disables switching */
+  lockedUnit?: Unit | null;
+}
+
+export function UnitProvider({ children, lockedUnit }: UnitProviderProps) {
   const [unit, setUnitState] = useState<Unit>(() => {
+    if (lockedUnit) return lockedUnit;
     try {
       return (localStorage.getItem("selectedUnit") as Unit) || "AM";
     } catch {
@@ -30,13 +40,16 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  const locked = Boolean(lockedUnit);
+
   const setUnit = (u: Unit) => {
+    if (locked) return; // No-op when locked
     try { localStorage.setItem("selectedUnit", u); } catch {}
     setUnitState(u);
   };
 
   return (
-    <UnitContext.Provider value={{ unit, setUnit }}>
+    <UnitContext.Provider value={{ unit: locked ? lockedUnit! : unit, setUnit, locked }}>
       {children}
     </UnitContext.Provider>
   );

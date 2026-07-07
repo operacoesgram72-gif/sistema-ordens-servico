@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { serviceOrdersTable, techniciansTable } from "@workspace/db";
 import { eq, gte, and, sql, count, sum } from "drizzle-orm";
+import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ function getFormatoAvg(formato: string | null): number {
 // GET /dashboard/summary
 router.get("/dashboard/summary", async (req, res) => {
   try {
-    const unidade = req.query.unidade as string | undefined;
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const unitCond = unidade ? [eq(serviceOrdersTable.unidade, unidade)] : [];
 
     const now = new Date();
@@ -143,7 +144,7 @@ router.get("/dashboard/stats", async (req, res) => {
 router.get("/dashboard/indicators", async (req, res) => {
   try {
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
-    const unidade = req.query.unidade as string | undefined;
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const dateParam = req.query.date as string | undefined;
     let rangeStart: Date;
     let rangeEnd: Date;

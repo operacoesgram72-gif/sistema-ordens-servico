@@ -4,6 +4,7 @@ import { settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import nodemailer from "nodemailer";
 import { logger } from "../lib/logger";
+import { generateShareToken } from "../lib/share-tokens";
 
 const router = Router();
 
@@ -37,6 +38,18 @@ async function upsertSetting(key: string, value: string) {
     await db.insert(settingsTable).values({ key, value });
   }
 }
+
+// GET /share-urls — returns management area share URLs for all units (admin only; no auth required as admin area has none)
+router.get("/share-urls", async (req, res) => {
+  const UNITS = ["AM", "AC", "AP", "RO", "RR", "PA"];
+  const base = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
+  const result = UNITS.map((unit) => ({
+    unit,
+    token: generateShareToken(unit),
+    url: `${base}?share=${unit}&t=${generateShareToken(unit)}`,
+  }));
+  res.json(result);
+});
 
 // GET /settings
 router.get("/settings", async (req, res) => {

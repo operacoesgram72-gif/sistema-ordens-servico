@@ -2,12 +2,13 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { fileEntriesTable } from "@workspace/db";
 import { eq, and, isNull, sql } from "drizzle-orm";
+import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
 
 router.get("/file-entries", async (req, res) => {
   try {
-    const unidade = req.query.unidade as string | undefined;
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const parentIdParam = req.query.parentId as string | undefined;
 
     const conditions: any[] = [];

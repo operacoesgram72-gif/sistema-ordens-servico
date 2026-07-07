@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useGetDashboardIndicators } from "@workspace/api-client-react";
 import { useUnit } from "@/contexts/unit-context";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +9,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart, Line, Legend,
 } from "recharts";
-import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar } from "lucide-react";
+import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const MONTHS = [
   "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -31,6 +33,7 @@ export default function Indicadores() {
   const [selectedDate, setSelectedDate] = useState<string>(todayISO());
   const [years, setYears] = useState<number[]>([currentYear]);
   const { unit } = useUnit();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/service-orders/available-years`)
@@ -92,6 +95,14 @@ export default function Indicadores() {
           <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do período selecionado.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] })}
+            title="Atualizar indicadores"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
           <Select
             value={periodMode}
             onValueChange={(val) => {

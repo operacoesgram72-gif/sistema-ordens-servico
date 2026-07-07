@@ -52,7 +52,7 @@ export default function Dashboard() {
   const statsQueryKey = ["dashboard-stats", period];
 
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary(
-    { unidade: effectiveUnit } as any,
+    { unidade: effectiveUnit },
     { query: { enabled: true, queryKey: summaryQueryKey } }
   );
   const { data: stats, isLoading: loadingStats } = useGetDashboardStats(

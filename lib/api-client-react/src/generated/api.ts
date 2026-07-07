@@ -649,20 +649,27 @@ export const useSignServiceOrder = <TError = ErrorType<unknown>,
       return useMutation(getSignServiceOrderMutationOptions(options));
     }
 
-export const getGetDashboardSummaryUrl = () => {
+export type GetDashboardSummaryParams = {
+  unidade?: string;
+};
 
-
-
-
-  return `/api/dashboard/summary`
+export const getGetDashboardSummaryUrl = (params?: GetDashboardSummaryParams) => {
+  const normalizedParams = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString());
+    }
+  });
+  const stringifiedParams = normalizedParams.toString();
+  return stringifiedParams.length > 0 ? `/api/dashboard/summary?${stringifiedParams}` : `/api/dashboard/summary`;
 }
 
 /**
  * @summary Resumo do dashboard com indicadores
  */
-export const getDashboardSummary = async ( options?: RequestInit): Promise<DashboardSummary> => {
+export const getDashboardSummary = async (params?: GetDashboardSummaryParams, options?: RequestInit): Promise<DashboardSummary> => {
 
-  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(),
+  return customFetch<DashboardSummary>(getGetDashboardSummaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -675,23 +682,23 @@ export const getDashboardSummary = async ( options?: RequestInit): Promise<Dashb
 
 
 
-export const getGetDashboardSummaryQueryKey = () => {
+export const getGetDashboardSummaryQueryKey = (params?: GetDashboardSummaryParams) => {
     return [
-    `/api/dashboard/summary`
+    `/api/dashboard/summary`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDashboardSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>(params?: GetDashboardSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDashboardSummaryQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSummary>>> = ({ signal }) => getDashboardSummary({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDashboardSummary>>> = ({ signal }) => getDashboardSummary(params, { signal, ...requestOptions });
 
 
 
@@ -709,11 +716,12 @@ export type GetDashboardSummaryQueryError = ErrorType<unknown>
  */
 
 export function useGetDashboardSummary<TData = Awaited<ReturnType<typeof getDashboardSummary>>, TError = ErrorType<unknown>>(
+  params?: GetDashboardSummaryParams,
   options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDashboardSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetDashboardSummaryQueryOptions(options)
+  const queryOptions = getGetDashboardSummaryQueryOptions(params, options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -2,12 +2,13 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { materialWithdrawalsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
+import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
 
 router.get("/material-withdrawals", async (req, res) => {
   try {
-    const unidade = req.query.unidade as string | undefined;
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const conditions: any[] = [];
     if (unidade) conditions.push(eq(materialWithdrawalsTable.unidade, unidade));
     const rows = await db

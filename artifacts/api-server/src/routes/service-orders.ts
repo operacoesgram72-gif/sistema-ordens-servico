@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { serviceOrdersTable, techniciansTable } from "@workspace/db";
+import { resolveUnit } from "../lib/share-tokens";
 import {
   CreateServiceOrderBody,
   UpdateServiceOrderBody,
@@ -62,7 +63,7 @@ router.get("/service-orders", async (req, res) => {
 
     const conditions: any[] = [];
 
-    const unidade = req.query.unidade as string | undefined;
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     if (unidade) conditions.push(eq(serviceOrdersTable.unidade, unidade));
 
     if (q.status) conditions.push(eq(serviceOrdersTable.status, q.status));
@@ -131,10 +132,13 @@ router.post("/service-orders", async (req, res) => {
     const body = CreateServiceOrderBody.parse(req.body);
     const number = generateNumber();
 
-    // Always auto-calculate estimated value from formato_servico market rates
-    const estimatedValue = body.formatoServico
-      ? MARKET_RATES[body.formatoServico] ?? null
-      : null;
+    // Calculate estimated value using tipo multiplier × base rate × 4 hours × IPCA 1.046
+    const TIPO_MULT: Record<string, number> = {
+      reforma: 1.5, revitalizacao: 1.2, preventiva: 0.8, corretiva: 1.0, outros: 1.0,
+    };
+    const baseRate = body.formatoServico ? (MARKET_RATES[body.formatoServico] ?? null) : null;
+    const tipoMult = body.tipo ? (TIPO_MULT[body.tipo] ?? 1.0) : 1.0;
+    const estimatedValue = baseRate !== null ? Math.round(baseRate * tipoMult * 4 * 1.046) : null;
 
     // Auto-generate title if not provided
     const title = body.title?.trim() || number;

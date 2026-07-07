@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Pencil, Trash2, Search, Truck, MapPin, Share2, FileText } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Plus, Pencil, Trash2, Search, Truck, MapPin, Share2, FileText, RefreshCw } from "lucide-react";
 import {
   useCreateSupplier,
   useUpdateSupplier,
@@ -192,6 +192,9 @@ export default function Fornecedores() {
           <p className="text-muted-foreground mt-1">Cadastro da unidade <strong>{unit}</strong>.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="icon" onClick={() => invalidate()} title="Atualizar lista">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
           <Button variant="outline" onClick={handleExportPDF} disabled={!filtered.length}>
             <FileText className="w-4 h-4 mr-2" />
             Exportar PDF

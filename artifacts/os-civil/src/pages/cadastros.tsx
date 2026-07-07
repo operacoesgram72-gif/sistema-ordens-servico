@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Plus, Pencil, Trash2, Search, User, FileText } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, User, FileText, RefreshCw } from "lucide-react";
 import { useCreateContact, useUpdateContact, useDeleteContact } from "@workspace/api-client-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -143,6 +143,9 @@ export default function Cadastros() {
           <p className="text-muted-foreground mt-1">Funcionários e contatos — unidade <strong>{unit}</strong>.</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={() => invalidate()} title="Atualizar lista">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
           <Button variant="outline" onClick={handleExportPDF} disabled={!filtered.length}>
             <FileText className="w-4 h-4 mr-2" />
             Exportar PDF

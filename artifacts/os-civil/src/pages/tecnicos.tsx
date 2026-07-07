@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { Users, Plus, Pencil, Trash2, Shield, Phone, Mail } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, Shield, Phone, Mail, RefreshCw } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { 
@@ -101,10 +101,15 @@ export default function Tecnicos() {
           <h1 className="text-3xl font-bold tracking-tight">Equipe Técnica</h1>
           <p className="text-muted-foreground mt-1">Gerencie os profissionais de campo.</p>
         </div>
-        <Button onClick={openNewModal}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Técnico
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={() => queryClient.invalidateQueries({ queryKey: getListTechniciansQueryKey() })} title="Atualizar lista">
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+          <Button onClick={openNewModal}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Técnico
+          </Button>
+        </div>
       </div>
 
       <div className="border border-border/50 rounded-md bg-card overflow-hidden">

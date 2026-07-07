@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { shareTokenMiddleware } from "../lib/share-tokens";
 import healthRouter from "./health";
 import serviceOrdersRouter from "./service-orders";
 import techniciansRouter from "./technicians";
@@ -11,6 +12,9 @@ import suppliersRouter from "./suppliers";
 import linksRouter from "./links";
 
 const router: IRouter = Router();
+
+// Validate share tokens on all requests (sets req.shareUnit when valid)
+router.use(shareTokenMiddleware);
 
 router.use(healthRouter);
 router.use(serviceOrdersRouter);

@@ -4,7 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/app-layout";
-import { UnitProvider } from "@/contexts/unit-context";
+import { UnitProvider, type Unit } from "@/contexts/unit-context";
+import { ShareProvider, useShare } from "@/contexts/share-context";
 
 const Dashboard         = lazy(() => import("@/pages/dashboard"));
 const Ordens            = lazy(() => import("@/pages/ordens"));
@@ -79,8 +80,15 @@ function StandaloneGuard() {
 }
 
 function ManagementRouter() {
+  const { isShareMode, shareUnit, isAMShare } = useShare();
+
+  // For share mode: lock unit (unless AM which can see all)
+  const lockedUnit: Unit | null = isShareMode && !isAMShare && shareUnit
+    ? shareUnit as Unit
+    : null;
+
   return (
-    <UnitProvider>
+    <UnitProvider lockedUnit={lockedUnit}>
       <AppLayout>
         <Suspense fallback={<PageFallback />}>
           <Switch>
@@ -110,18 +118,20 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Suspense fallback={<PageFallback />}>
-            <Switch>
-              <Route path="/registrar/os" component={RegistrarOS} />
-              <Route path="/registrar/pmoc" component={RegistrarPmoc} />
-              <Route path="/registrar/materiais" component={RegistrarMateriais} />
-              <Route path="/registrar/fechar-os" component={FecharOS} />
-              <Route path="/registrar" component={MenuFuncionario} />
-              <Route path="/fornecedores/publico/:id" component={FornecedorPublico} />
-              <Route path="/fornecedores/publico" component={FornecedoresPublico} />
-              <Route component={StandaloneGuard} />
-            </Switch>
-          </Suspense>
+          <ShareProvider>
+            <Suspense fallback={<PageFallback />}>
+              <Switch>
+                <Route path="/registrar/os" component={RegistrarOS} />
+                <Route path="/registrar/pmoc" component={RegistrarPmoc} />
+                <Route path="/registrar/materiais" component={RegistrarMateriais} />
+                <Route path="/registrar/fechar-os" component={FecharOS} />
+                <Route path="/registrar" component={MenuFuncionario} />
+                <Route path="/fornecedores/publico/:id" component={FornecedorPublico} />
+                <Route path="/fornecedores/publico" component={FornecedoresPublico} />
+                <Route component={StandaloneGuard} />
+              </Switch>
+            </Suspense>
+          </ShareProvider>
         </WouterRouter>
         <Toaster />
       </TooltipProvider>
