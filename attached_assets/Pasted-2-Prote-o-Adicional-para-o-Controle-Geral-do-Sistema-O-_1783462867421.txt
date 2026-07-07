@@ -1,0 +1,65 @@
+2. Proteção Adicional para o Controle Geral do Sistema
+
+O módulo Controle Geral do Sistema deverá possuir um nível adicional de segurança.
+
+Além da proteção existente, quando o administrador clicar sobre o menu "Controle Geral do Sistema", antes mesmo de visualizar seu conteúdo, deverá ser exibida uma tela solicitando uma segunda senha de acesso.
+
+Requisitos:
+
+Essa senha deve ser diferente da senha utilizada para ativar ou desativar o sistema.
+Somente após a validação correta da senha o módulo deverá ser aberto.
+Caso a senha esteja incorreta, o acesso deverá ser negado.
+Toda a validação deve ocorrer também no backend para impedir qualquer tentativa de acesso indevido.
+
+Dessa forma, existirão dois níveis de proteção:
+
+Senha de acesso ao módulo "Controle Geral do Sistema".
+Senha de confirmação para executar ações críticas, como ativar ou desativar o sistema.
+3. Aprimoramento da Interface (UX/UI)
+
+O layout atual está aprovado e deve ser preservado.
+
+Não alterar:
+
+Paleta de cores;
+Identidade visual;
+Organização das abas;
+Estrutura do menu lateral;
+Fluxo de navegação;
+Posição dos elementos principais.
+
+O objetivo é apenas elevar o nível de qualidade visual e da experiência do usuário.
+
+Realizar melhorias como:
+
+Animações suaves entre páginas;
+Transições mais fluidas;
+Feedback visual ao clicar em botões;
+Hover mais elegante em menus e tabelas;
+Ícones mais modernos e consistentes;
+Melhor organização dos espaçamentos;
+Tipografia mais equilibrada;
+Cartões (cards) com aparência mais profissional;
+Melhor hierarquia visual das informações;
+Pequenos efeitos de profundidade (sombras discretas, bordas suaves e cantos arredondados, quando fizer sentido);
+Melhor responsividade em diferentes resoluções.
+
+A aparência deve transmitir um sistema moderno, corporativo e profissional, inspirado em plataformas como:
+
+Microsoft 365;
+Notion;
+Linear;
+Atlassian;
+Material Design 3.
+
+A interface deve continuar leve, limpa e intuitiva, sem excesso de elementos visuais.
+
+Requisitos Obrigatórios
+Não remover nenhuma funcionalidade existente.
+Não alterar regras de negócio.
+Não modificar o funcionamento atual das telas.
+Não alterar a identidade visual já aprovada.
+Não criar novos bugs ou regressões.
+Garantir que todas as alterações sejam compatíveis com as funcionalidades já implementadas.
+
+O objetivo é evoluir o sistema, tornando-o mais seguro, organizado e sofisticado, preservando toda a estrutura atual e mantendo uma excelente experiência de uso
