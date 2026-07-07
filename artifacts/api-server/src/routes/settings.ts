@@ -182,6 +182,11 @@ router.post("/settings/system-module-password", requireAMUnit, async (req, res) 
 
 // POST /settings/system-module-verify (AM-only) — verify the module access password
 // Body: { password: string } — returns { ok: true } on success, 403 on wrong password
+//
+// Priority chain:
+//   1. systemModulePasswordHash — dedicated module-access password (set via /system-module-password)
+//   2. systemControlPasswordHash — action password used as fallback when no module password is set
+//   3. Neither configured — grant access immediately; frontend will prompt admin to configure one
 router.post("/settings/system-module-verify", requireAMUnit, async (req, res) => {
   try {
     const { password } = req.body as { password?: string };
@@ -190,13 +195,18 @@ router.post("/settings/system-module-verify", requireAMUnit, async (req, res) =>
       return;
     }
     const settings = await getAllSettings();
-    const hash = settings.systemModulePasswordHash;
-    if (!hash) {
-      // No module password configured — grant access without check
-      res.json({ ok: true });
+    const moduleHash = settings.systemModulePasswordHash;
+    const actionHash = settings.systemControlPasswordHash;
+
+    // No protection configured at all — grant access and signal frontend
+    if (!moduleHash && !actionHash) {
+      res.json({ ok: true, noPasswordConfigured: true });
       return;
     }
-    const valid = await bcrypt.compare(password, hash);
+
+    // Verify against the most specific password available
+    const hashToCheck = moduleHash ?? actionHash!;
+    const valid = await bcrypt.compare(password, hashToCheck);
     if (!valid) {
       res.status(403).json({ error: "Senha incorreta." });
       return;

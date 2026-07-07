@@ -221,7 +221,9 @@ export default function Configuracoes() {
 
   // System Control section: gate behind module password if configured
   const handleSystemControlSectClick = () => {
-    if (modulePasswordSet && !moduleAccessGranted) {
+    // Always gate behind password verification — never open directly on click.
+    // moduleAccessGranted is session-scoped state; it resets on page load.
+    if (!moduleAccessGranted) {
       setShowModuleVerifyDialog(true);
       setModuleAccessPassword("");
     } else {
@@ -419,6 +421,14 @@ export default function Configuracoes() {
       setModuleAccessPassword("");
       // Auto-open the section after successful authentication
       setSectOpen(p => ({ ...p, systemControl: true }));
+      // Warn admin if no password is configured yet so they know to set one
+      if (data.noPasswordConfigured) {
+        toast({
+          title: "Nenhuma senha configurada",
+          description: "Defina uma senha de acesso ao módulo para protegê-lo adequadamente.",
+          variant: "destructive",
+        });
+      }
     } catch (e: any) {
       toast({ title: "Acesso negado", description: e.message, variant: "destructive" });
     } finally {
@@ -983,12 +993,12 @@ export default function Configuracoes() {
             <span className="flex items-center gap-2.5">
               <Power className="w-4.5 h-4.5 shrink-0 text-red-500" />
               Controle Geral do Sistema
-              {modulePasswordSet && !moduleAccessGranted && (
+              {!moduleAccessGranted && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground bg-muted/60 border border-border/60 px-1.5 py-0.5 rounded-full">
                   <Lock className="w-2.5 h-2.5" />Protegido
                 </span>
               )}
-              {modulePasswordSet && moduleAccessGranted && (
+              {moduleAccessGranted && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400 bg-emerald-950/30 border border-emerald-800/40 px-1.5 py-0.5 rounded-full">
                   <KeyRound className="w-2.5 h-2.5" />Desbloqueado
                 </span>

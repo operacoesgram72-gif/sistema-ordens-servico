@@ -1,0 +1,52 @@
+Proteção de Acesso ao "Controle Geral do Sistema"
+
+Realizar uma alteração no módulo Controle Geral do Sistema, tornando o acesso mais seguro.
+
+Funcionamento Desejado
+
+Atualmente, ao clicar na seção "Controle Geral do Sistema", ela é aberta imediatamente.
+
+Isso deve ser alterado.
+
+Novo fluxo
+O módulo deverá permanecer bloqueado por padrão.
+Ao clicar sobre "Controle Geral do Sistema", não deverá expandir nem exibir seu conteúdo.
+Antes de qualquer acesso, deverá ser exibida uma janela (modal) solicitando uma senha.
+Somente após a validação da senha correta o módulo poderá ser desbloqueado e expandido.
+Caso a senha esteja incorreta:
+O módulo deverá permanecer bloqueado;
+Nenhuma informação interna deverá ser exibida;
+Exibir apenas uma mensagem informando que a senha é inválida.
+Estado Visual
+
+Enquanto estiver bloqueado:
+
+Exibir um ícone de cadeado ao lado do título.
+Exibir um indicador visual informando "Protegido" ou "Bloqueado".
+O usuário deverá perceber claramente que existe uma proteção antes mesmo de tentar abrir a seção.
+
+Após informar a senha correta:
+
+O cadeado deverá mudar para o estado Desbloqueado.
+O painel poderá ser expandido normalmente.
+Todas as funcionalidades existentes deverão continuar funcionando.
+Tempo de Desbloqueio
+
+Após o desbloqueio:
+
+O acesso deverá permanecer liberado apenas durante a sessão atual.
+Ao atualizar a página, encerrar a sessão ou realizar novo login, o módulo deverá voltar automaticamente ao estado bloqueado, exigindo novamente a senha.
+Segurança
+
+A validação da senha deve ocorrer também no backend.
+
+Não permitir que o painel seja aberto apenas manipulando o HTML, JavaScript ou a URL.
+
+Requisitos Obrigatórios
+Não alterar nenhuma funcionalidade existente dentro do módulo.
+Alterar apenas a forma de acesso ao Controle Geral do Sistema.
+Manter o layout atual.
+Apenas adicionar essa camada extra de segurança antes da abertura do painel.
+Garantir que a implementação seja segura, estável e sem impacto nas demais funcionalidades do sistema.
+
+Objetivo: o módulo Controle Geral do Sistema deve permanecer completamente inacessível até que a senha correta seja informada. Somente após essa autenticação o conteúdo poderá ser visualizado e utilizado.
