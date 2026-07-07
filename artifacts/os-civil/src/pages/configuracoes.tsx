@@ -2,12 +2,16 @@ import { useState, useEffect } from "react";
 import {
   Save, Bell, Share2, Copy, CheckCircle2, Mail, Server, Info,
   Send, XCircle, Loader2, ExternalLink, Plug, Plus, Trash2, Eye, EyeOff,
-  ChevronDown, ChevronUp, Shield, Power,
+  ChevronDown, ChevronUp, Shield, Power, Lock,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUnit } from "@/contexts/unit-context";
+import { useSystemStatus } from "@/hooks/use-system-status";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,13 +165,18 @@ export default function Configuracoes() {
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
   const isCreatorMode = typeof window !== "undefined" && window.location.search.includes("modo=criador");
-  const [systemOnline, setSystemOnline] = useState<boolean>(() => {
-    try { return localStorage.getItem("gram_system_online") !== "false"; } catch { return true; }
-  });
+
+  // System Control state
+  const { systemActive, passwordSet, isLoading: systemStatusLoading } = useSystemStatus();
+  const [showSetPasswordDialog, setShowSetPasswordDialog] = useState(false);
+  const [showToggleDialog, setShowToggleDialog] = useState(false);
+  const [systemControlPassword, setSystemControlPassword] = useState("");
+  const [systemControlCurrentPassword, setSystemControlCurrentPassword] = useState("");
+  const [systemControlLoading, setSystemControlLoading] = useState(false);
 
   const [sectOpen, setSectOpen] = useState<Record<string, boolean>>({
     notif: true, smtp: false, webhook: false, monitoring: false, sharing: true,
-    integrations: false, creator: true,
+    integrations: false, creator: true, systemControl: true,
   });
 
   const [copiedCal, setCopiedCal] = useState(false);
@@ -226,14 +235,61 @@ export default function Configuracoes() {
   };
   const toggleSect = (key: string) => setSectOpen(p => ({ ...p, [key]: !p[key] }));
 
-  const handleSystemToggle = () => {
-    const next = !systemOnline;
-    setSystemOnline(next);
-    try { localStorage.setItem("gram_system_online", next ? "true" : "false"); } catch {}
-    toast({
-      title: next ? "Sistema ativado" : "Sistema em manutenção",
-      description: next ? "O sistema voltou ao ar normalmente." : "O sistema foi colocado em modo de manutenção.",
-    });
+  const handleSetPassword = async () => {
+    if (systemControlPassword.trim().length < 6) {
+      toast({ title: "Senha muito curta", description: "A senha deve ter pelo menos 6 caracteres.", variant: "destructive" });
+      return;
+    }
+    if (passwordSet && systemControlCurrentPassword.trim().length < 1) {
+      toast({ title: "Senha atual obrigatória", description: "Informe a senha atual para alterá-la.", variant: "destructive" });
+      return;
+    }
+    setSystemControlLoading(true);
+    try {
+      const body: Record<string, string> = { password: systemControlPassword.trim() };
+      if (passwordSet) body.currentPassword = systemControlCurrentPassword;
+      const res = await fetch(`${BASE_URL_CONF}/api/settings/system-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao definir senha");
+      toast({ title: "Senha definida!", description: "A senha de controle foi configurada com sucesso." });
+      setShowSetPasswordDialog(false);
+      setSystemControlPassword("");
+      queryClient.invalidateQueries({ queryKey: ["system-status"] });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setSystemControlLoading(false);
+    }
+  };
+
+  const handleSystemControlToggle = async () => {
+    setSystemControlLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL_CONF}/api/settings/system-toggle`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: systemControlPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro ao alterar estado do sistema");
+      toast({
+        title: data.active ? "Sistema ativado ✓" : "Sistema desativado",
+        description: data.active
+          ? "O sistema está ativo e acessível normalmente."
+          : "O sistema foi desativado. Novos registros estão bloqueados para colaboradores.",
+      });
+      setShowToggleDialog(false);
+      setSystemControlPassword("");
+      queryClient.invalidateQueries({ queryKey: ["system-status"] });
+    } catch (e: any) {
+      toast({ title: "Erro", description: e.message, variant: "destructive" });
+    } finally {
+      setSystemControlLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -879,6 +935,113 @@ export default function Configuracoes() {
         </CardContent>}
       </Card>
 
+      {/* ── Controle Geral do Sistema ─────────────────────────────────── */}
+      <Card className="bg-card border-border/50 border-red-900/30">
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => toggleSect("systemControl")}
+        >
+          <CardTitle className="flex items-center justify-between text-lg">
+            <span className="flex items-center gap-2">
+              <Power className="w-5 h-5 text-red-500" />
+              Controle Geral do Sistema
+            </span>
+            {sectOpen.systemControl ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+          </CardTitle>
+          <CardDescription>
+            Ative ou desative o acesso ao sistema para todos os colaboradores. Requer senha de controle.
+          </CardDescription>
+        </CardHeader>
+        {sectOpen.systemControl && (
+          <CardContent className="space-y-4">
+            {/* Estado atual */}
+            {systemStatusLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Carregando estado…
+              </div>
+            ) : (
+              <div className={`flex items-center justify-between p-4 rounded-md border ${
+                systemActive
+                  ? "border-emerald-700/40 bg-emerald-950/20"
+                  : "border-red-700/40 bg-red-950/20"
+              }`}>
+                <div className="flex items-center gap-3">
+                  <Power className={`w-5 h-5 shrink-0 ${systemActive ? "text-emerald-500" : "text-red-500"}`} />
+                  <div>
+                    <p className="text-sm font-semibold">{systemActive ? "Sistema Ativo" : "Sistema Inativo"}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {systemActive
+                        ? "Todas as funcionalidades estão disponíveis normalmente."
+                        : "Registros de OS e materiais estão bloqueados para colaboradores."}
+                    </p>
+                  </div>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={systemActive
+                    ? "text-emerald-400 border-emerald-700/50 shrink-0"
+                    : "text-red-400 border-red-700/50 shrink-0"}
+                >
+                  {systemActive ? "Ativo" : "Inativo"}
+                </Badge>
+              </div>
+            )}
+
+            {/* Ações */}
+            {!passwordSet ? (
+              <div className="rounded-md bg-amber-950/20 border border-amber-700/30 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-400">
+                  <Lock className="w-4 h-4 shrink-0" />
+                  Senha de controle não configurada
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Para ativar ou desativar o sistema, defina primeiro uma senha de controle.
+                  Ela será solicitada toda vez que você tentar alterar o estado.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => { setShowSetPasswordDialog(true); setSystemControlPassword(""); setSystemControlCurrentPassword(""); }}
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  Definir Senha de Controle
+                </Button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant={systemActive ? "destructive" : "default"}
+                  className="flex-1 gap-2"
+                  onClick={() => { setShowToggleDialog(true); setSystemControlPassword(""); }}
+                >
+                  <Power className="w-4 h-4" />
+                  {systemActive ? "Desativar Sistema" : "Ativar Sistema"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 shrink-0"
+                  onClick={() => { setShowSetPasswordDialog(true); setSystemControlPassword(""); setSystemControlCurrentPassword(""); }}
+                >
+                  <Lock className="w-3.5 h-3.5" />
+                  Alterar Senha
+                </Button>
+              </div>
+            )}
+
+            <div className="rounded-md bg-muted/30 border border-border/50 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-semibold text-foreground">Quando o sistema estiver inativo:</p>
+              <ul className="list-disc list-inside space-y-0.5 leading-relaxed">
+                <li>Não será possível registrar novas Ordens de Serviço</li>
+                <li>Não será possível registrar retirada de materiais</li>
+                <li>A consulta e gestão de OS existentes permanece disponível</li>
+              </ul>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
       {/* Creator Control Panel — visible only via ?modo=criador */}
       {isCreatorMode && (
         <Card className="bg-card border-border/50 border-violet-600/40">
@@ -898,24 +1061,24 @@ export default function Configuracoes() {
             </CardDescription>
           </CardHeader>
           {sectOpen.creator && <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-4 rounded-md border border-border/60 bg-muted/30">
+            <div className={`flex items-center justify-between p-4 rounded-md border ${systemActive ? "border-emerald-700/40 bg-emerald-950/20" : "border-red-700/40 bg-red-950/20"}`}>
               <div className="flex items-center gap-3">
-                <Power className={`w-5 h-5 ${systemOnline ? "text-emerald-500" : "text-red-500"}`} />
+                <Power className={`w-5 h-5 ${systemActive ? "text-emerald-500" : "text-red-500"}`} />
                 <div>
-                  <p className="text-sm font-semibold">{systemOnline ? "Sistema Online" : "Sistema em Manutenção"}</p>
+                  <p className="text-sm font-semibold">{systemActive ? "Sistema Ativo" : "Sistema Inativo"}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {systemOnline
+                    {systemActive
                       ? "O sistema está ativo e acessível normalmente."
-                      : "O sistema está bloqueado. Apenas o criador consegue acessar."}
+                      : "O sistema está desativado. Novos registros estão bloqueados."}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={handleSystemToggle}
-                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${systemOnline ? "bg-emerald-500" : "bg-red-500"}`}
+                onClick={() => { setShowToggleDialog(true); setSystemControlPassword(""); }}
+                className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${systemActive ? "bg-emerald-500" : "bg-red-500"}`}
               >
-                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow ${systemOnline ? "translate-x-6" : "translate-x-0"}`} />
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow ${systemActive ? "translate-x-6" : "translate-x-0"}`} />
               </button>
             </div>
             <p className="text-xs text-muted-foreground/60">
@@ -939,6 +1102,103 @@ export default function Configuracoes() {
       <div className="pt-6 border-t border-border/30 text-center">
         <p className="text-xs text-muted-foreground/50">Desenvolvido por <strong>Aristoteles Melo</strong> — GRAM Operações.</p>
       </div>
+
+      {/* ── Dialog: Definir / Alterar Senha de Controle ─────────────── */}
+      <Dialog open={showSetPasswordDialog} onOpenChange={open => { setShowSetPasswordDialog(open); if (!open) { setSystemControlPassword(""); setSystemControlCurrentPassword(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" />
+              {passwordSet ? "Alterar Senha de Controle" : "Definir Senha de Controle"}
+            </DialogTitle>
+            <DialogDescription>
+              Esta senha será solicitada toda vez que você tentar alterar o estado do sistema.
+              Guarde-a em local seguro.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {passwordSet && (
+              <div className="space-y-1.5">
+                <Label>Senha Atual</Label>
+                <Input
+                  type="password"
+                  placeholder="Digite a senha atual"
+                  value={systemControlCurrentPassword}
+                  onChange={e => setSystemControlCurrentPassword(e.target.value)}
+                  autoFocus
+                />
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label>Nova Senha</Label>
+              <Input
+                type="password"
+                placeholder="Mínimo 6 caracteres"
+                value={systemControlPassword}
+                onChange={e => setSystemControlPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !systemControlLoading && handleSetPassword()}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSetPasswordDialog(false)} disabled={systemControlLoading}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSetPassword}
+              disabled={systemControlLoading || systemControlPassword.trim().length < 6}
+            >
+              {systemControlLoading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando…</>
+                : "Definir Senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Dialog: Confirmar Ativação / Desativação ─────────────────── */}
+      <Dialog open={showToggleDialog} onOpenChange={setShowToggleDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Power className={`w-5 h-5 ${systemActive ? "text-red-500" : "text-emerald-500"}`} />
+              {systemActive ? "Desativar Sistema" : "Ativar Sistema"}
+            </DialogTitle>
+            <DialogDescription>
+              {systemActive
+                ? "Após desativar, os colaboradores não poderão registrar novas OS ou materiais. Informe a senha de controle para confirmar."
+                : "O sistema voltará a operar normalmente para todos os colaboradores. Informe a senha de controle para confirmar."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Senha de Controle</Label>
+              <Input
+                type="password"
+                placeholder="Digite a senha de controle"
+                value={systemControlPassword}
+                onChange={e => setSystemControlPassword(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !systemControlLoading && systemControlPassword && handleSystemControlToggle()}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowToggleDialog(false)} disabled={systemControlLoading}>
+              Cancelar
+            </Button>
+            <Button
+              variant={systemActive ? "destructive" : "default"}
+              onClick={handleSystemControlToggle}
+              disabled={systemControlLoading || !systemControlPassword}
+            >
+              {systemControlLoading
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Processando…</>
+                : systemActive ? "Confirmar Desativação" : "Confirmar Ativação"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

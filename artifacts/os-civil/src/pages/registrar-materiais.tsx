@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
+import { useSystemStatus } from "@/hooks/use-system-status";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -22,6 +23,7 @@ export default function RegistrarMateriais() {
   const search = useSearch();
   const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
   const { isOnline, pendingCount, enqueue, enqueueBatch } = useOfflineQueue();
+  const { systemActive } = useSystemStatus();
 
   const [form, setForm] = useState({
     nome: "",
@@ -166,6 +168,33 @@ export default function RegistrarMateriais() {
     setMaterials([{ tipoMaterial: "", quantidade: "" }]);
     setPhotos([]);
   };
+
+  // System inactive gate
+  if (!systemActive) {
+    return (
+      <div className="min-h-screen bg-background text-foreground dark flex flex-col">
+        <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
+          <img src="/logo-amazonica.png" alt="Logo Rede Amazônica" className="h-10 w-10 object-contain" />
+          <div className="border-l border-border pl-4">
+            <div className="font-bold text-sm leading-tight">Grupo Rede Amazônica</div>
+            <div className="text-xs text-muted-foreground">Departamento: Operações</div>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
+              <WifiOff className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold">Sistema Temporariamente Indisponível</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              O acesso ao sistema foi suspenso temporariamente por decisão administrativa.
+              Por favor, aguarde a reativação ou entre em contato com o responsável.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">

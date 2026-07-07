@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { useCreateServiceOrder, getListServiceOrdersQueryKey } from "@workspace/api-client-react";
+import { useSystemStatus } from "@/hooks/use-system-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,6 +61,7 @@ export default function RegistrarOS() {
   const search = useSearch();
   const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
   const { isOnline, pendingCount, enqueue } = useOfflineQueue();
+  const { systemActive } = useSystemStatus();
 
   const goBack = () => {
     setCalendarOpen(false);
@@ -184,6 +186,33 @@ export default function RegistrarOS() {
       }
     );
   };
+
+  // System inactive gate — show before rendering the full form
+  if (!systemActive) {
+    return (
+      <div className="min-h-screen bg-background text-foreground dark flex flex-col">
+        <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
+          <img src="/logo-amazonica.png" alt="Logo Rede Amazônica" className="h-10 w-10 object-contain" />
+          <div className="border-l border-border pl-4">
+            <div className="font-bold text-sm leading-tight">Grupo Rede Amazônica</div>
+            <div className="text-xs text-muted-foreground">Departamento: Operações</div>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mx-auto">
+              <WifiOff className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-bold">Sistema Temporariamente Indisponível</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              O acesso ao sistema foi suspenso temporariamente por decisão administrativa.
+              Por favor, aguarde a reativação ou entre em contato com o responsável.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">

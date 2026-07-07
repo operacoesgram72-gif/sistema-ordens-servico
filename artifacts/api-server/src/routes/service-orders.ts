@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { serviceOrdersTable, techniciansTable } from "@workspace/db";
 import { resolveUnit } from "../lib/share-tokens";
+import { requireSystemActive } from "../lib/system-guard";
 import {
   CreateServiceOrderBody,
   UpdateServiceOrderBody,
@@ -125,8 +126,8 @@ router.get("/service-orders", async (req, res) => {
   }
 });
 
-// POST /service-orders
-router.post("/service-orders", async (req, res) => {
+// POST /service-orders — blocked when system is inactive
+router.post("/service-orders", requireSystemActive, async (req, res) => {
   try {
     const unidade = (req.body.unidade as string) || "AM";
     const origem = (req.body.origem as string) || "manual";

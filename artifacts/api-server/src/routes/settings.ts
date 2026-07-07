@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { settingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
 import { logger } from "../lib/logger";
 import { generateShareToken } from "../lib/share-tokens";
 
@@ -52,6 +53,97 @@ function requireAMUnit(req: any, res: any, next: any) {
   next();
 }
 
+// ── System Control ────────────────────────────────────────────────────────────
+
+// GET /system-status — public; returns active flag and whether a password has been set
+router.get("/system-status", async (req, res) => {
+  try {
+    const settings = await getAllSettings();
+    const active = settings.systemActive !== "false"; // default true
+    const passwordSet = Boolean(settings.systemControlPasswordHash);
+    res.json({ active, passwordSet });
+  } catch (err) {
+    req.log.error(err);
+    // Fail open — never let a DB error lock out the system
+    res.json({ active: true, passwordSet: false });
+  }
+});
+
+// POST /settings/system-password (AM-only) — set or change the control password
+// Body: { password: string, currentPassword?: string }
+// When a password is already configured, `currentPassword` must be provided and correct.
+router.post("/settings/system-password", requireAMUnit, async (req, res) => {
+  try {
+    const { password, currentPassword } = req.body as {
+      password?: string;
+      currentPassword?: string;
+    };
+    if (!password || typeof password !== "string" || password.trim().length < 6) {
+      res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres." });
+      return;
+    }
+    const settings = await getAllSettings();
+    const existingHash = settings.systemControlPasswordHash;
+
+    // If a password is already configured, the caller must prove knowledge of it
+    if (existingHash) {
+      if (!currentPassword || typeof currentPassword !== "string") {
+        res.status(403).json({ error: "Informe a senha atual para alterá-la." });
+        return;
+      }
+      const valid = await bcrypt.compare(currentPassword, existingHash);
+      if (!valid) {
+        res.status(403).json({ error: "Senha atual incorreta." });
+        return;
+      }
+    }
+
+    const hash = await bcrypt.hash(password.trim(), 12);
+    await upsertSetting("systemControlPasswordHash", hash);
+    // Initialise systemActive = true the first time a password is set
+    if (!settings.systemActive) {
+      await upsertSetting("systemActive", "true");
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno ao salvar senha." });
+  }
+});
+
+// POST /settings/system-toggle (AM-only) — toggle active/inactive after password check
+// Body: { password: string }
+router.post("/settings/system-toggle", requireAMUnit, async (req, res) => {
+  try {
+    const { password } = req.body as { password?: string };
+    if (!password || typeof password !== "string") {
+      res.status(400).json({ error: "Senha obrigatória." });
+      return;
+    }
+    const settings = await getAllSettings();
+    const hash = settings.systemControlPasswordHash;
+    if (!hash) {
+      res.status(400).json({ error: "Senha de controle ainda não configurada." });
+      return;
+    }
+    const valid = await bcrypt.compare(password, hash);
+    if (!valid) {
+      res.status(403).json({ error: "Senha incorreta." });
+      return;
+    }
+    const current = settings.systemActive !== "false";
+    const next = !current;
+    await upsertSetting("systemActive", next ? "true" : "false");
+    req.log.info({ active: next }, "System active state toggled");
+    res.json({ active: next });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno ao alterar estado do sistema." });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 // GET /share-urls — returns management area share URLs for all units (AM only)
 router.get("/share-urls", requireAMUnit, async (req, res) => {
   const UNITS = ["AM", "AC", "AP", "RO", "RR", "PA"];
@@ -64,11 +156,22 @@ router.get("/share-urls", requireAMUnit, async (req, res) => {
   res.json(result);
 });
 
+/**
+ * Keys that must never be returned to the client, even to AM admins.
+ * These hold credential material (hashes, raw passwords) that has no
+ * business being in the browser.
+ */
+const SENSITIVE_KEYS = new Set(["systemControlPasswordHash"]);
+
 // GET /settings (AM-only)
 router.get("/settings", requireAMUnit, async (req, res) => {
   try {
     const settings = await getAllSettings();
-    res.json(settings);
+    // Strip credential/hash keys before sending to the client
+    const safe = Object.fromEntries(
+      Object.entries(settings).filter(([key]) => !SENSITIVE_KEYS.has(key))
+    );
+    res.json(safe);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Erro interno" });

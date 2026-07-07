@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link, useSearch } from "wouter";
-import { ClipboardList, Wind, PackageOpen, MapPin, LogIn, LogOut, ArrowLeft } from "lucide-react";
+import { ClipboardList, Wind, PackageOpen, MapPin, LogIn, LogOut, ArrowLeft, PowerOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { UNITS, type Unit } from "@/contexts/unit-context";
+import { useSystemStatus } from "@/hooks/use-system-status";
 
 export default function MenuFuncionario() {
   const search = useSearch();
@@ -11,6 +12,7 @@ export default function MenuFuncionario() {
   const unitFromUrl = (params.get("u") || "AM") as Unit;
   const unitInfo = UNITS.find(u => u.key === unitFromUrl) || UNITS[0];
   const [showOsSubMenu, setShowOsSubMenu] = useState(false);
+  const { systemActive } = useSystemStatus();
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
@@ -38,6 +40,14 @@ export default function MenuFuncionario() {
           </span>
         </div>
       </header>
+
+      {/* System inactive banner */}
+      {!systemActive && (
+        <div className="bg-red-900/80 text-red-200 text-xs font-semibold px-4 py-3 flex items-center justify-center gap-2 border-b border-red-700/50">
+          <PowerOff className="w-3.5 h-3.5 shrink-0" />
+          Sistema temporariamente indisponível — novos registros estão bloqueados por decisão administrativa
+        </div>
+      )}
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="w-full max-w-md space-y-6">

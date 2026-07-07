@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { materialWithdrawalsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
 import { resolveUnit } from "../lib/share-tokens";
+import { requireSystemActive } from "../lib/system-guard";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get("/material-withdrawals", async (req, res) => {
   }
 });
 
-router.post("/material-withdrawals", async (req, res) => {
+router.post("/material-withdrawals", requireSystemActive, async (req, res) => {
   try {
     const {
       nome,
