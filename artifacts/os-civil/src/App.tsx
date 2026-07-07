@@ -1,11 +1,12 @@
 import { Suspense, lazy } from "react";
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation, useSearch } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/app-layout";
 import { UnitProvider, type Unit } from "@/contexts/unit-context";
 import { ShareProvider, useShare } from "@/contexts/share-context";
+import CalendarAlerts from "@/components/calendar-alerts";
 
 const Dashboard         = lazy(() => import("@/pages/dashboard"));
 const Ordens            = lazy(() => import("@/pages/ordens"));
@@ -66,23 +67,56 @@ function MaintenancePage() {
   );
 }
 
+/**
+ * Catch-all guard:
+ * - Maintenance mode → MaintenancePage
+ * - ?view=1 on /calendario → standalone calendar (no sidebar/admin bar)
+ * - PWA standalone mode (but NOT for share/view links) → redirect to /registrar
+ * - Everything else → ManagementRouter
+ */
 function StandaloneGuard() {
+  const [location] = useLocation();
+  const search = useSearch();
+
+  const params = new URLSearchParams(search);
+  const isViewOnly = params.get("view") === "1";
+  const isShareLink = params.has("share");
+  const isCreatorMode = params.get("modo") === "criador";
+
   const isStandalone =
     window.matchMedia("(display-mode: standalone)").matches ||
     (navigator as any).standalone === true;
-  const isCreatorMode = window.location.search.includes("modo=criador");
+
   const isOffline = !isCreatorMode && (() => {
     try { return localStorage.getItem("gram_system_online") === "false"; } catch { return false; }
   })();
+
   if (isOffline) return <MaintenancePage />;
-  if (isStandalone) return <Redirect to="/registrar" />;
+
+  // Calendar view-only mode: render WITHOUT AppLayout (no sidebar, no admin elements)
+  if (isViewOnly && location === "/calendario") {
+    return (
+      <UnitProvider>
+        <div className="min-h-screen bg-background text-foreground dark">
+          <Suspense fallback={<PageFallback />}>
+            <Calendario />
+          </Suspense>
+        </div>
+      </UnitProvider>
+    );
+  }
+
+  // PWA standalone: redirect to employee area — but preserve share/view links
+  if (isStandalone && !isShareLink && !isViewOnly) {
+    return <Redirect to="/registrar" />;
+  }
+
   return <ManagementRouter />;
 }
 
 function ManagementRouter() {
   const { isShareMode, shareUnit, isAMShare } = useShare();
 
-  // For share mode: lock unit (unless AM which can see all)
   const lockedUnit: Unit | null = isShareMode && !isAMShare && shareUnit
     ? shareUnit as Unit
     : null;
@@ -109,6 +143,8 @@ function ManagementRouter() {
           </Switch>
         </Suspense>
       </AppLayout>
+      {/* Calendar alerts: shown once per session when tomorrow has scheduled services */}
+      <CalendarAlerts />
     </UnitProvider>
   );
 }

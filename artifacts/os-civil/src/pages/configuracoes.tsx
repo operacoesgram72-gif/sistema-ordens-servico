@@ -4,8 +4,10 @@ import {
   Send, XCircle, Loader2, ExternalLink, Plug, Plus, Trash2, Eye, EyeOff,
   ChevronDown, ChevronUp, Shield, Power,
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useUnit } from "@/contexts/unit-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -106,8 +108,18 @@ function genId() {
 export default function Configuracoes() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { unit } = useUnit();
+  const [, setLocation] = useLocation();
   const { data: settings, isLoading } = useGetSettings();
   const updateSettings = useUpdateSettings();
+
+  // Configurações is exclusively for AM unit — redirect others immediately
+  useEffect(() => {
+    if (unit !== "AM") {
+      setLocation("/");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unit]);
   const [copied, setCopied] = useState(false);
   const [testResult, setTestResult] = useState<TestResult>(null);
   const [testing, setTesting] = useState(false);
@@ -376,7 +388,7 @@ export default function Configuracoes() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Adicione um ou mais e-mails. Cada nova OS enviará notificação para todos os destinatários.
+              Adicione todos os e-mails que devem receber notificações. Todos receberão automaticamente.
             </p>
           </div>
         </CardContent>}

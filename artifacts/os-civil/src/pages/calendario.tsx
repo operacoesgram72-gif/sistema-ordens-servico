@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Share2, Copy, CheckCircle2 } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Share2, Copy, CheckCircle2, X } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay, addMonths, subMonths,
@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { STATUS_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +20,13 @@ const STATUS_DOT: Record<string, string> = {
   em_andamento: "bg-yellow-500",
   concluida: "bg-emerald-500",
   cancelada: "bg-red-500",
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  aberta: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  em_andamento: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+  concluida: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  cancelada: "bg-red-500/15 text-red-400 border-red-500/30",
 };
 
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -42,6 +50,7 @@ export default function Calendario() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
   const queryKey = ["service-orders-calendar", unit, currentDate.getFullYear()];
 
@@ -54,6 +63,7 @@ export default function Calendario() {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey });
     setRefreshing(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queryClient, unit, currentDate.getFullYear()]);
 
   const shareViewUrl = `${window.location.origin}${BASE_URL}/calendario?view=1`;
@@ -67,7 +77,7 @@ export default function Calendario() {
   };
 
   const filteredOrders = useMemo(
-    () => orders.filter((os: any) => !os.unidade || os.unidade === unit),
+    () => (orders as any[]).filter((os: any) => !os.unidade || os.unidade === unit),
     [orders, unit]
   );
 
@@ -75,9 +85,14 @@ export default function Calendario() {
     const map = new Map<string, typeof filteredOrders>();
     for (const os of filteredOrders) {
       const raw = (os as any).scheduledAt || os.createdAt;
-      const dateKey = format(new Date(raw), "yyyy-MM-dd");
-      if (!map.has(dateKey)) map.set(dateKey, []);
-      map.get(dateKey)!.push(os);
+      if (!raw) continue;
+      try {
+        const dateKey = format(new Date(raw), "yyyy-MM-dd");
+        if (!map.has(dateKey)) map.set(dateKey, []);
+        map.get(dateKey)!.push(os);
+      } catch {
+        // skip malformed dates
+      }
     }
     return map;
   }, [filteredOrders]);
@@ -100,15 +115,25 @@ export default function Calendario() {
 
   const today = new Date();
 
+  // Orders for the selected day (used in the expansion modal)
+  const selectedDayOrders = useMemo(() => {
+    if (!selectedDay) return [];
+    const key = format(selectedDay, "yyyy-MM-dd");
+    return ordersByDate.get(key) || [];
+  }, [selectedDay, ordersByDate]);
+
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-full">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <CalendarDays className="w-7 h-7 text-primary" />
             Calendário
             {isReadOnly && (
-              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Somente Visualização</span>
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                Somente Visualização
+              </span>
             )}
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -152,6 +177,7 @@ export default function Calendario() {
         </div>
       </div>
 
+      {/* Legend */}
       <div className="flex flex-wrap gap-4 text-xs">
         {Object.entries(STATUS_DOT).map(([status, color]) => (
           <div key={status} className="flex items-center gap-1.5 text-muted-foreground">
@@ -161,8 +187,10 @@ export default function Calendario() {
         ))}
       </div>
 
+      {/* Calendar grid */}
       <Card className="bg-card border-border/50 overflow-hidden">
         <CardContent className="p-0">
+          {/* Day name header */}
           <div className="grid grid-cols-7 border-b border-border bg-muted/30">
             {DAY_NAMES.map(d => (
               <div key={d} className="text-center text-xs font-semibold text-muted-foreground py-2.5 border-r border-border/30 last:border-r-0">
@@ -171,6 +199,7 @@ export default function Calendario() {
             ))}
           </div>
 
+          {/* Weeks */}
           {weeks.map((week, wi) => (
             <div key={wi} className="grid grid-cols-7 border-b border-border/30 last:border-b-0">
               {week.map((date, di) => {
@@ -178,16 +207,21 @@ export default function Calendario() {
                 const dayOrders = ordersByDate.get(dateKey) || [];
                 const isCurrentMonth = isSameMonth(date, currentDate);
                 const isToday = isSameDay(date, today);
+                const hasOrders = dayOrders.length > 0;
 
                 return (
                   <div
                     key={di}
+                    onClick={() => hasOrders && setSelectedDay(date)}
                     className={cn(
                       "min-h-[90px] md:min-h-[110px] p-1 border-r border-border/20 last:border-r-0 transition-colors",
                       !isCurrentMonth && "bg-muted/20",
-                      isToday && "bg-primary/5"
+                      isToday && "bg-primary/5",
+                      hasOrders && "cursor-pointer hover:bg-muted/30"
                     )}
+                    title={hasOrders ? `${dayOrders.length} ordem${dayOrders.length > 1 ? "s" : ""} — clique para expandir` : undefined}
                   >
+                    {/* Day number */}
                     <div className={cn(
                       "text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full",
                       isToday
@@ -199,11 +233,15 @@ export default function Calendario() {
                       {format(date, "d")}
                     </div>
 
+                    {/* Order dots */}
                     <div className="space-y-0.5">
                       {dayOrders.slice(0, 3).map((os: any) => (
                         <button
                           key={os.id}
-                          onClick={() => !isReadOnly && setLocation(`/ordens/${os.id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (!isReadOnly) setLocation(`/ordens/${os.id}`);
+                          }}
                           className={cn(
                             "w-full text-left flex items-center gap-1 px-1 py-0.5 rounded text-[10px] transition-colors group",
                             isReadOnly ? "cursor-default" : "hover:bg-muted/60"
@@ -217,9 +255,12 @@ export default function Calendario() {
                         </button>
                       ))}
                       {dayOrders.length > 3 && (
-                        <div className="text-[10px] text-muted-foreground/60 pl-1">
-                          +{dayOrders.length - 3}
-                        </div>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedDay(date); }}
+                          className="text-[10px] text-primary/70 hover:text-primary pl-1 w-full text-left transition-colors"
+                        >
+                          +{dayOrders.length - 3} mais
+                        </button>
                       )}
                     </div>
                   </div>
@@ -233,7 +274,7 @@ export default function Calendario() {
       <p className="text-xs text-muted-foreground">
         {isReadOnly
           ? "📅 Modo de visualização — somente leitura"
-          : "💡 Clique em qualquer OS no calendário para ver os detalhes · OS mostradas na data de agendamento ou criação"}
+          : "💡 Clique em qualquer dia com OS para expandir · Clique em uma OS para ver os detalhes"}
       </p>
 
       {/* Floating Action Button (mobile only) */}
@@ -246,6 +287,74 @@ export default function Calendario() {
           <Plus className="w-6 h-6" />
         </button>
       )}
+
+      {/* Day expansion modal */}
+      <Dialog open={Boolean(selectedDay)} onOpenChange={(open) => !open && setSelectedDay(null)}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-primary" />
+              {selectedDay
+                ? `${DAY_NAMES[selectedDay.getDay()]}, ${format(selectedDay, "d")} de ${MONTH_NAMES[selectedDay.getMonth()]} de ${selectedDay.getFullYear()}`
+                : ""}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {selectedDayOrders.length} ordem{selectedDayOrders.length !== 1 ? "s" : ""} — Unidade {unit}
+            </p>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-2">
+            {selectedDayOrders.map((os: any) => (
+              <div
+                key={os.id}
+                className={cn(
+                  "rounded-lg border p-3 space-y-1.5",
+                  "bg-muted/30 border-border/50"
+                )}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0">
+                    <span className={cn("w-2 h-2 rounded-full shrink-0 mt-1.5", STATUS_DOT[os.status] || "bg-muted")} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground leading-snug">{os.title}</p>
+                      <p className="text-xs text-muted-foreground">{os.number}</p>
+                    </div>
+                  </div>
+                  <span className={cn(
+                    "text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0",
+                    STATUS_BADGE[os.status] || "bg-muted/50 text-muted-foreground border-border"
+                  )}>
+                    {STATUS_LABELS[os.status as keyof typeof STATUS_LABELS] || os.status}
+                  </span>
+                </div>
+
+                {os.location && (
+                  <p className="text-xs text-muted-foreground pl-4 truncate">{os.location}</p>
+                )}
+
+                {(os.scheduledAt || os.createdAt) && (
+                  <p className="text-[10px] text-muted-foreground/60 pl-4">
+                    {os.scheduledAt
+                      ? `Agendado: ${format(new Date(os.scheduledAt), "dd/MM/yyyy")}`
+                      : `Criado: ${format(new Date(os.createdAt), "dd/MM/yyyy")}`}
+                  </p>
+                )}
+
+                {!isReadOnly && (
+                  <div className="pl-4">
+                    <button
+                      onClick={() => { setSelectedDay(null); setLocation(`/ordens/${os.id}`); }}
+                      className="text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      Ver detalhes →
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

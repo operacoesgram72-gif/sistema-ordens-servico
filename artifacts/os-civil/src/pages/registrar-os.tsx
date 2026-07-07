@@ -2,7 +2,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp, CalendarDays, ArrowLeft, Camera, Video } from "lucide-react";
+import {
+  CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp,
+  CalendarDays, ArrowLeft, Camera, Video, WifiOff, Clock,
+} from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -17,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
@@ -51,9 +55,11 @@ export default function RegistrarOS() {
   const [, setLocation] = useLocation();
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const [submittedOffline, setSubmittedOffline] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const search = useSearch();
   const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
+  const { isOnline, pendingCount, enqueue } = useOfflineQueue();
 
   const goBack = () => {
     setCalendarOpen(false);
@@ -119,28 +125,47 @@ export default function RegistrarOS() {
     const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
     const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
 
+    const payload = {
+      title: autoTitle,
+      location: values.location,
+      department: values.department || undefined,
+      description,
+      category: values.category,
+      priority: values.priority,
+      scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
+      tipo: values.tipo,
+      formatoServico: values.formatoServico,
+      technicianName: values.technicianName || undefined,
+      photos: values.photos || undefined,
+      unidade: unitFromUrl,
+      origem: "manual",
+      estimatedValue: estimativaAuto || undefined,
+    };
+
+    // Offline: queue submission and show deferred success
+    if (!isOnline) {
+      enqueue({
+        type: "create-os",
+        endpoint: "/api/service-orders",
+        method: "POST",
+        body: payload as Record<string, unknown>,
+        unit: unitFromUrl,
+        label: `OS — ${autoTitle}`,
+      });
+      setSubmittedOffline(true);
+      setSubmitted("Em fila — aguardando conexão");
+      form.reset();
+      setPhotosBase64([]);
+      return;
+    }
+
+    // Online: submit immediately
     createOrder.mutate(
-      {
-        data: {
-          title: autoTitle,
-          location: values.location,
-          department: values.department || undefined,
-          description,
-          category: values.category,
-          priority: values.priority,
-          scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
-          tipo: values.tipo,
-          formatoServico: values.formatoServico,
-          technicianName: values.technicianName || undefined,
-          photos: values.photos || undefined,
-          unidade: unitFromUrl,
-          origem: "manual",
-          estimatedValue: estimativaAuto || undefined,
-        } as any,
-      },
+      { data: payload as any },
       {
         onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
+          setSubmittedOffline(false);
           setSubmitted((data as any).number || "OS registrada");
           form.reset();
           setPhotosBase64([]);
@@ -154,6 +179,15 @@ export default function RegistrarOS() {
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-amber-500/90 text-black text-xs font-semibold px-4 py-2 flex items-center justify-center gap-2">
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          Sem conexão — OS será salva localmente e enviada ao reconectar
+          {pendingCount > 0 && ` (${pendingCount} em fila)`}
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
         <img
@@ -189,21 +223,39 @@ export default function RegistrarOS() {
           {submitted ? (
             <Card className="bg-card border-border/50">
               <CardContent className="p-10 flex flex-col items-center text-center gap-4">
-                <CheckCircle2 className="w-16 h-16 text-emerald-500" />
+                {submittedOffline
+                  ? <Clock className="w-16 h-16 text-amber-500" />
+                  : <CheckCircle2 className="w-16 h-16 text-emerald-500" />
+                }
                 <div>
-                  <h2 className="text-2xl font-bold">Chamado Registrado!</h2>
+                  <h2 className="text-2xl font-bold">
+                    {submittedOffline ? "Chamado Salvo Localmente!" : "Chamado Registrado!"}
+                  </h2>
                   <p className="text-muted-foreground mt-1">
-                    Sua ordem de serviço foi enviada com sucesso.
+                    {submittedOffline
+                      ? "Sem conexão no momento. O chamado será enviado automaticamente ao reconectar."
+                      : "Sua ordem de serviço foi enviada com sucesso."
+                    }
                   </p>
                 </div>
-                <div className="bg-muted rounded-lg px-6 py-3 font-mono text-primary text-xl font-bold">
-                  {submitted}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Guarde o número acima para acompanhar seu chamado com o gestor.
-                </p>
+                {!submittedOffline && (
+                  <div className="bg-muted rounded-lg px-6 py-3 font-mono text-primary text-xl font-bold">
+                    {submitted}
+                  </div>
+                )}
+                {!submittedOffline && (
+                  <p className="text-sm text-muted-foreground">
+                    Guarde o número acima para acompanhar seu chamado com o gestor.
+                  </p>
+                )}
+                {submittedOffline && (
+                  <div className="flex items-center gap-2 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                    <WifiOff className="w-3.5 h-3.5 shrink-0" />
+                    {pendingCount} registro{pendingCount !== 1 ? "s" : ""} aguardando sincronização
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
-                  <Button onClick={() => setSubmitted(null)} variant="outline" className="flex-1">
+                  <Button onClick={() => { setSubmitted(null); setSubmittedOffline(false); }} variant="outline" className="flex-1">
                     Registrar Novo Chamado
                   </Button>
                   <Button
@@ -474,13 +526,23 @@ export default function RegistrarOS() {
 
                       <div className="pt-2 border-t border-border/50">
                         <Button type="submit" disabled={createOrder.isPending} size="lg" className="w-full">
-                          {createOrder.isPending ? "Registrando..." : (
+                          {createOrder.isPending ? "Registrando..." : !isOnline ? (
+                            <>
+                              <Clock className="w-4 h-4 mr-2" />
+                              Salvar para Envio Posterior
+                            </>
+                          ) : (
                             <>
                               <Save className="w-4 h-4 mr-2" />
                               Registrar Chamado
                             </>
                           )}
                         </Button>
+                        {!isOnline && (
+                          <p className="text-xs text-amber-500 text-center mt-2">
+                            Offline — o chamado será enviado automaticamente ao reconectar.
+                          </p>
+                        )}
                       </div>
                     </form>
                   </Form>

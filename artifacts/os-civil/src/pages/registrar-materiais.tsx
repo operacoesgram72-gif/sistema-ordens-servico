@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { salvarRetiradaMateriais } from "@/lib/supabase";
 import { Link, useSearch } from "wouter";
-import { Save, Image as ImageIcon, X, CheckCircle2, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Save, Image as ImageIcon, X, CheckCircle2, ArrowLeft, Plus, Trash2, WifiOff, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -16,9 +17,11 @@ type MaterialItem = { tipoMaterial: string; quantidade: string };
 export default function RegistrarMateriais() {
   const { toast } = useToast();
   const [submitted, setSubmitted] = useState(false);
+  const [submittedOffline, setSubmittedOffline] = useState(false);
   const [loading, setLoading] = useState(false);
   const search = useSearch();
   const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
+  const { isOnline, pendingCount, enqueue } = useOfflineQueue();
 
   const [form, setForm] = useState({
     nome: "",
@@ -70,9 +73,28 @@ export default function RegistrarMateriais() {
       return;
     }
 
+    const fotoJson = photos.length > 0 ? JSON.stringify(photos) : null;
+
+    // Offline: queue all materials for later sync
+    if (!isOnline) {
+      for (const mat of validMaterials) {
+        enqueue({
+          type: "create-materiais",
+          endpoint: "/api/material-withdrawals",
+          method: "POST",
+          body: { ...form, tipoMaterial: mat.tipoMaterial, quantidade: mat.quantidade, foto: fotoJson, unidade: unitFromUrl },
+          unit: unitFromUrl,
+          label: `Retirada — ${mat.tipoMaterial} (${mat.quantidade})`,
+        });
+      }
+      setSubmittedOffline(true);
+      setSubmitted(true);
+      return;
+    }
+
+    // Online: submit immediately
     setLoading(true);
     try {
-      const fotoJson = photos.length > 0 ? JSON.stringify(photos) : null;
       for (const mat of validMaterials) {
         const res = await fetch(`${BASE_URL}/api/material-withdrawals`, {
           method: "POST",
@@ -86,6 +108,7 @@ export default function RegistrarMateriais() {
           }),
         });
         if (!res.ok) throw new Error("Erro ao registrar");
+        // Also persist to Supabase as backup
         salvarRetiradaMateriais({
           ...form,
           tipoMaterial: mat.tipoMaterial,
@@ -94,6 +117,7 @@ export default function RegistrarMateriais() {
           unidade: unitFromUrl,
         });
       }
+      setSubmittedOffline(false);
       setSubmitted(true);
     } catch {
       toast({ title: "Erro", description: "Não foi possível registrar. Tente novamente.", variant: "destructive" });
@@ -104,6 +128,7 @@ export default function RegistrarMateriais() {
 
   const resetForm = () => {
     setSubmitted(false);
+    setSubmittedOffline(false);
     setForm({ nome: "", date: new Date().toISOString().slice(0, 10), justificativa: "", tipo: "retirada" });
     setMaterials([{ tipoMaterial: "", quantidade: "" }]);
     setPhotos([]);
@@ -111,6 +136,15 @@ export default function RegistrarMateriais() {
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-amber-500/90 text-black text-xs font-semibold px-4 py-2 flex items-center justify-center gap-2">
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          Sem conexão — registros serão salvos localmente e enviados ao reconectar
+          {pendingCount > 0 && ` (${pendingCount} em fila)`}
+        </div>
+      )}
+
       <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
         <img src="/logo-amazonica.png" alt="Logo Rede Amazônica" className="h-10 w-10 object-contain" />
         <div className="border-l border-border pl-4">
@@ -139,11 +173,27 @@ export default function RegistrarMateriais() {
           {submitted ? (
             <Card className="bg-card border-border/50">
               <CardContent className="p-10 flex flex-col items-center text-center gap-4">
-                <CheckCircle2 className="w-16 h-16 text-emerald-500" />
+                {submittedOffline
+                  ? <Clock className="w-16 h-16 text-amber-500" />
+                  : <CheckCircle2 className="w-16 h-16 text-emerald-500" />
+                }
                 <div>
-                  <h2 className="text-2xl font-bold">Registro Salvo!</h2>
-                  <p className="text-muted-foreground mt-1">Seu registro foi enviado com sucesso.</p>
+                  <h2 className="text-2xl font-bold">
+                    {submittedOffline ? "Registro Salvo Localmente!" : "Registro Salvo!"}
+                  </h2>
+                  <p className="text-muted-foreground mt-1">
+                    {submittedOffline
+                      ? "Sem conexão no momento. Os dados serão enviados automaticamente ao reconectar."
+                      : "Seu registro foi enviado com sucesso."
+                    }
+                  </p>
                 </div>
+                {submittedOffline && pendingCount > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-md px-3 py-2">
+                    <WifiOff className="w-3.5 h-3.5 shrink-0" />
+                    {pendingCount} registro{pendingCount !== 1 ? "s" : ""} aguardando sincronização
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row gap-3 mt-2 w-full">
                   <Button onClick={resetForm} variant="outline" className="flex-1">
                     Novo Registro
@@ -284,8 +334,17 @@ export default function RegistrarMateriais() {
 
                   <div className="pt-2 border-t border-border/50">
                     <Button type="submit" disabled={loading} size="lg" className="w-full">
-                      {loading ? "Registrando..." : <><Save className="w-4 h-4 mr-2" />Registrar</>}
+                      {loading ? "Registrando..." : !isOnline ? (
+                        <><Clock className="w-4 h-4 mr-2" />Salvar para Envio Posterior</>
+                      ) : (
+                        <><Save className="w-4 h-4 mr-2" />Registrar</>
+                      )}
                     </Button>
+                    {!isOnline && (
+                      <p className="text-xs text-amber-500 text-center mt-2">
+                        Offline — os dados serão enviados automaticamente ao reconectar.
+                      </p>
+                    )}
                   </div>
                 </form>
               </CardContent>

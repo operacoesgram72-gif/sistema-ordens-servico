@@ -1,5 +1,6 @@
 import { useGetDashboardSummary, useGetDashboardStats } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
@@ -90,7 +91,38 @@ export default function Dashboard() {
   ].filter(Boolean).join(" — ");
 
   if (loadingSummary || loadingStats) {
-    return <div className="p-8 flex items-center justify-center h-full"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+    return (
+      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+        <div className="space-y-2">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-4 w-80" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="bg-card border-border/50">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-4 w-4 rounded" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-8 w-16 mb-1" />
+                <Skeleton className="h-3 w-36" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="lg:col-span-2 bg-card border-border/50">
+            <CardHeader><Skeleton className="h-5 w-48" /></CardHeader>
+            <CardContent><Skeleton className="h-[320px] w-full rounded-md" /></CardContent>
+          </Card>
+          <Card className="bg-card border-border/50">
+            <CardHeader><Skeleton className="h-5 w-32" /></CardHeader>
+            <CardContent><Skeleton className="h-[320px] w-full rounded-md" /></CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   if (!summary) return null;

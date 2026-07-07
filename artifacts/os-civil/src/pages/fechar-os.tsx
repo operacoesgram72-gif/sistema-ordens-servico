@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
 import { format } from "date-fns";
-import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { UNITS, type Unit } from "@/contexts/unit-context";
 import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS } from "@/lib/constants";
 import type { ServiceOrderStatus, ServiceOrderPriority } from "@workspace/api-client-react";
@@ -23,6 +25,24 @@ type OS = {
   createdAt: string;
 };
 
+function getCacheKey(unit: string) {
+  return `gram-fechar-os-cache-${unit}`;
+}
+
+function readCache(unit: string): OS[] {
+  try {
+    return JSON.parse(localStorage.getItem(getCacheKey(unit)) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function writeCache(unit: string, orders: OS[]): void {
+  try {
+    localStorage.setItem(getCacheKey(unit), JSON.stringify(orders));
+  } catch {}
+}
+
 export default function FecharOS() {
   const search = useSearch();
   const [, setLocation] = useLocation();
@@ -30,29 +50,75 @@ export default function FecharOS() {
   const params = new URLSearchParams(search);
   const unitFromUrl = (params.get("u") || "AM") as Unit;
   const unitInfo = UNITS.find(u => u.key === unitFromUrl) || UNITS[0];
+  const { isOnline, pendingCount, enqueue } = useOfflineQueue();
 
   const [ordens, setOrdens] = useState<OS[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fromCache, setFromCache] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successId, setSuccessId] = useState<number | null>(null);
 
-  // Load OS on mount
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`${BASE_URL}/api/service-orders?unidade=${unitFromUrl}`);
-        if (!cancelled && res.ok) setOrdens(await res.json());
-      } catch {
-        if (!cancelled) toast({ title: "Erro ao carregar ordens", variant: "destructive" });
-      } finally {
-        if (!cancelled) setLoading(false);
+  const loadOrdens = useCallback(async () => {
+    setLoading(true);
+    setFromCache(false);
+    try {
+      const res = await fetch(`${BASE_URL}/api/service-orders?unidade=${unitFromUrl}`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrdens(data);
+        writeCache(unitFromUrl, data);
+      } else {
+        throw new Error("Server error");
       }
-    })();
-    return () => { cancelled = true; };
-  }, [unitFromUrl]);
+    } catch {
+      // Fallback to cache (works offline or on transient network errors)
+      const cached = readCache(unitFromUrl);
+      if (cached.length > 0) {
+        setOrdens(cached);
+        setFromCache(true);
+      } else {
+        toast({ title: "Erro ao carregar ordens", variant: "destructive" });
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [unitFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    void loadOrdens();
+  }, [loadOrdens]);
 
   const handleStatusChange = async (id: number, newStatus: string) => {
+    // Capture previous status BEFORE any state change for safe rollback
+    const previousStatus = ordens.find(o => o.id === id)?.status;
+    if (previousStatus === undefined) return;
+
+    // Optimistic update — use functional setter to avoid stale closure issues
+    setOrdens(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+
+    // If offline: queue the patch and persist optimistic state to cache
+    if (!isOnline) {
+      const os = ordens.find(o => o.id === id);
+      enqueue({
+        type: "patch-status",
+        endpoint: `/api/service-orders/${id}/status`,
+        method: "PATCH",
+        body: { status: newStatus },
+        unit: unitFromUrl,
+        label: `Status ${os?.number || id} → ${STATUS_LABELS[newStatus as ServiceOrderStatus] || newStatus}`,
+      });
+      // Persist optimistic state to cache so reload shows updated status
+      setOrdens(prev => {
+        writeCache(unitFromUrl, prev);
+        return prev;
+      });
+      setSuccessId(id);
+      setTimeout(() => setSuccessId(null), 2000);
+      toast({ title: "Status salvo localmente", description: "Será sincronizado ao reconectar." });
+      return;
+    }
+
+    // Online: send immediately
     setUpdatingId(id);
     try {
       const res = await fetch(`${BASE_URL}/api/service-orders/${id}/status`, {
@@ -61,11 +127,17 @@ export default function FecharOS() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error();
-      setOrdens(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+      // Persist confirmed state to cache
+      setOrdens(prev => {
+        writeCache(unitFromUrl, prev);
+        return prev;
+      });
       setSuccessId(id);
       setTimeout(() => setSuccessId(null), 2000);
       toast({ title: "Status atualizado!" });
     } catch {
+      // Revert to captured previousStatus using functional setter (no stale closure)
+      setOrdens(prev => prev.map(o => o.id === id ? { ...o, status: previousStatus } : o));
       toast({ title: "Erro ao atualizar status", variant: "destructive" });
     } finally {
       setUpdatingId(null);
@@ -76,6 +148,22 @@ export default function FecharOS() {
 
   return (
     <div className="min-h-screen bg-background text-foreground dark flex flex-col">
+      {/* Offline banner */}
+      {!isOnline && (
+        <div className="bg-amber-500/90 text-black text-xs font-semibold px-4 py-2 flex items-center justify-center gap-2">
+          <WifiOff className="w-3.5 h-3.5 shrink-0" />
+          Sem conexão — alterações serão sincronizadas ao reconectar
+          {pendingCount > 0 && ` (${pendingCount} em fila)`}
+        </div>
+      )}
+
+      {/* Cached data notice */}
+      {fromCache && (
+        <div className="bg-blue-500/10 border-b border-blue-500/20 text-blue-400 text-xs px-4 py-1.5 flex items-center justify-center gap-2">
+          Exibindo dados em cache — sem conexão com o servidor
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-border bg-card px-6 py-3 flex items-center gap-4 shrink-0">
         <img src="/logo-amazonica.png" alt="Logo Rede Amazônica" className="h-10 w-10 object-contain" />
@@ -92,6 +180,15 @@ export default function FecharOS() {
             </Badge>
             <span className="hidden sm:inline text-muted-foreground/60">— {unitInfo.name}</span>
           </div>
+          {isOnline && (
+            <button
+              onClick={() => void loadOrdens()}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              title="Atualizar lista"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
           <button
             onClick={goBack}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
@@ -120,8 +217,14 @@ export default function FecharOS() {
           </div>
         ) : ordens.length === 0 ? (
           <Card className="bg-card border-border/50">
-            <CardContent className="p-10 text-center text-muted-foreground">
-              Nenhuma ordem de serviço encontrada para a unidade {unitFromUrl}.
+            <CardContent className="p-10 text-center space-y-3">
+              <p className="text-muted-foreground">Nenhuma ordem de serviço encontrada para a unidade {unitFromUrl}.</p>
+              {isOnline && (
+                <Button variant="outline" size="sm" onClick={() => void loadOrdens()} className="gap-2">
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Tentar novamente
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -159,7 +262,7 @@ export default function FecharOS() {
                     <div className="flex-1 max-w-[220px]">
                       <Select
                         value={os.status}
-                        onValueChange={(val) => handleStatusChange(os.id, val)}
+                        onValueChange={(val) => void handleStatusChange(os.id, val)}
                         disabled={updatingId === os.id}
                       >
                         <SelectTrigger className="h-8 text-sm">

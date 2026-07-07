@@ -39,8 +39,21 @@ async function upsertSetting(key: string, value: string) {
   }
 }
 
-// GET /share-urls — returns management area share URLs for all units (admin only; no auth required as admin area has none)
-router.get("/share-urls", async (req, res) => {
+/**
+ * Middleware: restrict settings access to AM unit only.
+ * Blocks requests from share sessions of non-AM units.
+ * Regular admin sessions (no share token) are always allowed.
+ */
+function requireAMUnit(req: any, res: any, next: any) {
+  const shareUnit: string | null = req.shareUnit ?? null;
+  if (shareUnit && shareUnit !== "AM") {
+    return res.status(403).json({ error: "Acesso restrito à unidade AM." });
+  }
+  next();
+}
+
+// GET /share-urls — returns management area share URLs for all units (AM only)
+router.get("/share-urls", requireAMUnit, async (req, res) => {
   const UNITS = ["AM", "AC", "AP", "RO", "RR", "PA"];
   const base = (process.env.PUBLIC_URL ?? "").replace(/\/$/, "");
   const result = UNITS.map((unit) => ({
@@ -51,8 +64,8 @@ router.get("/share-urls", async (req, res) => {
   res.json(result);
 });
 
-// GET /settings
-router.get("/settings", async (req, res) => {
+// GET /settings (AM-only)
+router.get("/settings", requireAMUnit, async (req, res) => {
   try {
     const settings = await getAllSettings();
     res.json(settings);
@@ -62,8 +75,8 @@ router.get("/settings", async (req, res) => {
   }
 });
 
-// PUT /settings
-router.put("/settings", async (req, res) => {
+// PUT /settings (AM-only)
+router.put("/settings", requireAMUnit, async (req, res) => {
   try {
     const body = req.body as Record<string, string>;
     for (const key of SETTING_KEYS) {
@@ -79,8 +92,8 @@ router.put("/settings", async (req, res) => {
   }
 });
 
-// POST /settings/test-email
-router.post("/settings/test-email", async (req, res) => {
+// POST /settings/test-email (AM-only)
+router.post("/settings/test-email", requireAMUnit, async (req, res) => {
   try {
     const result = await attemptSendEmail({
       subject: "[Teste] Painel de Serviços — Configuração de E-mail",
