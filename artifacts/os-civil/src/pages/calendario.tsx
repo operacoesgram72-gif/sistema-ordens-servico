@@ -1,16 +1,18 @@
-import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { useLocation, useSearch } from "wouter";
+import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Share2, Copy, CheckCircle2 } from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay, addMonths, subMonths,
 } from "date-fns";
 import { useListServiceOrders } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { STATUS_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const STATUS_DOT: Record<string, string> = {
   aberta: "bg-blue-500",
@@ -25,15 +27,44 @@ const MONTH_NAMES = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export default function Calendario() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { unit } = useUnit();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Read-only / view-only mode (for shared links)
+  const isReadOnly = new URLSearchParams(search).get("view") === "1";
+
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [refreshing, setRefreshing] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
+
+  const queryKey = ["service-orders-calendar", unit, currentDate.getFullYear()];
 
   const { data: orders = [] } = useListServiceOrders(
     { period: "annual" } as any,
-    { query: { enabled: true, queryKey: ["service-orders-calendar", unit, currentDate.getFullYear()] } }
+    { query: { enabled: true, queryKey } }
   );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey });
+    setRefreshing(false);
+  }, [queryClient, unit, currentDate.getFullYear()]);
+
+  const shareViewUrl = `${window.location.origin}${BASE_URL}/calendario?view=1`;
+
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareViewUrl).then(() => {
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2500);
+      toast({ title: "Link de visualização copiado!", description: "Compartilhe para permitir somente leitura." });
+    });
+  };
 
   const filteredOrders = useMemo(
     () => orders.filter((os: any) => !os.unidade || os.unidade === unit),
@@ -76,6 +107,9 @@ export default function Calendario() {
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <CalendarDays className="w-7 h-7 text-primary" />
             Calendário
+            {isReadOnly && (
+              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">Somente Visualização</span>
+            )}
           </h1>
           <p className="text-muted-foreground mt-1">
             Ordens de serviço agendadas e registradas por data — Unidade: <strong>{unit}</strong>
@@ -94,10 +128,27 @@ export default function Calendario() {
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
             Hoje
           </Button>
-          <Button size="sm" onClick={() => setLocation("/ordens/nova")} className="gap-2 hidden sm:flex">
-            <Plus className="w-4 h-4" />
-            Nova OS
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-1.5">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
           </Button>
+          {!isReadOnly && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyShareLink}
+                className="gap-1.5 hidden sm:flex"
+                title="Copiar link somente leitura"
+              >
+                {copiedShare ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+                Compartilhar
+              </Button>
+              <Button size="sm" onClick={() => setLocation("/ordens/nova")} className="gap-2 hidden sm:flex">
+                <Plus className="w-4 h-4" />
+                Nova OS
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -152,8 +203,11 @@ export default function Calendario() {
                       {dayOrders.slice(0, 3).map((os: any) => (
                         <button
                           key={os.id}
-                          onClick={() => setLocation(`/ordens/${os.id}`)}
-                          className="w-full text-left flex items-center gap-1 px-1 py-0.5 rounded text-[10px] hover:bg-muted/60 transition-colors group"
+                          onClick={() => !isReadOnly && setLocation(`/ordens/${os.id}`)}
+                          className={cn(
+                            "w-full text-left flex items-center gap-1 px-1 py-0.5 rounded text-[10px] transition-colors group",
+                            isReadOnly ? "cursor-default" : "hover:bg-muted/60"
+                          )}
                           title={`${os.number} — ${os.title}`}
                         >
                           <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[os.status] || "bg-muted")} />
@@ -177,17 +231,21 @@ export default function Calendario() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        💡 Clique em qualquer OS no calendário para ver os detalhes · OS mostradas na data de agendamento ou criação
+        {isReadOnly
+          ? "📅 Modo de visualização — somente leitura"
+          : "💡 Clique em qualquer OS no calendário para ver os detalhes · OS mostradas na data de agendamento ou criação"}
       </p>
 
       {/* Floating Action Button (mobile only) */}
-      <button
-        onClick={() => setLocation("/ordens/nova")}
-        aria-label="Nova Ordem de Serviço"
-        className="fab sm:hidden"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
+      {!isReadOnly && (
+        <button
+          onClick={() => setLocation("/ordens/nova")}
+          aria-label="Nova Ordem de Serviço"
+          className="fab sm:hidden"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      )}
     </div>
   );
 }

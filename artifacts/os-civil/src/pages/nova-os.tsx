@@ -40,6 +40,19 @@ const MARKET_RATES: Record<string, number> = {
   outros: 180,
 };
 
+// Multiplier per service type (normalized to a single visit)
+const TIPO_MULTIPLIER: Record<string, number> = {
+  reforma: 1.5,
+  revitalizacao: 1.2,
+  preventiva: 0.8,
+  corretiva: 1.0,
+  outros: 1.0,
+};
+
+// IPCA accumulated correction factor (~4.6% per year, 2025 reference)
+const IPCA_FACTOR = 1.046;
+const STANDARD_HOURS = 4;
+
 const ORIGEM_LABELS: Record<string, string> = {
   manual: "Manual",
   email: "E-mail",
@@ -92,7 +105,15 @@ export default function NovaOS() {
   });
 
   const formatoServico = form.watch("formatoServico");
-  const estimativaAuto = formatoServico ? MARKET_RATES[formatoServico] : null;
+  const tipoOS = form.watch("tipo");
+  const estimativaAuto = formatoServico
+    ? Math.round(
+        MARKET_RATES[formatoServico] *
+        (TIPO_MULTIPLIER[tipoOS ?? "corretiva"] ?? 1.0) *
+        STANDARD_HOURS *
+        IPCA_FACTOR
+      )
+    : null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -189,6 +210,7 @@ export default function NovaOS() {
           photos: values.photos || undefined,
           unidade: unit,
           origem: values.origem || "manual",
+          estimatedValue: estimativaAuto || undefined,
         } as any,
       },
       {

@@ -66,7 +66,7 @@ router.put("/settings", async (req, res) => {
   }
 });
 
-// POST /settings/test-email  — dispara um e-mail de teste com as configs atuais
+// POST /settings/test-email
 router.post("/settings/test-email", async (req, res) => {
   try {
     const result = await attemptSendEmail({
@@ -100,30 +100,35 @@ router.post("/settings/test-email", async (req, res) => {
   }
 });
 
-// Internal helper: attempt to send email and return result (never throws)
+// Internal helper: attempt to send email and return result (never throws).
+// notificationEmail may be comma-separated — sends to all recipients.
 async function attemptSendEmail(mail: {
   subject: string;
   html: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
-}): Promise<
-  { ok: true } | { ok: false; error: string }
-> {
+}): Promise<{ ok: true } | { ok: false; error: string }> {
   const settings = await getAllSettings();
-  const to = settings.notificationEmail;
+  const toRaw = settings.notificationEmail || "";
   const host = settings.smtpHost || process.env.SMTP_HOST || "";
   const port = Number(settings.smtpPort || process.env.SMTP_PORT || 587);
   const user = settings.smtpUser || process.env.SMTP_USER || "";
   const pass = settings.smtpPass || process.env.SMTP_PASS || "";
 
+  // Support multiple recipients: comma-separated list
+  const recipients = toRaw
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+
   logger.info(
     {
       smtp: { host, port, user: user || "(não configurado)" },
-      to: to || "(não configurado)",
+      to: recipients,
     },
     "Email send attempt"
   );
 
-  if (!to) return { ok: false, error: "E-mail de destino não configurado nas Configurações." };
+  if (recipients.length === 0) return { ok: false, error: "E-mail de destino não configurado nas Configurações." };
   if (!host) return { ok: false, error: "Host SMTP não configurado." };
   if (!user) return { ok: false, error: "Usuário SMTP não configurado." };
   if (!pass) return { ok: false, error: "Senha SMTP não configurada." };
@@ -139,20 +144,20 @@ async function attemptSendEmail(mail: {
 
     await transporter.sendMail({
       from: `"Painel de Serviços" <${user}>`,
-      to,
+      to: recipients.join(", "),
       subject: mail.subject,
       html: mail.html,
       attachments: mail.attachments,
     });
 
-    logger.info({ to, host, port }, "Email sent successfully");
+    logger.info({ to: recipients, host, port }, "Email sent successfully");
     return { ok: true };
   } catch (err) {
     const e = err as Error & { code?: string; responseCode?: number; response?: string };
     logger.error(
       {
         smtp: { host, port, user },
-        to,
+        to: recipients,
         errorCode: e.code,
         responseCode: e.responseCode,
         smtpResponse: e.response,
@@ -165,8 +170,6 @@ async function attemptSendEmail(mail: {
   }
 }
 
-// Parses the "photos" field (JSON-stringified array of base64 data URIs) into
-// nodemailer attachment objects, preserving the original upload order.
 function parsePhotoAttachments(photos?: string | null): { filename: string; content: Buffer; contentType: string }[] {
   if (!photos) return [];
   try {
@@ -191,7 +194,6 @@ function parsePhotoAttachments(photos?: string | null): { filename: string; cont
   }
 }
 
-// Exported utility: send OS notification email (non-blocking, never throws)
 export async function sendOsNotification(os: {
   number: string;
   title: string;

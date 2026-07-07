@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
-import { Download, Plus, Search, FileSpreadsheet, Camera, FileText } from "lucide-react";
+import { Download, Plus, Search, FileSpreadsheet, Camera, FileText, RefreshCw } from "lucide-react";
 import { 
   useListServiceOrders, 
   ServiceOrderStatus, 
   ServiceOrderPriority 
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,7 @@ const formatCurrency = (val?: number) => {
 export default function Ordens() {
   const [, setLocation] = useLocation();
   const { unit } = useUnit();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [period, setPeriod] = useState<string>("monthly");
@@ -41,6 +43,9 @@ export default function Ordens() {
   const [formato, setFormato] = useState<string>("all");
   const [hoveredPhoto, setHoveredPhoto] = useState<HoveredPhoto>(null);
   const [lightbox, setLightbox] = useState<LightboxState>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const queryKey = ["service-orders", search, status, period, tipo, formato, unit];
 
   const { data: ordens, isLoading } = useListServiceOrders(
     {
@@ -51,15 +56,23 @@ export default function Ordens() {
       formatoServico: formato !== "all" ? (formato as any) : undefined,
       unidade: unit,
     } as any,
-    { query: { enabled: true, queryKey: ["service-orders", search, status, period, tipo, formato, unit] } }
+    { query: { enabled: true, queryKey } }
   );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await queryClient.invalidateQueries({ queryKey });
+    setRefreshing(false);
+  }, [queryClient, queryKey]);
 
   const exportToExcel = () => {
     if (!ordens || ordens.length === 0) return;
-    const headers = ["Número", "Título / Local", "Tipo", "Formato", "Status", "Prioridade", "Técnico", "Valor Estimado", "Data"];
+    const headers = ["Data", "UF", "Número", "Título / Local", "Tipo", "Formato", "Status", "Prioridade", "Técnico", "Valor Estimado"];
     const content = [
       headers.join("\t"),
       ...ordens.map(os => [
+        format(new Date(os.createdAt), "dd/MM/yyyy"),
+        (os as any).unidade || "—",
         os.number,
         `${os.title} - ${os.location}`.replace(/\t/g, ' '),
         os.tipo ? TIPO_LABELS[os.tipo] : "—",
@@ -68,7 +81,6 @@ export default function Ordens() {
         PRIORITY_LABELS[os.priority as ServiceOrderPriority] || os.priority,
         (os.technicianName || "Não atribuído"),
         os.estimatedValue || 0,
-        format(new Date(os.createdAt), "dd/MM/yyyy HH:mm")
       ].join("\t"))
     ].join("\n");
     const blob = new Blob(["\uFEFF" + content], { type: "application/vnd.ms-excel;charset=utf-8;" });
@@ -87,18 +99,20 @@ export default function Ordens() {
       subtitle: "Chamados e atividades de manutenção",
       unit,
       columns: [
-        { header: "Data", key: "data", width: "10%" },
-        { header: "Número", key: "numero", width: "10%" },
-        { header: "Título / Local", key: "titulo", width: "22%" },
-        { header: "Tipo", key: "tipo", width: "10%" },
-        { header: "Formato", key: "formato", width: "12%" },
-        { header: "Status", key: "status", width: "10%" },
-        { header: "Prioridade", key: "prioridade", width: "10%" },
-        { header: "Técnico", key: "tecnico", width: "12%" },
-        { header: "Valor Est.", key: "valor", width: "9%" },
+        { header: "Data", key: "data", width: "9%" },
+        { header: "UF", key: "uf", width: "5%" },
+        { header: "Número", key: "numero", width: "9%" },
+        { header: "Título / Local", key: "titulo", width: "20%" },
+        { header: "Tipo", key: "tipo", width: "9%" },
+        { header: "Formato", key: "formato", width: "11%" },
+        { header: "Status", key: "status", width: "9%" },
+        { header: "Prioridade", key: "prioridade", width: "9%" },
+        { header: "Técnico", key: "tecnico", width: "11%" },
+        { header: "Valor Est.", key: "valor", width: "8%" },
       ],
       rows: ordens.map(os => ({
         data: format(new Date(os.createdAt), "dd/MM/yyyy"),
+        uf: (os as any).unidade || "—",
         numero: os.number,
         titulo: `${os.title} — ${os.location}`,
         tipo: os.tipo ? TIPO_LABELS[os.tipo] : "—",
@@ -119,6 +133,10 @@ export default function Ordens() {
           <p className="text-muted-foreground mt-1">Unidade: <strong>{unit}</strong> — chamados e atividades.</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2" title="Atualizar lista">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
           <Button variant="outline" onClick={handleExportPDF} disabled={!ordens?.length}>
             <FileText className="w-4 h-4 mr-2" />
             Exportar PDF
@@ -222,7 +240,8 @@ export default function Ordens() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-[110px]">Data</TableHead>
+              <TableHead className="w-[100px]">Data</TableHead>
+              <TableHead className="w-[60px]">UF</TableHead>
               <TableHead className="w-[100px]">Número</TableHead>
               <TableHead>Título / Local</TableHead>
               <TableHead>Tipo</TableHead>
@@ -237,7 +256,7 @@ export default function Ordens() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
                   <div className="flex items-center justify-center">
                     <div className="animate-spin w-6 h-6 border-2 border-primary border-t-transparent rounded-full mr-2" />
                     Carregando ordens...
@@ -246,7 +265,7 @@ export default function Ordens() {
               </TableRow>
             ) : ordens?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
                   Nenhuma ordem de serviço encontrada para a unidade {unit}.
                 </TableCell>
               </TableRow>
@@ -257,6 +276,11 @@ export default function Ordens() {
                 return (
                   <TableRow key={os.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation(`/ordens/${os.id}`)}>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(new Date(os.createdAt), "dd/MM/yyyy")}</TableCell>
+                    <TableCell>
+                      <span className="text-xs font-mono font-semibold text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded">
+                        {(os as any).unidade || "—"}
+                      </span>
+                    </TableCell>
                     <TableCell className="font-mono font-medium text-primary">{os.number}</TableCell>
                     <TableCell>
                       <div className="font-medium truncate max-w-[200px]">{os.title}</div>

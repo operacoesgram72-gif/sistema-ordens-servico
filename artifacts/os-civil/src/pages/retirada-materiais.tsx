@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { PackageOpen, Plus, Trash2, Pencil, Check, X, Image as ImageIcon } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { PackageOpen, Plus, Trash2, Pencil, Check, X, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,19 +43,29 @@ const emptyForm = (): FormState => ({
   tipo: "retirada",
 });
 
+/** Parse foto field — may be a single base64 string OR a JSON array of strings */
+function parsePhotos(foto: string | null): string[] {
+  if (!foto) return [];
+  if (foto.startsWith("[")) {
+    try { return JSON.parse(foto) as string[]; } catch { /* fall through */ }
+  }
+  return [foto];
+}
+
 export default function RetiradaMateriais() {
   const { toast } = useToast();
   const { unit } = useUnit();
   const [records, setRecords] = useState<Withdrawal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [viewPhoto, setViewPhoto] = useState<string | null>(null);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
 
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     try {
       const res = await fetch(`${BASE_URL}/api/material-withdrawals?unidade=${unit}`);
       if (res.ok) setRecords(await res.json());
@@ -63,36 +73,55 @@ export default function RetiradaMateriais() {
       toast({ title: "Erro ao carregar registros", variant: "destructive" });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  }, [unit]);
+
+  useEffect(() => { setLoading(true); fetchAll(); }, [unit]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchAll();
   };
 
-  useEffect(() => { fetchAll(); }, [unit]);
-
-  const handleField = (field: keyof FormState, value: string) => {
+  const handleField = (field: keyof FormState, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
+
+  const handlePhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const b64 = reader.result as string;
+        setPhotoPreviews(p => [...p, b64]);
+        setForm(prev => {
+          const existing = parsePhotos(prev.foto);
+          return { ...prev, foto: JSON.stringify([...existing, b64]) };
+        });
+      };
+    });
+    e.target.value = "";
   };
 
-  const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const b64 = reader.result as string;
-      setForm(prev => ({ ...prev, foto: b64 }));
-      setPhotoPreview(b64);
-    };
+  const removePhoto = (i: number) => {
+    setPhotoPreviews(p => p.filter((_, j) => j !== i));
+    setForm(prev => {
+      const existing = parsePhotos(prev.foto).filter((_, j) => j !== i);
+      return { ...prev, foto: existing.length > 0 ? JSON.stringify(existing) : null };
+    });
   };
 
   const openNew = () => {
     setEditingId(null);
     setForm(emptyForm());
-    setPhotoPreview(null);
+    setPhotoPreviews([]);
     setShowForm(true);
   };
 
   const openEdit = (r: Withdrawal) => {
     setEditingId(r.id);
+    const photos = parsePhotos(r.foto);
     setForm({
       nome: r.nome || "",
       date: r.date,
@@ -102,7 +131,7 @@ export default function RetiradaMateriais() {
       foto: r.foto ?? null,
       tipo: r.tipo,
     });
-    setPhotoPreview(r.foto ?? null);
+    setPhotoPreviews(photos);
     setShowForm(true);
   };
 
@@ -151,7 +180,7 @@ export default function RetiradaMateriais() {
 
   return (
     <div className="p-4 md:p-6 max-w-full mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <PackageOpen className="w-7 h-7 text-primary" />
@@ -161,10 +190,16 @@ export default function RetiradaMateriais() {
             Registro de retirada e entrega de materiais e ferramentas.
           </p>
         </div>
-        <Button onClick={openNew} className="gap-2 shrink-0">
-          <Plus className="w-4 h-4" />
-          Novo Registro
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
+            <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+          <Button onClick={openNew} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Novo Registro
+          </Button>
+        </div>
       </div>
 
       {/* Modal de formulário */}
@@ -192,19 +227,9 @@ export default function RetiradaMateriais() {
               <div className="space-y-1.5">
                 <Label>Tipo de Operação <span className="text-destructive">*</span></Label>
                 <div className="flex gap-4 pt-1.5">
-                  {[
-                    { value: "retirada", label: "Retirada" },
-                    { value: "entrega", label: "Entrega" },
-                  ].map(opt => (
+                  {[{ value: "retirada", label: "Retirada" }, { value: "entrega", label: "Entrega" }].map(opt => (
                     <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="tipo-form"
-                        value={opt.value}
-                        checked={form.tipo === opt.value}
-                        onChange={() => handleField("tipo", opt.value)}
-                        className="w-4 h-4 accent-primary"
-                      />
+                      <input type="radio" name="tipo-form" value={opt.value} checked={form.tipo === opt.value} onChange={() => handleField("tipo", opt.value)} className="w-4 h-4 accent-primary" />
                       <span className="text-sm font-medium">{opt.label}</span>
                     </label>
                   ))}
@@ -227,22 +252,24 @@ export default function RetiradaMateriais() {
               </div>
 
               <div className="sm:col-span-2 space-y-2">
-                <Label>Foto (opcional)</Label>
-                <div className="flex items-center gap-3">
-                  <Button variant="outline" type="button" size="sm" onClick={() => document.getElementById("foto-mgmt")?.click()}>
-                    <ImageIcon className="w-4 h-4 mr-2" />
-                    {photoPreview ? "Trocar Foto" : "Anexar Foto"}
+                <div className="flex items-center justify-between">
+                  <Label>Fotos (opcional)</Label>
+                  <Button variant="outline" type="button" size="sm" onClick={() => document.getElementById("foto-mgmt")?.click()} className="gap-1.5 h-7 text-xs">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                    Adicionar Fotos
                   </Button>
-                  <input id="foto-mgmt" type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-                  {photoPreview && (
-                    <button type="button" onClick={() => { setPhotoPreview(null); setForm(p => ({ ...p, foto: null })); }} className="text-muted-foreground hover:text-destructive">
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
+                  <input id="foto-mgmt" type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
                 </div>
-                {photoPreview && (
-                  <div className="w-32 h-24 rounded-md overflow-hidden border border-border mt-2">
-                    <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                {photoPreviews.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {photoPreviews.map((src, i) => (
+                      <div key={i} className="relative w-20 h-16 rounded-md overflow-hidden border border-border group">
+                        <img src={src} alt="Preview" className="w-full h-full object-cover" />
+                        <button type="button" onClick={() => removePhoto(i)} className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -258,10 +285,27 @@ export default function RetiradaMateriais() {
         </div>
       )}
 
-      {/* Photo viewer */}
-      {viewPhoto && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setViewPhoto(null)}>
-          <img src={viewPhoto} alt="Foto" className="max-w-full max-h-full rounded-lg" />
+      {/* Lightbox */}
+      {lightbox && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => setLightbox(null)}>
+          {lightbox.photos.length > 1 && (
+            <>
+              <button className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/40 rounded-full p-2" onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, index: (l.index - 1 + l.photos.length) % l.photos.length } : null); }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <button className="absolute right-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white bg-black/40 rounded-full p-2" onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, index: (l.index + 1) % l.photos.length } : null); }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </>
+          )}
+          <img src={lightbox.photos[lightbox.index]} alt="Foto" className="max-w-full max-h-[90vh] rounded-lg object-contain" onClick={e => e.stopPropagation()} />
+          {lightbox.photos.length > 1 && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+              {lightbox.photos.map((_, i) => (
+                <button key={i} onClick={e => { e.stopPropagation(); setLightbox(l => l ? { ...l, index: i } : null); }} className={`w-2 h-2 rounded-full ${i === lightbox.index ? "bg-white" : "bg-white/40"}`} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -284,48 +328,59 @@ export default function RetiradaMateriais() {
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Material/Ferramenta</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Quantidade</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Justificativa</th>
-                  <th className="text-center px-4 py-3 font-semibold border-r border-border/40">Foto</th>
+                  <th className="text-center px-4 py-3 font-semibold border-r border-border/40">Fotos</th>
                   <th className="text-center px-4 py-3 font-semibold w-20">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {records.map(r => (
-                  <tr key={r.id} className="hover:bg-muted/10 transition-colors group">
-                    <td className="px-4 py-3 border-r border-border/30 font-medium">{r.nome || <span className="text-muted-foreground italic">—</span>}</td>
-                    <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm">
-                      {r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
-                    </td>
-                    <td className="px-4 py-3 border-r border-border/30">
-                      <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", tipoBadge(r.tipo))}>
-                        {r.tipo === "retirada" ? "Retirada" : "Entrega"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 border-r border-border/30 font-medium">{r.tipoMaterial}</td>
-                    <td className="px-4 py-3 border-r border-border/30">{r.quantidade}</td>
-                    <td className="px-4 py-3 border-r border-border/30 text-muted-foreground max-w-[240px] truncate" title={r.justificativa}>
-                      {r.justificativa}
-                    </td>
-                    <td className="px-4 py-3 border-r border-border/30 text-center">
-                      {r.foto ? (
-                        <button onClick={() => setViewPhoto(r.foto!)} className="mx-auto flex items-center justify-center w-8 h-8 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors">
-                          <ImageIcon className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <span className="text-muted-foreground/40 text-xs">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => openEdit(r)} className="text-muted-foreground hover:text-primary transition-colors">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(r.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {records.map(r => {
+                  const photos = parsePhotos(r.foto);
+                  return (
+                    <tr key={r.id} className="hover:bg-muted/10 transition-colors group">
+                      <td className="px-4 py-3 border-r border-border/30 font-medium">{r.nome || <span className="text-muted-foreground italic">—</span>}</td>
+                      <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm">
+                        {r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
+                      </td>
+                      <td className="px-4 py-3 border-r border-border/30">
+                        <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", tipoBadge(r.tipo))}>
+                          {r.tipo === "retirada" ? "Retirada" : "Entrega"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 border-r border-border/30 font-medium">{r.tipoMaterial}</td>
+                      <td className="px-4 py-3 border-r border-border/30">{r.quantidade}</td>
+                      <td className="px-4 py-3 border-r border-border/30 text-muted-foreground max-w-[240px] truncate" title={r.justificativa}>
+                        {r.justificativa}
+                      </td>
+                      <td className="px-4 py-3 border-r border-border/30 text-center">
+                        {photos.length > 0 ? (
+                          <button
+                            onClick={() => setLightbox({ photos, index: 0 })}
+                            className="relative mx-auto inline-flex items-center justify-center w-9 h-9 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                          >
+                            <ImageIcon className="w-4 h-4" />
+                            {photos.length > 1 && (
+                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                                {photos.length}
+                              </span>
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground/40 text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => openEdit(r)} className="text-muted-foreground hover:text-primary transition-colors">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(r.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

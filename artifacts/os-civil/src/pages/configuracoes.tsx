@@ -124,6 +124,25 @@ export default function Configuracoes() {
     emailMonitoringEnabled: "false",
   });
 
+  // Multi-email helpers: email list is stored/saved as comma-separated string in form.notificationEmail
+  const emailList = form.notificationEmail
+    ? form.notificationEmail.split(",").map(e => e.trim()).filter(Boolean)
+    : [];
+  const [newEmail, setNewEmail] = useState("");
+
+  const addEmail = () => {
+    const trimmed = newEmail.trim();
+    if (!trimmed || emailList.includes(trimmed)) return;
+    const updated = [...emailList, trimmed].join(",");
+    setForm(f => ({ ...f, notificationEmail: updated }));
+    setNewEmail("");
+  };
+
+  const removeEmail = (idx: number) => {
+    const updated = emailList.filter((_, i) => i !== idx).join(",");
+    setForm(f => ({ ...f, notificationEmail: updated }));
+  };
+
   const [connections, setConnections] = useState<SavedConnection[]>([]);
   const [addingFor, setAddingFor] = useState<string | null>(null);
   const [connForm, setConnForm] = useState({ label: "", apiKey: "", endpointUrl: "" });
@@ -138,6 +157,29 @@ export default function Configuracoes() {
     notif: true, smtp: false, webhook: false, monitoring: false, sharing: true,
     integrations: false, creator: true,
   });
+
+  const [copiedCal, setCopiedCal] = useState(false);
+  const [copiedUnit, setCopiedUnit] = useState<string | null>(null);
+
+  const calShareUrl = `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/calendario?view=1`;
+  const copyCal = () => {
+    navigator.clipboard.writeText(calShareUrl).then(() => {
+      setCopiedCal(true);
+      setTimeout(() => setCopiedCal(false), 2500);
+      toast({ title: "Link do calendário copiado!" });
+    });
+  };
+
+  const REGIONAL_UNITS_LIST = ["AM", "AC", "AP", "RO", "RR", "PA"];
+  const unitLink = (u: string) =>
+    `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/registrar?u=${u}`;
+  const copyUnitLink = (u: string) => {
+    navigator.clipboard.writeText(unitLink(u)).then(() => {
+      setCopiedUnit(u);
+      setTimeout(() => setCopiedUnit(null), 2000);
+      toast({ title: `Link da unidade ${u} copiado!` });
+    });
+  };
   const toggleSect = (key: string) => setSectOpen(p => ({ ...p, [key]: !p[key] }));
 
   const handleSystemToggle = () => {
@@ -262,19 +304,47 @@ export default function Configuracoes() {
           </CardDescription>
         </CardHeader>
         {sectOpen.notif && <CardContent className="space-y-4">
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Mail className="w-4 h-4" />
-              E-mail de Destino das Notificações
+              E-mails de Destino das Notificações
             </Label>
-            <Input
-              type="email"
-              placeholder="gestor@empresa.com.br"
-              value={form.notificationEmail}
-              onChange={(e) => setForm(f => ({ ...f, notificationEmail: e.target.value }))}
-            />
+            {/* Current list */}
+            {emailList.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {emailList.map((email, idx) => (
+                  <span key={idx} className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs px-2.5 py-1 rounded-full font-medium">
+                    <Mail className="w-3 h-3 shrink-0" />
+                    {email}
+                    <button
+                      type="button"
+                      onClick={() => removeEmail(idx)}
+                      className="text-primary/60 hover:text-destructive ml-0.5 transition-colors"
+                      title="Remover"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {/* Add email row */}
+            <div className="flex gap-2">
+              <Input
+                type="email"
+                placeholder="gestor@empresa.com.br"
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addEmail())}
+                className="flex-1"
+              />
+              <Button type="button" variant="outline" onClick={addEmail} className="shrink-0 gap-1.5" size="sm">
+                <Plus className="w-3.5 h-3.5" />
+                Adicionar
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              Cada vez que um funcionário registrar uma OS, esse e-mail receberá um aviso com os detalhes.
+              Adicione um ou mais e-mails. Cada nova OS enviará notificação para todos os destinatários.
             </p>
           </div>
         </CardContent>}
@@ -510,16 +580,67 @@ export default function Configuracoes() {
             Envie este link para os funcionários abrirem chamados sem acesso ao painel de gestão.
           </CardDescription>
         </CardHeader>
-        {sectOpen.sharing && <CardContent className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Input value={shareUrl} readOnly className="font-mono text-sm bg-muted/50" />
-            <Button variant="outline" onClick={copyLink} className="shrink-0">
-              {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-            </Button>
+        {sectOpen.sharing && <CardContent className="space-y-6">
+
+          {/* Generic registration link */}
+          <div className="space-y-2">
+            <p className="text-sm font-semibold">Link Geral de Registro</p>
+            <div className="flex items-center gap-2">
+              <Input value={shareUrl} readOnly className="font-mono text-sm bg-muted/50" />
+              <Button variant="outline" onClick={copyLink} className="shrink-0">
+                {copied ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              O funcionário preenche o formulário e recebe um número de protocolo. Nenhuma informação de gestão é visível nessa página.
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground">
-            O funcionário preenche o formulário e recebe um número de protocolo. Nenhuma informação de gestão é visível nessa página.
-          </p>
+
+          {/* Per-unit links */}
+          <div className="space-y-2 border-t border-border/40 pt-4">
+            <p className="text-sm font-semibold">Links por Unidade (UF)</p>
+            <p className="text-xs text-muted-foreground">
+              Cada link isola automaticamente os registros e chamados da respectiva unidade.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {REGIONAL_UNITS_LIST.map(u => (
+                <div key={u} className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                  <span className="text-xs font-mono font-bold text-primary w-8 shrink-0">{u}</span>
+                  <Input value={unitLink(u)} readOnly className="font-mono text-xs bg-transparent border-0 p-0 h-auto focus-visible:ring-0 text-muted-foreground" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0"
+                    onClick={() => copyUnitLink(u)}
+                    title={`Copiar link da unidade ${u}`}
+                  >
+                    {copiedUnit === u
+                      ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                      : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Calendar view-only link */}
+          <div className="space-y-2 border-t border-border/40 pt-4">
+            <p className="text-sm font-semibold">Compartilhar Calendário (Somente Leitura)</p>
+            <div className="flex items-center gap-2">
+              <Input value={calShareUrl} readOnly className="font-mono text-sm bg-muted/50" />
+              <Button variant="outline" onClick={copyCal} className="shrink-0">
+                {copiedCal ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+              </Button>
+              <a href={calShareUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="ghost" size="icon" className="shrink-0" title="Abrir em nova aba">
+                  <ExternalLink className="w-4 h-4" />
+                </Button>
+              </a>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Qualquer pessoa com este link pode visualizar o calendário de OS sem acesso ao painel de gestão.
+            </p>
+          </div>
         </CardContent>}
       </Card>
 

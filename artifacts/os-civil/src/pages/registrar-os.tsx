@@ -75,7 +75,11 @@ export default function RegistrarOS() {
   });
 
   const formatoServico = form.watch("formatoServico");
-  const estimativaAuto = formatoServico ? MARKET_RATES[formatoServico] : null;
+  const tipoOS = form.watch("tipo");
+  const TIPO_MULT: Record<string, number> = { reforma: 1.5, revitalizacao: 1.2, preventiva: 0.8, corretiva: 1.0, outros: 1.0 };
+  const estimativaAuto = formatoServico
+    ? Math.round(MARKET_RATES[formatoServico] * (TIPO_MULT[tipoOS ?? "corretiva"] ?? 1.0) * 4 * 1.046)
+    : null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -131,6 +135,7 @@ export default function RegistrarOS() {
           photos: values.photos || undefined,
           unidade: unitFromUrl,
           origem: "manual",
+          estimatedValue: estimativaAuto || undefined,
         } as any,
       },
       {

@@ -3,9 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays, MapPin, RefreshCw } from "lucide-react";
 import { PRIORITY_LABELS } from "@/lib/constants";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useUnit } from "@/contexts/unit-context";
+import { useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -21,17 +24,40 @@ const MONTHS = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
+const REGIONAL_UNITS = ["AM", "AC", "AP", "RO", "RR", "PA"];
+
 export default function Dashboard() {
+  const { unit } = useUnit();
+  const queryClient = useQueryClient();
   const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
 
   const [period, setPeriod] = useState<"daily" | "monthly" | "annual">("monthly");
   const [filterYear, setFilterYear] = useState<string>(currentYear.toString());
   const [filterMonth, setFilterMonth] = useState<string>("0");
   const [filterDay, setFilterDay] = useState<string>("0");
+  const [filterUnit, setFilterUnit] = useState<string>("all");
+  const [refreshing, setRefreshing] = useState(false);
 
   const [years, setYears] = useState<number[]>(
     Array.from({ length: 5 }, (_, i) => currentYear - i)
+  );
+
+  const isAM = unit === "AM";
+  // Effective unit for API calls: AM can filter by sub-unit; other units always see themselves
+  const effectiveUnit = isAM
+    ? (filterUnit === "all" ? undefined : filterUnit)
+    : unit;
+
+  const summaryQueryKey = ["dashboard-summary", effectiveUnit];
+  const statsQueryKey = ["dashboard-stats", period];
+
+  const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary(
+    { unidade: effectiveUnit } as any,
+    { query: { enabled: true, queryKey: summaryQueryKey } }
+  );
+  const { data: stats, isLoading: loadingStats } = useGetDashboardStats(
+    { period },
+    { query: { enabled: true, queryKey: statsQueryKey } }
   );
 
   useEffect(() => {
@@ -42,16 +68,20 @@ export default function Dashboard() {
       })
       .catch(() => {});
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: summaryQueryKey }),
+      queryClient.invalidateQueries({ queryKey: statsQueryKey }),
+    ]);
+    setRefreshing(false);
+  }, [queryClient, JSON.stringify(summaryQueryKey), JSON.stringify(statsQueryKey)]);
+
   const daysInMonth = filterMonth !== "0"
     ? new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
     : 31;
   const dayOptions = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-  const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary();
-  const { data: stats, isLoading: loadingStats } = useGetDashboardStats(
-    { period },
-    { query: { enabled: true, queryKey: ["dashboard-stats", period] } }
-  );
 
   const filterLabel = [
     filterYear,
@@ -65,16 +95,24 @@ export default function Dashboard() {
 
   if (!summary) return null;
 
+  const unitLabel = isAM && filterUnit !== "all" ? ` — ${filterUnit}` : isAM ? " — Todas as Unidades" : ` — ${unit}`;
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header + Filtro de Data */}
+      {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Painel de Controle</h1>
-            <p className="text-muted-foreground mt-1">Visão geral das operações e serviços.</p>
+            <p className="text-muted-foreground mt-1">
+              Visão geral das operações e serviços{unitLabel}.
+            </p>
           </div>
-          <div className="flex gap-3 text-sm shrink-0">
+          <div className="flex items-center gap-3 text-sm shrink-0 flex-wrap">
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2" title="Atualizar dados">
+              <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
             <div className="bg-card border border-border px-4 py-2 rounded-md">
               <span className="text-muted-foreground">Hoje:</span>
               <span className="font-mono font-bold text-primary ml-1">{summary.totalToday}</span>
@@ -86,11 +124,11 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filtro único Ano / Mês / Dia */}
+        {/* Filtros */}
         <div className="flex flex-wrap items-center gap-3 bg-card border border-border/50 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground shrink-0">
             <CalendarDays className="w-4 h-4 text-primary" />
-            Filtro de Período:
+            Período:
           </div>
           <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setFilterMonth("0"); setFilterDay("0"); }}>
             <SelectTrigger className="w-28 h-8 text-sm">
@@ -110,11 +148,7 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
 
-          <Select
-            value={filterDay}
-            onValueChange={setFilterDay}
-            disabled={filterMonth === "0"}
-          >
+          <Select value={filterDay} onValueChange={setFilterDay} disabled={filterMonth === "0"}>
             <SelectTrigger className="w-28 h-8 text-sm">
               <SelectValue placeholder="Dia" />
             </SelectTrigger>
@@ -124,18 +158,39 @@ export default function Dashboard() {
             </SelectContent>
           </Select>
 
-          {(filterMonth !== "0" || filterDay !== "0") && (
-            <span className="text-xs text-primary font-medium">
-              Exibindo: {filterLabel}
-            </span>
+          {/* UF filter — only for AM (main office) */}
+          {isAM && (
+            <>
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground shrink-0 ml-2 pl-2 border-l border-border">
+                <MapPin className="w-4 h-4 text-primary" />
+                UF:
+              </div>
+              <Select value={filterUnit} onValueChange={setFilterUnit}>
+                <SelectTrigger className="w-32 h-8 text-sm">
+                  <SelectValue placeholder="Unidade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  {REGIONAL_UNITS.map(u => (
+                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
           )}
+
           {(filterMonth !== "0" || filterDay !== "0") && (
-            <button
-              onClick={() => { setFilterMonth("0"); setFilterDay("0"); }}
-              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-            >
-              Limpar filtro
-            </button>
+            <>
+              <span className="text-xs text-primary font-medium">
+                Exibindo: {filterLabel}
+              </span>
+              <button
+                onClick={() => { setFilterMonth("0"); setFilterDay("0"); }}
+                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                Limpar
+              </button>
+            </>
           )}
         </div>
       </div>

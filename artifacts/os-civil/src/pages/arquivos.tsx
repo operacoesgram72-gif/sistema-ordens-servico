@@ -488,10 +488,17 @@ export default function Arquivos() {
                     {links.map(link => (
                       <tr key={link.id} className="hover:bg-muted/10 transition-colors group">
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
+                          <a
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2.5 hover:text-primary transition-colors group/linkname"
+                            title={`Abrir: ${link.url}`}
+                          >
                             <LinkIcon className="w-4 h-4 text-primary shrink-0" />
-                            <span className="font-medium">{link.nome}</span>
-                          </div>
+                            <span className="font-medium group-hover/linkname:underline underline-offset-2">{link.nome}</span>
+                            <ExternalLink className="w-3 h-3 text-muted-foreground/50 group-hover/linkname:text-primary transition-colors" />
+                          </a>
                         </td>
                         <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell text-xs">
                           <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
