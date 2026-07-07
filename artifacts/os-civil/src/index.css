@@ -182,11 +182,54 @@
 
 /* ── Page transition ── */
 .page-enter {
-  animation: pageEnter 0.22s ease both;
+  animation: pageEnter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes pageEnter {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Section content accordion animation ── */
+.sect-content {
+  animation: sectEnter 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes sectEnter {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Card interactive hover ── */
+.card-interactive {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.card-interactive:hover {
+  border-color: hsl(var(--border) / 0.75);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.22), 0 2px 8px rgba(0,0,0,0.12);
+}
+
+/* ── Sidebar nav item active indicator ── */
+.nav-item-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: hsl(var(--primary));
+}
+
+/* ── Smooth toggle switch ── */
+.toggle-switch {
+  transition: background-color 0.2s ease;
+}
+.toggle-switch .toggle-thumb {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ── Button press micro-feedback ── */
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
 /* ── Floating Action Button (FAB) ── */

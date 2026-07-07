@@ -61,7 +61,8 @@ router.get("/system-status", async (req, res) => {
     const settings = await getAllSettings();
     const active = settings.systemActive !== "false"; // default true
     const passwordSet = Boolean(settings.systemControlPasswordHash);
-    res.json({ active, passwordSet });
+    const modulePasswordSet = Boolean(settings.systemModulePasswordHash);
+    res.json({ active, passwordSet, modulePasswordSet });
   } catch (err) {
     req.log.error(err);
     // Fail open — never let a DB error lock out the system
@@ -142,6 +143,71 @@ router.post("/settings/system-toggle", requireAMUnit, async (req, res) => {
   }
 });
 
+// POST /settings/system-module-password (AM-only) — set/change the module *access* password
+// Body: { password: string, currentPassword?: string }
+router.post("/settings/system-module-password", requireAMUnit, async (req, res) => {
+  try {
+    const { password, currentPassword } = req.body as {
+      password?: string;
+      currentPassword?: string;
+    };
+    if (!password || typeof password !== "string" || password.trim().length < 6) {
+      res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres." });
+      return;
+    }
+    const settings = await getAllSettings();
+    const existingHash = settings.systemModulePasswordHash;
+
+    if (existingHash) {
+      if (!currentPassword || typeof currentPassword !== "string") {
+        res.status(403).json({ error: "Informe a senha atual para alterá-la." });
+        return;
+      }
+      const valid = await bcrypt.compare(currentPassword, existingHash);
+      if (!valid) {
+        res.status(403).json({ error: "Senha atual incorreta." });
+        return;
+      }
+    }
+
+    const hash = await bcrypt.hash(password.trim(), 12);
+    await upsertSetting("systemModulePasswordHash", hash);
+    req.log.info("System module access password updated");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno ao salvar senha." });
+  }
+});
+
+// POST /settings/system-module-verify (AM-only) — verify the module access password
+// Body: { password: string } — returns { ok: true } on success, 403 on wrong password
+router.post("/settings/system-module-verify", requireAMUnit, async (req, res) => {
+  try {
+    const { password } = req.body as { password?: string };
+    if (!password || typeof password !== "string") {
+      res.status(400).json({ error: "Senha obrigatória." });
+      return;
+    }
+    const settings = await getAllSettings();
+    const hash = settings.systemModulePasswordHash;
+    if (!hash) {
+      // No module password configured — grant access without check
+      res.json({ ok: true });
+      return;
+    }
+    const valid = await bcrypt.compare(password, hash);
+    if (!valid) {
+      res.status(403).json({ error: "Senha incorreta." });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno." });
+  }
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // GET /share-urls — returns management area share URLs for all units (AM only)
@@ -161,7 +227,10 @@ router.get("/share-urls", requireAMUnit, async (req, res) => {
  * These hold credential material (hashes, raw passwords) that has no
  * business being in the browser.
  */
-const SENSITIVE_KEYS = new Set(["systemControlPasswordHash"]);
+const SENSITIVE_KEYS = new Set([
+  "systemControlPasswordHash",
+  "systemModulePasswordHash",
+]);
 
 // GET /settings (AM-only)
 router.get("/settings", requireAMUnit, async (req, res) => {

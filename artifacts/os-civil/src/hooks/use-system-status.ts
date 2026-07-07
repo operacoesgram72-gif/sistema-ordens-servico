@@ -4,8 +4,10 @@ const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 export interface SystemStatus {
   active: boolean;
-  /** True when the control password has already been configured */
+  /** True when the action/toggle password has been configured */
   passwordSet: boolean;
+  /** True when the module-level access password has been configured */
+  modulePasswordSet: boolean;
 }
 
 /**
@@ -18,7 +20,7 @@ export function useSystemStatus() {
     queryKey: ["system-status"],
     queryFn: async () => {
       const res = await fetch(`${BASE_URL}/api/system-status`);
-      if (!res.ok) return { active: true, passwordSet: false };
+      if (!res.ok) return { active: true, passwordSet: false, modulePasswordSet: false };
       return res.json();
     },
     staleTime: 30_000,
@@ -28,6 +30,7 @@ export function useSystemStatus() {
   return {
     systemActive: data?.active ?? true,
     passwordSet: data?.passwordSet ?? false,
+    modulePasswordSet: data?.modulePasswordSet ?? false,
     isLoading,
   };
 }

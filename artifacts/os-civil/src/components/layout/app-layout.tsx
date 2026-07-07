@@ -147,11 +147,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4">
-        {navSections.filter((section) => {
-          // Configurações is available only for the AM unit
-          if (section.label === "Sistema" && unit !== "AM") return false;
-          return true;
-        }).map((section) => (
+        {navSections.map((section) => (
           <div key={section.label}>
             <p className="px-3 mb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
               {section.label}
