@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
+import { useStatusEvents } from "@/hooks/use-status-events";
 import { UNITS, type Unit } from "@/contexts/unit-context";
 import { STATUS_LABELS, STATUS_COLORS, PRIORITY_LABELS, PRIORITY_COLORS } from "@/lib/constants";
 import type { ServiceOrderStatus, ServiceOrderPriority } from "@workspace/api-client-react";
@@ -57,6 +58,27 @@ export default function FecharOS() {
   const [fromCache, setFromCache] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successId, setSuccessId] = useState<number | null>(null);
+
+  // Real-time SSE updates — apply status changes broadcast by other clients
+  useStatusEvents(
+    useCallback((event) => {
+      // Only apply events for the current unit
+      if (event.unidade !== unitFromUrl) return;
+      setOrdens(prev => {
+        const exists = prev.some(o => o.id === event.id);
+        if (!exists) return prev;
+        const updated = prev.map(o =>
+          o.id === event.id ? { ...o, status: event.status } : o
+        );
+        writeCache(unitFromUrl, updated);
+        return updated;
+      });
+      toast({
+        title: `OS ${event.number} atualizada`,
+        description: `Status → ${STATUS_LABELS[event.status as ServiceOrderStatus] || event.status}`,
+      });
+    }, [unitFromUrl, toast]) // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const loadOrdens = useCallback(async () => {
     setLoading(true);

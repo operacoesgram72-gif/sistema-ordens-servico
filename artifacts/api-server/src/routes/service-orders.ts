@@ -11,6 +11,7 @@ import {
 } from "@workspace/api-zod";
 import { eq, and, gte, lte, like, or, sql } from "drizzle-orm";
 import { sendOsNotification } from "./settings";
+import { broadcast } from "../lib/sse-broadcast";
 
 const router = Router();
 
@@ -282,6 +283,16 @@ router.patch("/service-orders/:id/status", async (req, res) => {
 
     if (!updated) { res.status(404).json({ error: "Não encontrada" }); return; }
     const [enriched] = await enrichWithTechnician([updated]);
+    // Broadcast real-time event to all connected SSE clients
+    broadcast({
+      type: "status-changed",
+      id: updated.id,
+      number: updated.number,
+      title: updated.title,
+      status: updated.status,
+      unidade: updated.unidade,
+      updatedAt: updated.updatedAt.toISOString(),
+    });
     res.json(enriched);
   } catch (err) {
     req.log.error(err);

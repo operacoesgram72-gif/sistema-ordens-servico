@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { shareTokenMiddleware } from "../lib/share-tokens";
 import healthRouter from "./health";
+import eventsRouter from "./events";
 import serviceOrdersRouter from "./service-orders";
 import techniciansRouter from "./technicians";
 import dashboardRouter from "./dashboard";
@@ -17,6 +18,7 @@ const router: IRouter = Router();
 router.use(shareTokenMiddleware);
 
 router.use(healthRouter);
+router.use(eventsRouter);
 router.use(serviceOrdersRouter);
 router.use(techniciansRouter);
 router.use(dashboardRouter);
