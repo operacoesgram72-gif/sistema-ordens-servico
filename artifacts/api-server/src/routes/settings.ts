@@ -348,6 +348,10 @@ async function attemptSendEmail(mail: {
       secure: port === 465,
       auth: { user, pass },
       tls: { rejectUnauthorized: false },
+      // Hard timeouts so a blocked SMTP port never hangs the request indefinitely.
+      connectionTimeout: 12_000,  // 12 s to establish TCP connection
+      greetingTimeout:  10_000,   // 10 s waiting for SMTP greeting
+      socketTimeout:    20_000,   // 20 s of socket inactivity
     });
 
     await transporter.sendMail({

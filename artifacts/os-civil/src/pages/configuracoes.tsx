@@ -329,8 +329,16 @@ export default function Configuracoes() {
   const handleTestEmail = async () => {
     setTesting(true);
     setTestResult(null);
+    const controller = new AbortController();
+    // 40 s client-side hard cap — backend times out at ~42 s worst-case,
+    // so this ensures the button is never stuck "Enviando…" indefinitely.
+    const timer = setTimeout(() => controller.abort(), 40_000);
     try {
-      const res = await fetch(`${BASE_URL_CONF}/api/settings/test-email`, { method: "POST" });
+      const res = await fetch(`${BASE_URL_CONF}/api/settings/test-email`, {
+        method: "POST",
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
       const data = await res.json();
       setTestResult(data);
       if (data.ok) {
@@ -338,8 +346,13 @@ export default function Configuracoes() {
       } else {
         toast({ title: "Falha no envio", description: data.error, variant: "destructive" });
       }
-    } catch {
-      setTestResult({ ok: false, error: "Erro de rede ao testar envio." });
+    } catch (err: any) {
+      clearTimeout(timer);
+      const msg = err?.name === "AbortError"
+        ? "Tempo esgotado — verifique host/porta SMTP e tente novamente."
+        : "Erro de rede ao testar envio.";
+      setTestResult({ ok: false, error: msg });
+      toast({ title: "Falha no envio", description: msg, variant: "destructive" });
     } finally {
       setTesting(false);
     }
