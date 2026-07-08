@@ -61,6 +61,15 @@ const migrations = [
     active     boolean NOT NULL DEFAULT true,
     created_at timestamptz NOT NULL DEFAULT now()
   )`,
+  `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS unidade text NOT NULL DEFAULT 'AM'`,
+  `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS position text`,
+  `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS manager_id integer`,
+  `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS photo_url text`,
+  `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS is_corporate boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE technicians DROP CONSTRAINT IF EXISTS technicians_manager_id_fkey`,
+  `ALTER TABLE technicians
+     ADD CONSTRAINT technicians_manager_id_fkey
+     FOREIGN KEY (manager_id) REFERENCES technicians(id) ON DELETE SET NULL`,
 
   // ── material_withdrawals ───────────────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS material_withdrawals (
@@ -114,6 +123,19 @@ const migrations = [
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   )`,
+
+  // ── corporate org-chart roles (shared across all units) ───────────────────
+  `INSERT INTO technicians (name, specialty, position, unidade, is_corporate, active)
+   SELECT 'Eduardo Lopes', 'Diretoria', 'Diretor de Tecnologia', 'AM', true, true
+   WHERE NOT EXISTS (SELECT 1 FROM technicians WHERE name = 'Eduardo Lopes' AND is_corporate = true)`,
+  `INSERT INTO technicians (name, specialty, position, unidade, is_corporate, active, manager_id)
+   SELECT 'Salvino Guerra', 'Gerência', 'Gerente de Projetos', 'AM', true, true,
+     (SELECT id FROM technicians WHERE name = 'Eduardo Lopes' AND is_corporate = true LIMIT 1)
+   WHERE NOT EXISTS (SELECT 1 FROM technicians WHERE name = 'Salvino Guerra' AND is_corporate = true)`,
+  `INSERT INTO technicians (name, specialty, position, unidade, is_corporate, active, manager_id)
+   SELECT 'Marco Carneiro', 'Gerência', 'Gerente de Tecnologia', 'AM', true, true,
+     (SELECT id FROM technicians WHERE name = 'Salvino Guerra' AND is_corporate = true LIMIT 1)
+   WHERE NOT EXISTS (SELECT 1 FROM technicians WHERE name = 'Marco Carneiro' AND is_corporate = true)`,
 ];
 
 const client = await pool.connect();

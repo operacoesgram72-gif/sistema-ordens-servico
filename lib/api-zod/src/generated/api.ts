@@ -253,6 +253,10 @@ export const SignServiceOrderResponse = zod.object({
 /**
  * @summary Resumo do dashboard com indicadores
  */
+export const GetDashboardSummaryQueryParams = zod.object({
+  "unidade": zod.coerce.string().optional()
+})
+
 export const GetDashboardSummaryResponse = zod.object({
   "totalOpen": zod.number(),
   "totalInProgress": zod.number(),
@@ -550,6 +554,10 @@ export const UpdateSettingsResponse = zod.object({
 /**
  * @summary Listar técnicos
  */
+export const ListTechniciansQueryParams = zod.object({
+  "unidade": zod.coerce.string().optional()
+})
+
 export const ListTechniciansResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
@@ -557,6 +565,11 @@ export const ListTechniciansResponseItem = zod.object({
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
   "active": zod.boolean(),
+  "unidade": zod.string(),
+  "position": zod.string().nullish(),
+  "managerId": zod.number().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "isCorporate": zod.boolean(),
   "createdAt": zod.string()
 })
 export const ListTechniciansResponse = zod.array(ListTechniciansResponseItem)
@@ -572,7 +585,11 @@ export const CreateTechnicianBody = zod.object({
   "name": zod.string().min(1),
   "specialty": zod.string(),
   "phone": zod.string().optional(),
-  "email": zod.string().optional()
+  "email": zod.string().optional(),
+  "unidade": zod.string().optional(),
+  "position": zod.string().optional(),
+  "managerId": zod.number().nullish(),
+  "photoUrl": zod.string().nullish()
 })
 
 
@@ -588,7 +605,12 @@ export const UpdateTechnicianBody = zod.object({
   "specialty": zod.string().optional(),
   "phone": zod.string().optional(),
   "email": zod.string().optional(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "unidade": zod.string().optional(),
+  "position": zod.string().nullish(),
+  "managerId": zod.number().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "isCorporate": zod.boolean().optional()
 })
 
 export const UpdateTechnicianResponse = zod.object({
@@ -598,6 +620,11 @@ export const UpdateTechnicianResponse = zod.object({
   "phone": zod.string().nullish(),
   "email": zod.string().nullish(),
   "active": zod.boolean(),
+  "unidade": zod.string(),
+  "position": zod.string().nullish(),
+  "managerId": zod.number().nullish(),
+  "photoUrl": zod.string().nullish(),
+  "isCorporate": zod.boolean(),
   "createdAt": zod.string()
 })
 
@@ -607,6 +634,55 @@ export const UpdateTechnicianResponse = zod.object({
  */
 export const DeleteTechnicianParams = zod.object({
   "id": zod.coerce.number()
+})
+
+
+/**
+ * Returns a presigned GCS URL for direct upload. The client sends JSON
+metadata here, then uploads the file directly to the returned URL.
+
+ * @summary Request a presigned URL for file upload
+ */
+
+
+
+
+
+export const RequestUploadUrlBody = zod.object({
+  "name": zod.string().min(1),
+  "size": zod.number().min(1),
+  "contentType": zod.string().min(1)
+})
+
+
+
+
+
+
+export const RequestUploadUrlResponse = zod.object({
+  "uploadURL": zod.string().url(),
+  "objectPath": zod.string(),
+  "metadata": zod.object({
+  "name": zod.string().min(1),
+  "size": zod.number().min(1),
+  "contentType": zod.string().min(1)
+}).optional()
+})
+
+
+/**
+ * @summary Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+ */
+export const GetPublicObjectParams = zod.object({
+  "filePath": zod.coerce.string()
+})
+
+
+/**
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  "objectPath": zod.coerce.string()
 })
 
 

@@ -15,5 +15,13 @@ export interface Technician {
   /** @nullable */
   email?: string | null;
   active: boolean;
+  unidade: string;
+  /** @nullable */
+  position?: string | null;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  isCorporate: boolean;
   createdAt: string;
 }

@@ -5,6 +5,25 @@
  * Sistema de Ordem de Serviço - Construção Civil, Manutenção e Limpeza
  * OpenAPI spec version: 0.2.0
  */
+export interface UploadUrlRequest {
+  /** @minLength 1 */
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  /** @minLength 1 */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+  metadata?: UploadUrlRequest;
+}
+
+export interface ErrorEnvelope {
+  error: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -348,6 +367,14 @@ export interface Technician {
   /** @nullable */
   email?: string | null;
   active: boolean;
+  unidade: string;
+  /** @nullable */
+  position?: string | null;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  isCorporate: boolean;
   createdAt: string;
 }
 
@@ -357,6 +384,12 @@ export interface TechnicianInput {
   specialty: string;
   phone?: string;
   email?: string;
+  unidade?: string;
+  position?: string;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  photoUrl?: string | null;
 }
 
 export interface TechnicianUpdate {
@@ -365,6 +398,14 @@ export interface TechnicianUpdate {
   phone?: string;
   email?: string;
   active?: boolean;
+  unidade?: string;
+  /** @nullable */
+  position?: string | null;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  isCorporate?: boolean;
 }
 
 export interface Contact {
@@ -466,6 +507,10 @@ export const ListServiceOrdersPeriod = {
   annual: 'annual',
 } as const;
 
+export type GetDashboardSummaryParams = {
+unidade?: string;
+};
+
 export type GetDashboardStatsParams = {
 period?: GetDashboardStatsPeriod;
 };
@@ -485,5 +530,9 @@ year?: number;
  * Filtra indicadores para um dia específico (YYYY-MM-DD)
  */
 date?: string;
+};
+
+export type ListTechniciansParams = {
+unidade?: string;
 };
 

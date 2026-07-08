@@ -11,6 +11,7 @@ import materialWithdrawalsRouter from "./material-withdrawals";
 import fileEntriesRouter from "./file-entries";
 import suppliersRouter from "./suppliers";
 import linksRouter from "./links";
+import storageRouter from "./storage";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(materialWithdrawalsRouter);
 router.use(fileEntriesRouter);
 router.use(suppliersRouter);
 router.use(linksRouter);
+router.use(storageRouter);
 
 export default router;

@@ -12,4 +12,10 @@ export interface TechnicianInput {
   specialty: string;
   phone?: string;
   email?: string;
+  unidade?: string;
+  position?: string;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  photoUrl?: string | null;
 }

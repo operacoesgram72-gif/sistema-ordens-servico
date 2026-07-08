@@ -14,6 +14,8 @@ tags:
   - name: contacts
   - name: settings
   - name: suppliers
+  - name: Storage
+    description: Object storage upload and serving endpoints.
 
 paths:
   /healthz:
@@ -218,6 +220,12 @@ paths:
       operationId: getDashboardSummary
       tags: [dashboard]
       summary: Resumo do dashboard com indicadores
+      parameters:
+        - name: unidade
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Resumo
@@ -465,6 +473,12 @@ paths:
       operationId: listTechnicians
       tags: [technicians]
       summary: Listar técnicos
+      parameters:
+        - name: unidade
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Lista de técnicos
@@ -532,8 +546,127 @@ paths:
         "204":
           description: Deletado
 
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. The client sends JSON
+        metadata here, then uploads the file directly to the returned URL.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "400":
+          description: Missing or invalid required fields.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to generate upload URL.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset from PUBLIC_OBJECT_SEARCH_PATHS
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: File not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an object entity from PRIVATE_OBJECT_DIR
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content streamed with correct Content-Type.
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Object not found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
 components:
   schemas:
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        size:
+          type: integer
+          minimum: 1
+        contentType:
+          type: string
+          minLength: 1
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          format: uri
+        objectPath:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
     HealthStatus:
       type: object
       properties:
@@ -863,6 +996,8 @@ components:
         - name
         - specialty
         - active
+        - unidade
+        - isCorporate
         - createdAt
       properties:
         id:
@@ -876,6 +1011,16 @@ components:
         email:
           type: ["string", "null"]
         active:
+          type: boolean
+        unidade:
+          type: string
+        position:
+          type: ["string", "null"]
+        managerId:
+          type: ["integer", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        isCorporate:
           type: boolean
         createdAt:
           type: string
@@ -895,6 +1040,14 @@ components:
           type: string
         email:
           type: string
+        unidade:
+          type: string
+        position:
+          type: string
+        managerId:
+          type: ["integer", "null"]
+        photoUrl:
+          type: ["string", "null"]
 
     TechnicianUpdate:
       type: object
@@ -908,6 +1061,16 @@ components:
         email:
           type: string
         active:
+          type: boolean
+        unidade:
+          type: string
+        position:
+          type: ["string", "null"]
+        managerId:
+          type: ["integer", "null"]
+        photoUrl:
+          type: ["string", "null"]
+        isCorporate:
           type: boolean
 
     Contact:

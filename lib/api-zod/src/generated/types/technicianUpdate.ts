@@ -12,4 +12,12 @@ export interface TechnicianUpdate {
   phone?: string;
   email?: string;
   active?: boolean;
+  unidade?: string;
+  /** @nullable */
+  position?: string | null;
+  /** @nullable */
+  managerId?: number | null;
+  /** @nullable */
+  photoUrl?: string | null;
+  isCorporate?: boolean;
 }
