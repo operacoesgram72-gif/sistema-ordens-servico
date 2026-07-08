@@ -1,0 +1,62 @@
+Unidade RO
+
+Eduardo Lopes
+
+↓
+
+Salvino Guerra
+
+↓
+
+Marco Carneiro
+
+↓
+
+(Coordenador da unidade RO)
+
+↓
+
+(Líderes da unidade RO)
+
+↓
+
+(Técnicos da unidade RO)
+
+Cada unidade deverá manter sua própria estrutura organizacional sem interferir nas demais.
+
+11. Edição do Organograma
+
+O organograma deverá ser editável somente pela unidade AM, que funcionará como administração central do sistema.
+
+Somente administradores da unidade AM poderão:
+
+alterar a estrutura hierárquica;
+criar novos níveis;
+alterar gestores;
+alterar cargos;
+reorganizar posições;
+remover cargos;
+incluir novos cargos.
+
+As demais unidades poderão apenas visualizar o organograma correspondente à sua própria unidade, sem qualquer possibilidade de edição.
+
+A validação dessa permissão deverá ocorrer também no backend, impedindo alterações por URL ou chamadas diretas à API.
+
+12. Atualização Automática
+
+Sempre que houver alterações na estrutura organizacional realizadas pela unidade AM:
+
+o organograma da unidade correspondente deverá ser atualizado automaticamente;
+os colaboradores permanecerão vinculados aos gestores definidos pelo campo "Gestão" no cadastro;
+a estrutura deverá ser refletida imediatamente em todas as telas do organograma.
+Regras Obrigatórias
+Cada unidade possui um organograma próprio e independente.
+Somente os cargos corporativos (Eduardo Lopes, Salvino Guerra e Marco Carneiro) serão compartilhados entre todas as unidades.
+Todos os demais cargos e colaboradores serão exclusivos da unidade à qual pertencem.
+O organograma deverá utilizar os dados cadastrados na aba Equipes, sem necessidade de manutenção manual dos colaboradores.
+Apenas a unidade AM poderá editar a estrutura organizacional.
+As demais unidades terão acesso apenas para consulta.
+Não alterar nenhuma funcionalidade já existente no sistema.
+Manter a identidade visual atual e integrar o organograma de forma elegante, moderna e totalmente responsiva.
+
+Objetivo: criar um organograma corporativo inteligente, dinâmico e centralizado, onde a unidade AM administra toda a estrutura organizacional, enquanto cada unidade visualiza apenas sua própria hierarquia, mantendo os colaboradores sincronizados automaticamente conforme os cadastros realizados.
