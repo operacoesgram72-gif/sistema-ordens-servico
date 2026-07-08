@@ -12,6 +12,7 @@ import { useUnit, UNITS } from "@/contexts/unit-context";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useShare } from "@/contexts/share-context";
+import { StatusAlertsBell } from "@/components/layout/status-alerts-bell";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -104,10 +105,11 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
       <div className="px-5 py-4 border-b border-border shrink-0">
         <div className="flex items-center gap-3">
           <img src="/logo-amazonica.png" alt="Logo Rede Amazônica" className="h-10 w-10 object-contain" />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="font-bold text-sm leading-tight text-foreground truncate">Grupo Rede Amazônica</div>
             <div className="text-xs text-muted-foreground">Departamento: Operações</div>
           </div>
+          <StatusAlertsBell variant="sidebar" />
         </div>
         <div className="mt-3 pt-3 border-t border-border/60">
           <span className="text-xs font-semibold text-primary uppercase tracking-widest">Painel de Serviços</span>
@@ -245,7 +247,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <img src="/logo-amazonica.png" alt="Logo" className="h-7 w-7 object-contain" />
           <span className="font-bold text-sm text-foreground">Ordem de Serviço</span>
         </div>
-        <div className="w-9 flex items-center justify-end">
+        <div className="flex items-center gap-1.5">
+          <StatusAlertsBell variant="topbar" />
           {isOnline
             ? <Wifi className="w-4 h-4 text-emerald-500" />
             : <WifiOff className="w-4 h-4 text-amber-500" />

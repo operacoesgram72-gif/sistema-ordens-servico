@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/app-layout";
 import { UnitProvider, type Unit } from "@/contexts/unit-context";
 import { ShareProvider, useShare } from "@/contexts/share-context";
+import { StatusAlertsProvider } from "@/contexts/status-alerts-context";
 import CalendarAlerts from "@/components/calendar-alerts";
 
 const Dashboard         = lazy(() => import("@/pages/dashboard"));
@@ -123,28 +124,30 @@ function ManagementRouter() {
 
   return (
     <UnitProvider lockedUnit={lockedUnit}>
-      <AppLayout>
-        <Suspense fallback={<PageFallback />}>
-          <Switch>
-            <Route path="/" component={Dashboard} />
-            <Route path="/ordens" component={Ordens} />
-            <Route path="/ordens/nova" component={NovaOS} />
-            <Route path="/ordens/:id" component={OSDetail} />
-            <Route path="/tecnicos" component={Tecnicos} />
-            <Route path="/indicadores" component={Indicadores} />
-            <Route path="/cadastros" component={Cadastros} />
-            <Route path="/fornecedores" component={Fornecedores} />
-            <Route path="/configuracoes" component={Configuracoes} />
-            <Route path="/pmoc" component={Pmoc} />
-            <Route path="/retirada-materiais" component={RetiradaMateriais} />
-            <Route path="/calendario" component={Calendario} />
-            <Route path="/arquivos" component={Arquivos} />
-            <Route component={NotFound} />
-          </Switch>
-        </Suspense>
-      </AppLayout>
-      {/* Calendar alerts: shown once per session when tomorrow has scheduled services */}
-      <CalendarAlerts />
+      <StatusAlertsProvider>
+        <AppLayout>
+          <Suspense fallback={<PageFallback />}>
+            <Switch>
+              <Route path="/" component={Dashboard} />
+              <Route path="/ordens" component={Ordens} />
+              <Route path="/ordens/nova" component={NovaOS} />
+              <Route path="/ordens/:id" component={OSDetail} />
+              <Route path="/tecnicos" component={Tecnicos} />
+              <Route path="/indicadores" component={Indicadores} />
+              <Route path="/cadastros" component={Cadastros} />
+              <Route path="/fornecedores" component={Fornecedores} />
+              <Route path="/configuracoes" component={Configuracoes} />
+              <Route path="/pmoc" component={Pmoc} />
+              <Route path="/retirada-materiais" component={RetiradaMateriais} />
+              <Route path="/calendario" component={Calendario} />
+              <Route path="/arquivos" component={Arquivos} />
+              <Route component={NotFound} />
+            </Switch>
+          </Suspense>
+        </AppLayout>
+        {/* Calendar alerts: shown once per session when tomorrow has scheduled services */}
+        <CalendarAlerts />
+      </StatusAlertsProvider>
     </UnitProvider>
   );
 }
