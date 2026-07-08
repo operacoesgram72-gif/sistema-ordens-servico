@@ -10,6 +10,7 @@ export const techniciansTable = pgTable("technicians", {
   email: text("email"),
   active: boolean("active").notNull().default(true),
   unidade: text("unidade").notNull().default("AM"),
+  area: text("area"),
   position: text("position"),
   managerId: integer("manager_id"),
   photoUrl: text("photo_url"),

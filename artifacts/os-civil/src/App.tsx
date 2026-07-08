@@ -27,6 +27,7 @@ const Pmoc              = lazy(() => import("@/pages/pmoc"));
 const RetiradaMateriais = lazy(() => import("@/pages/retirada-materiais"));
 const Calendario        = lazy(() => import("@/pages/calendario"));
 const Arquivos          = lazy(() => import("@/pages/arquivos"));
+const Processos         = lazy(() => import("@/pages/processos"));
 const RegistrarPmoc     = lazy(() => import("@/pages/registrar-pmoc"));
 const FecharOS          = lazy(() => import("@/pages/fechar-os"));
 const NotFound          = lazy(() => import("@/pages/not-found"));
@@ -141,6 +142,7 @@ function ManagementRouter() {
               <Route path="/retirada-materiais" component={RetiradaMateriais} />
               <Route path="/calendario" component={Calendario} />
               <Route path="/arquivos" component={Arquivos} />
+              <Route path="/processos" component={Processos} />
               <Route component={NotFound} />
             </Switch>
           </Suspense>

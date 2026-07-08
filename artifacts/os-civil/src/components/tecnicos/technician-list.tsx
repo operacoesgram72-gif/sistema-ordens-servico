@@ -17,7 +17,7 @@ interface TechnicianListProps {
 }
 
 export function TechnicianList({ technicians, isLoading, managerNameById, canManage, onEdit, onDelete }: TechnicianListProps) {
-  const colSpan = canManage ? 6 : 5;
+  const colSpan = canManage ? 7 : 6;
 
   return (
     <div className="border border-border/50 rounded-md bg-card overflow-hidden">
@@ -26,6 +26,7 @@ export function TechnicianList({ technicians, isLoading, managerNameById, canMan
           <TableRow>
             <TableHead>Nome</TableHead>
             <TableHead>Cargo / Especialidade</TableHead>
+            <TableHead>Área</TableHead>
             <TableHead>Gestão</TableHead>
             <TableHead>Contato</TableHead>
             <TableHead>Status</TableHead>
@@ -57,6 +58,9 @@ export function TechnicianList({ technicians, isLoading, managerNameById, canMan
                     {tech.position && <span className="text-sm font-medium">{tech.position}</span>}
                     <Badge variant="secondary" className="font-normal w-fit">{tech.specialty}</Badge>
                   </div>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {tech.area || "—"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {tech.managerId ? managerNameById.get(tech.managerId) ?? "—" : "—"}

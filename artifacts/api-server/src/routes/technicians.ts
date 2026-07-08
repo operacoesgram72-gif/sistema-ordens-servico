@@ -85,6 +85,7 @@ router.post("/technicians", requireAMUnit, async (req, res) => {
         phone: body.phone ?? null,
         email: body.email ?? null,
         unidade,
+        area: body.area ?? null,
         position: body.position ?? null,
         managerId,
         photoUrl: body.photoUrl ?? null,

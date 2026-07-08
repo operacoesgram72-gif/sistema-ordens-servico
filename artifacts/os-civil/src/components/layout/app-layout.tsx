@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp,
   Share2, Copy, BookUser, Settings2, Wind, PackageOpen, CalendarDays, Folder,
-  Menu, X, Wifi, WifiOff, Truck, Lock,
+  Menu, X, Wifi, WifiOff, Truck, Lock, ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,12 @@ const navSections = [
     items: [
       { href: "/pmoc", label: "PMOC e Bebedouros", icon: Wind },
       { href: "/retirada-materiais", label: "Retirada de Materiais", icon: PackageOpen },
+    ],
+  },
+  {
+    label: "Processos",
+    items: [
+      { href: "/processos", label: "Processos e Procedimentos", icon: ClipboardCheck },
     ],
   },
   {

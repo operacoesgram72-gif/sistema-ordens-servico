@@ -35,6 +35,7 @@ const techSchema = z.object({
   name: z.string().min(3, "Nome muito curto"),
   specialty: z.string().min(2, "Especialidade obrigatória"),
   position: z.string().optional(),
+  area: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email("E-mail inválido").optional().or(z.literal("")),
   managerId: z.string().default(NONE_MANAGER),
@@ -53,6 +54,7 @@ interface TechnicianFormDialogProps {
     name: string;
     specialty: string;
     position?: string;
+    area?: string | null;
     phone?: string;
     email?: string;
     managerId: number | null;
@@ -80,6 +82,7 @@ export function TechnicianFormDialog({
       name: "",
       specialty: "",
       position: "",
+      area: "",
       phone: "",
       email: "",
       managerId: NONE_MANAGER,
@@ -95,6 +98,7 @@ export function TechnicianFormDialog({
         name: editing.name,
         specialty: editing.specialty,
         position: editing.position || "",
+        area: editing.area || "",
         phone: editing.phone || "",
         email: editing.email || "",
         managerId: editing.managerId ? String(editing.managerId) : NONE_MANAGER,
@@ -106,6 +110,7 @@ export function TechnicianFormDialog({
         name: "",
         specialty: "",
         position: "",
+        area: "",
         phone: "",
         email: "",
         managerId: NONE_MANAGER,
@@ -145,6 +150,7 @@ export function TechnicianFormDialog({
       name: values.name,
       specialty: values.specialty,
       position: values.position || undefined,
+      area: values.area || null,
       phone: values.phone || undefined,
       email: values.email || undefined,
       managerId: values.managerId === NONE_MANAGER ? null : Number(values.managerId),
@@ -231,6 +237,18 @@ export function TechnicianFormDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="area"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Área</FormLabel>
+                  <FormControl><Input placeholder="Ex: Manutenções e Reparos" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

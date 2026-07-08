@@ -14,6 +14,8 @@ export interface TechnicianUpdate {
   active?: boolean;
   unidade?: string;
   /** @nullable */
+  area?: string | null;
+  /** @nullable */
   position?: string | null;
   /** @nullable */
   managerId?: number | null;

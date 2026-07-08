@@ -60,6 +60,7 @@ export default function Tecnicos() {
     name: string;
     specialty: string;
     position?: string;
+    area?: string | null;
     phone?: string;
     email?: string;
     managerId: number | null;

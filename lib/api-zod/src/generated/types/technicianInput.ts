@@ -13,6 +13,8 @@ export interface TechnicianInput {
   phone?: string;
   email?: string;
   unidade?: string;
+  /** @nullable */
+  area?: string | null;
   position?: string;
   /** @nullable */
   managerId?: number | null;

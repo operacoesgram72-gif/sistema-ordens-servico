@@ -66,6 +66,7 @@ const migrations = [
   `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS manager_id integer`,
   `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS photo_url text`,
   `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS is_corporate boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE technicians ADD COLUMN IF NOT EXISTS area text`,
   `ALTER TABLE technicians DROP CONSTRAINT IF EXISTS technicians_manager_id_fkey`,
   `ALTER TABLE technicians
      ADD CONSTRAINT technicians_manager_id_fkey
