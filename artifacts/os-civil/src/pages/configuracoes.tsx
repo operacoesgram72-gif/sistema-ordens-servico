@@ -330,9 +330,9 @@ export default function Configuracoes() {
     setTesting(true);
     setTestResult(null);
     const controller = new AbortController();
-    // 40 s client-side hard cap — backend times out at ~42 s worst-case,
-    // so this ensures the button is never stuck "Enviando…" indefinitely.
-    const timer = setTimeout(() => controller.abort(), 40_000);
+    // 28 s client-side cap — backend worst-case is ~23 s (fits Render's 30 s
+    // HTTP limit), so 28 s here gives it room while always unblocking the button.
+    const timer = setTimeout(() => controller.abort(), 28_000);
     try {
       const res = await fetch(`${BASE_URL_CONF}/api/settings/test-email`, {
         method: "POST",

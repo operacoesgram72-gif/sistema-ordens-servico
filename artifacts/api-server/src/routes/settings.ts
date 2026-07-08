@@ -348,10 +348,13 @@ async function attemptSendEmail(mail: {
       secure: port === 465,
       auth: { user, pass },
       tls: { rejectUnauthorized: false },
-      // Hard timeouts so a blocked SMTP port never hangs the request indefinitely.
-      connectionTimeout: 12_000,  // 12 s to establish TCP connection
-      greetingTimeout:  10_000,   // 10 s waiting for SMTP greeting
-      socketTimeout:    20_000,   // 20 s of socket inactivity
+      // Hard timeouts — must all complete well within Render's 30 s HTTP request
+      // limit; previous values (12+10+20=42 s) exceeded it, causing the proxy
+      // to cut the connection before nodemailer could report the error.
+      connectionTimeout:  8_000,   // 8 s to establish TCP connection
+      greetingTimeout:    5_000,   // 5 s waiting for SMTP greeting
+      socketTimeout:     10_000,   // 10 s of socket inactivity
+      // Total worst case ≈ 23 s — safely under the 30 s platform limit.
     });
 
     await transporter.sendMail({
