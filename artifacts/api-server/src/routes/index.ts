@@ -12,6 +12,7 @@ import fileEntriesRouter from "./file-entries";
 import suppliersRouter from "./suppliers";
 import linksRouter from "./links";
 import storageRouter from "./storage";
+import purchaseSheetsRouter from "./purchase-sheets";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(fileEntriesRouter);
 router.use(suppliersRouter);
 router.use(linksRouter);
 router.use(storageRouter);
+router.use(purchaseSheetsRouter);
 
 export default router;

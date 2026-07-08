@@ -22,6 +22,8 @@ const Cadastros         = lazy(() => import("@/pages/cadastros"));
 const Fornecedores      = lazy(() => import("@/pages/fornecedores"));
 const FornecedorPublico   = lazy(() => import("@/pages/fornecedor-publico"));
 const FornecedoresPublico = lazy(() => import("@/pages/fornecedores-publico"));
+const ComprasServicos     = lazy(() => import("@/pages/compras-servicos"));
+const ComprasServicosPublico = lazy(() => import("@/pages/compras-servicos-publico"));
 const Configuracoes     = lazy(() => import("@/pages/configuracoes"));
 const Pmoc              = lazy(() => import("@/pages/pmoc"));
 const RetiradaMateriais = lazy(() => import("@/pages/retirada-materiais"));
@@ -137,6 +139,7 @@ function ManagementRouter() {
               <Route path="/indicadores" component={Indicadores} />
               <Route path="/cadastros" component={Cadastros} />
               <Route path="/fornecedores" component={Fornecedores} />
+              <Route path="/compras" component={ComprasServicos} />
               <Route path="/configuracoes" component={Configuracoes} />
               <Route path="/pmoc" component={Pmoc} />
               <Route path="/retirada-materiais" component={RetiradaMateriais} />
@@ -169,6 +172,7 @@ function App() {
                 <Route path="/registrar" component={MenuFuncionario} />
                 <Route path="/fornecedores/publico/:id" component={FornecedorPublico} />
                 <Route path="/fornecedores/publico" component={FornecedoresPublico} />
+                <Route path="/compras/publico/:unidade" component={ComprasServicosPublico} />
                 <Route component={StandaloneGuard} />
               </Switch>
             </Suspense>

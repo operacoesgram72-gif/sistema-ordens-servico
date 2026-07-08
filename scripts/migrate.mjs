@@ -125,6 +125,19 @@ const migrations = [
     updated_at timestamptz NOT NULL DEFAULT now()
   )`,
 
+  // ── purchase_sheets (Compras e Serviços — one workbook per unit) ──────────
+  `CREATE TABLE IF NOT EXISTS purchase_sheets (
+    id         serial PRIMARY KEY,
+    unidade    text NOT NULL,
+    data       jsonb NOT NULL DEFAULT '{}'::jsonb,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `ALTER TABLE purchase_sheets ADD COLUMN IF NOT EXISTS unidade text NOT NULL DEFAULT 'AM'`,
+  `ALTER TABLE purchase_sheets ADD COLUMN IF NOT EXISTS data jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE purchase_sheets ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+  `ALTER TABLE purchase_sheets DROP CONSTRAINT IF EXISTS purchase_sheets_unidade_unique`,
+  `ALTER TABLE purchase_sheets ADD CONSTRAINT purchase_sheets_unidade_unique UNIQUE (unidade)`,
+
   // ── corporate org-chart roles (shared across all units) ───────────────────
   `INSERT INTO technicians (name, specialty, position, unidade, is_corporate, active)
    SELECT 'Eduardo Lopes', 'Diretoria', 'Diretor de Tecnologia', 'AM', true, true

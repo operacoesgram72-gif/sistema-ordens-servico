@@ -58,8 +58,18 @@ function buildForest(
   return { roots: rootNodes, countOf, orphaned };
 }
 
-function OrgCard({ node, countOf, defaultExpanded }: { node: TreeNode; countOf: Map<number, number>; defaultExpanded: boolean }) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
+function OrgCard({
+  node,
+  countOf,
+  depth,
+  autoExpandDepth,
+}: {
+  node: TreeNode;
+  countOf: Map<number, number>;
+  depth: number;
+  autoExpandDepth: number;
+}) {
+  const [expanded, setExpanded] = useState(depth < autoExpandDepth);
   const hasChildren = node.children.length > 0;
   const subCount = countOf.get(node.tech.id) ?? 0;
 
@@ -107,7 +117,13 @@ function OrgCard({ node, countOf, defaultExpanded }: { node: TreeNode; countOf: 
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-6 bg-border" />
           <div className="flex flex-wrap justify-center gap-x-8 gap-y-6">
             {node.children.map((child) => (
-              <OrgCard key={child.tech.id} node={child} countOf={countOf} defaultExpanded={false} />
+              <OrgCard
+                key={child.tech.id}
+                node={child}
+                countOf={countOf}
+                depth={depth + 1}
+                autoExpandDepth={autoExpandDepth}
+              />
             ))}
           </div>
         </div>
@@ -117,11 +133,12 @@ function OrgCard({ node, countOf, defaultExpanded }: { node: TreeNode; countOf: 
 }
 
 /**
- * Renders a data-driven org chart. Corporate roles (Eduardo Lopes → Salvino
- * Guerra → Marco Carneiro) sit at the top and are shared across every unit.
- * Anyone who reports directly to a corporate role is treated as the unit's
- * top management ("Área Administrativa"); everyone deeper in the tree is
- * "Área Operacional (Campo)".
+ * Renders a data-driven org chart as a single strict tree: every technician
+ * appears exactly once, nested directly under their own immediate manager.
+ * Siblings (same `managerId`) are laid out side by side; different
+ * hierarchy levels are always stacked vertically, never mixed on the same
+ * row. Corporate roles (Eduardo Lopes → Salvino Guerra → Marco Carneiro)
+ * are the shared roots at the top of every unit's chart.
  */
 export function OrgChart({ technicians }: { technicians: Technician[] }) {
   const { roots, countOf, orphaned } = useMemo(() => buildForest(technicians), [technicians]);
@@ -135,54 +152,32 @@ export function OrgChart({ technicians }: { technicians: Technician[] }) {
     );
   }
 
-  // Tier 0: the 3 shared corporate roles. Tier 1: whoever reports directly to
-  // one of them — that's each unit's own top management. Together these form
-  // "Área Administrativa"; everyone deeper in the tree is "Área Operacional".
-  const corporateIds = new Set(technicians.filter((t) => t.isCorporate).map((t) => t.id));
-  const unitTopManagerIds = new Set(
-    technicians.filter((t) => t.managerId && corporateIds.has(t.managerId)).map((t) => t.id)
-  );
-
-  function findNodes(nodes: TreeNode[], ids: Set<number>): TreeNode[] {
-    const found: TreeNode[] = [];
-    for (const node of nodes) {
-      if (ids.has(node.tech.id)) found.push(node);
-      found.push(...findNodes(node.children, ids));
-    }
-    return found;
-  }
-
-  const operationalCards = findNodes(roots, unitTopManagerIds).flatMap((n) => n.children);
+  // Auto-expand the first 2 levels (corporate roots + each unit's top
+  // manager) so the chart is useful at a glance; deeper levels expand on
+  // demand. This never changes *where* a card is positioned — only whether
+  // its children are shown by default.
+  const AUTO_EXPAND_DEPTH = 2;
 
   return (
     <div className="space-y-10">
       <section>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-          <Crown className="w-4 h-4 text-amber-500" /> Área Administrativa
+          <Crown className="w-4 h-4 text-amber-500" /> Estrutura Organizacional
         </h3>
         <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.03] p-6 overflow-x-auto">
           <div className="flex justify-center min-w-fit">
             {roots.map((root) => (
-              <OrgCard key={root.tech.id} node={root} countOf={countOf} defaultExpanded />
+              <OrgCard
+                key={root.tech.id}
+                node={root}
+                countOf={countOf}
+                depth={0}
+                autoExpandDepth={AUTO_EXPAND_DEPTH}
+              />
             ))}
           </div>
         </div>
       </section>
-
-      {operationalCards.length > 0 && (
-        <section>
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4 flex items-center gap-2">
-            <Users className="w-4 h-4" /> Área Operacional (Campo)
-          </h3>
-          <div className="rounded-xl border border-border/50 bg-muted/20 p-6 overflow-x-auto">
-            <div className="flex flex-wrap justify-center gap-x-10 gap-y-6 min-w-fit">
-              {operationalCards.map((node) => (
-                <OrgCard key={node.tech.id} node={node} countOf={countOf} defaultExpanded={false} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {orphaned.length > 0 && (
         <section>
@@ -195,7 +190,7 @@ export function OrgChart({ technicians }: { technicians: Technician[] }) {
           <div className="rounded-xl border border-destructive/30 bg-destructive/[0.03] p-6 overflow-x-auto">
             <div className="flex flex-wrap justify-center gap-x-10 gap-y-6 min-w-fit">
               {orphaned.map((tech) => (
-                <OrgCard key={tech.id} node={{ tech, children: [] }} countOf={countOf} defaultExpanded={false} />
+                <OrgCard key={tech.id} node={{ tech, children: [] }} countOf={countOf} depth={0} autoExpandDepth={0} />
               ))}
             </div>
           </div>

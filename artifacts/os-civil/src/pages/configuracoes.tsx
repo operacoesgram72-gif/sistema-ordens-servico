@@ -716,6 +716,29 @@ export default function Configuracoes() {
                 <Input type="password" placeholder="Senha de 16 dígitos gerada pelo Google" value={form.smtpPass} onChange={e => setForm(f => ({ ...f, smtpPass: e.target.value }))} />
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-2"><Mail className="w-4 h-4" /> E-mails Destinatários</Label>
+              {emailList.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {emailList.map((email, idx) => (
+                    <span key={idx} className="flex items-center gap-1.5 bg-primary/10 text-primary text-xs px-2.5 py-1 rounded-full font-medium">
+                      <Mail className="w-3 h-3 shrink-0" />
+                      {email}
+                      <button type="button" onClick={() => removeEmail(idx)} className="text-primary/60 hover:text-destructive ml-0.5 transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Input type="email" placeholder="gestor@empresa.com.br" value={newEmail} onChange={e => setNewEmail(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addEmail())} className="flex-1" />
+                <Button type="button" variant="outline" onClick={addEmail} className="shrink-0 gap-1.5" size="sm">
+                  <Plus className="w-3.5 h-3.5" />Adicionar e-mail
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Adicione um ou mais e-mails que devem receber os envios feitos por este servidor SMTP.</p>
+            </div>
             {testResult && (
               <div className={`rounded-md border p-3 flex items-start gap-2 text-sm ${
                 testResult.ok ? "bg-emerald-950/30 border-emerald-700/50 text-emerald-400" : "bg-red-950/30 border-red-700/50 text-red-400"
