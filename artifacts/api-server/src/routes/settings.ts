@@ -341,48 +341,73 @@ async function attemptSendEmail(mail: {
   if (!user) return { ok: false, error: "Usuário SMTP não configurado." };
   if (!pass) return { ok: false, error: "Senha SMTP não configurada." };
 
-  try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false },
-      // Hard timeouts — must all complete well within Render's 30 s HTTP request
-      // limit; previous values (12+10+20=42 s) exceeded it, causing the proxy
-      // to cut the connection before nodemailer could report the error.
-      connectionTimeout:  8_000,   // 8 s to establish TCP connection
-      greetingTimeout:    5_000,   // 5 s waiting for SMTP greeting
-      socketTimeout:     10_000,   // 10 s of socket inactivity
-      // Total worst case ≈ 23 s — safely under the 30 s platform limit.
-    });
+  // Try sending via a specific port. Returns the nodemailer error (or null on success).
+  const trySMTPPort = async (tryPort: number): Promise<null | (Error & { code?: string; responseCode?: number; response?: string })> => {
+    try {
+      const transporter = nodemailer.createTransport({
+        host,
+        port: tryPort,
+        secure: tryPort === 465,
+        auth: { user, pass },
+        tls: { rejectUnauthorized: false },
+        // Keep all timeouts well under Render's 30 s HTTP request limit.
+        connectionTimeout:  8_000,
+        greetingTimeout:    5_000,
+        socketTimeout:     10_000,
+      });
+      await transporter.sendMail({
+        from: `"Painel de Serviços" <${user}>`,
+        to: recipients.join(", "),
+        subject: mail.subject,
+        html: mail.html,
+        attachments: mail.attachments,
+      });
+      return null; // success
+    } catch (err) {
+      return err as Error & { code?: string; responseCode?: number; response?: string };
+    }
+  };
 
-    await transporter.sendMail({
-      from: `"Painel de Serviços" <${user}>`,
-      to: recipients.join(", "),
-      subject: mail.subject,
-      html: mail.html,
-      attachments: mail.attachments,
-    });
+  // Errors that indicate a port-level block or network unreachability (not auth/config).
+  const isConnectivityError = (e: Error & { code?: string }) =>
+    e.code === "ECONNREFUSED" ||
+    e.code === "ETIMEDOUT" ||
+    e.code === "ESOCKET" ||
+    e.code === "ECONNECTION" ||
+    /timeout|timed out|connect/i.test(e.message);
 
+  // Primary attempt on the configured port.
+  let err = await trySMTPPort(port);
+  if (err === null) {
     logger.info({ to: recipients, host, port }, "Email sent successfully");
     return { ok: true };
-  } catch (err) {
-    const e = err as Error & { code?: string; responseCode?: number; response?: string };
-    logger.error(
-      {
-        smtp: { host, port, user },
-        to: recipients,
-        errorCode: e.code,
-        responseCode: e.responseCode,
-        smtpResponse: e.response,
-        message: e.message,
-        stack: e.stack,
-      },
-      "Email send failed"
-    );
-    return { ok: false, error: e.message || "Erro desconhecido ao enviar e-mail." };
   }
+
+  // If it was a connectivity/timeout error on port 465, automatically retry on
+  // port 587 (STARTTLS) — common fix for environments that block port 465.
+  if (port === 465 && isConnectivityError(err)) {
+    logger.warn({ host, originalPort: port, fallbackPort: 587, code: err.code }, "Port 465 unreachable — retrying on port 587 (STARTTLS)");
+    const fallbackErr = await trySMTPPort(587);
+    if (fallbackErr === null) {
+      logger.info({ to: recipients, host, port: 587 }, "Email sent successfully via fallback port 587");
+      return { ok: true };
+    }
+    // Both ports failed — report the most useful error.
+    err = fallbackErr;
+  }
+
+  logger.error(
+    {
+      smtp: { host, port, user },
+      to: recipients,
+      errorCode: err.code,
+      responseCode: err.responseCode,
+      smtpResponse: err.response,
+      message: err.message,
+    },
+    "Email send failed"
+  );
+  return { ok: false, error: err.message || "Erro desconhecido ao enviar e-mail." };
 }
 
 function parsePhotoAttachments(photos?: string | null): { filename: string; content: Buffer; contentType: string }[] {
