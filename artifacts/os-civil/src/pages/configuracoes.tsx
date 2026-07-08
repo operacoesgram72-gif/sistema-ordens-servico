@@ -187,6 +187,7 @@ export default function Configuracoes() {
   const [copied, setCopied] = useState(false);
   const [copiedCal, setCopiedCal] = useState(false);
   const [copiedUnit, setCopiedUnit] = useState<string | null>(null);
+  const [copiedOsDireto, setCopiedOsDireto] = useState<string | null>(null);
   const [copiedMgmt, setCopiedMgmt] = useState<string | null>(null);
   const [shareUrls, setShareUrls] = useState<{ unit: string; token: string; url: string }[]>([]);
   const [testResult, setTestResult] = useState<TestResult>(null);
@@ -291,6 +292,15 @@ export default function Configuracoes() {
       setCopiedUnit(u);
       setTimeout(() => setCopiedUnit(null), 2000);
       toast({ title: `Link da unidade ${u} copiado!` });
+    });
+  };
+  const osDirectLink = (u: string) =>
+    `${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, "")}/registrar/os?u=${u}&direto=1`;
+  const copyOsDireto = (u: string) => {
+    navigator.clipboard.writeText(osDirectLink(u)).then(() => {
+      setCopiedOsDireto(u);
+      setTimeout(() => setCopiedOsDireto(null), 2000);
+      toast({ title: `Link de Nova OS — ${u} copiado!` });
     });
   };
   const copyMgmtLink = (u: string, url: string) => {
@@ -852,6 +862,22 @@ export default function Configuracoes() {
                     <Input value={unitLink(u)} readOnly className="font-mono text-xs bg-transparent border-0 p-0 h-auto focus-visible:ring-0 text-muted-foreground" />
                     <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copyUnitLink(u)}>
                       {copiedUnit === u ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 border-t border-border/40 pt-4">
+              <p className="text-sm font-semibold">Link Direto — Nova Ordem de Serviço</p>
+              <p className="text-xs text-muted-foreground">Abre diretamente o formulário de registro de OS sem menu de navegação. Ideal para fixar em murais ou enviar a um técnico específico.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {REGIONAL_UNITS_LIST.map(u => (
+                  <div key={u} className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                    <span className="text-xs font-mono font-bold text-primary w-8 shrink-0">{u}</span>
+                    <Input value={osDirectLink(u)} readOnly className="font-mono text-xs bg-transparent border-0 p-0 h-auto focus-visible:ring-0 text-muted-foreground" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => copyOsDireto(u)}>
+                      {copiedOsDireto === u ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </Button>
                   </div>
                 ))}

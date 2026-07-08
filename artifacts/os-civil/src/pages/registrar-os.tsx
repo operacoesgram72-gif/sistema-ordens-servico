@@ -59,7 +59,9 @@ export default function RegistrarOS() {
   const [submittedOffline, setSubmittedOffline] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const search = useSearch();
-  const unitFromUrl = new URLSearchParams(search).get("u") || "AM";
+  const searchParams = new URLSearchParams(search);
+  const unitFromUrl = searchParams.get("u") || "AM";
+  const isDirectLink = searchParams.get("direto") === "1";
   const { isOnline, pendingCount, enqueue } = useOfflineQueue();
   const { systemActive } = useSystemStatus();
 
@@ -243,14 +245,16 @@ export default function RegistrarOS() {
           <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/30">
             {unitFromUrl}
           </span>
-          <button
-            type="button"
-            onClick={goBack}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            Menu
-          </button>
+          {!isDirectLink && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Menu
+            </button>
+          )}
         </div>
       </header>
 
