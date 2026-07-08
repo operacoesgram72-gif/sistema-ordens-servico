@@ -1,6 +1,18 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 
+// Validate SMTP env vars at startup so misconfiguration is caught immediately
+// in logs rather than silently failing on the first email send.
+function validateEnv() {
+  const warnings: string[] = [];
+  if (!process.env["DATABASE_URL"]) warnings.push("DATABASE_URL not set — DB will be unavailable");
+  if (!process.env["SMTP_HOST"] && !process.env["SMTP_USER"]) {
+    logger.info("SMTP env vars not set — SMTP config will be loaded from DB settings at send time");
+  }
+  for (const w of warnings) logger.warn(w);
+}
+validateEnv();
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

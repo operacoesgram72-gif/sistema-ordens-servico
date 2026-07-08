@@ -341,8 +341,19 @@ async function attemptSendEmail(mail: {
   if (!user) return { ok: false, error: "Usuário SMTP não configurado." };
   if (!pass) return { ok: false, error: "Senha SMTP não configurada." };
 
-  // Try sending via a specific port. Returns the nodemailer error (or null on success).
-  const trySMTPPort = async (tryPort: number): Promise<null | (Error & { code?: string; responseCode?: number; response?: string })> => {
+  // Timeouts generous enough for Render free-tier cold starts / hibernation.
+  const SMTP_TIMEOUTS = {
+    connectionTimeout: 90_000,
+    greetingTimeout:   90_000,
+    socketTimeout:     90_000,
+    maxConnections:    5,
+    maxMessages:       100,
+  } as const;
+
+  type SMTPErr = Error & { code?: string; responseCode?: number; response?: string };
+
+  // Try sending via a specific port. Returns null on success, error otherwise.
+  const trySMTPPort = async (tryPort: number): Promise<null | SMTPErr> => {
     try {
       const transporter = nodemailer.createTransport({
         host,
@@ -350,10 +361,7 @@ async function attemptSendEmail(mail: {
         secure: tryPort === 465,
         auth: { user, pass },
         tls: { rejectUnauthorized: false },
-        // Keep all timeouts well under Render's 30 s HTTP request limit.
-        connectionTimeout:  8_000,
-        greetingTimeout:    5_000,
-        socketTimeout:     10_000,
+        ...SMTP_TIMEOUTS,
       });
       await transporter.sendMail({
         from: `"Painel de Serviços" <${user}>`,
@@ -362,37 +370,58 @@ async function attemptSendEmail(mail: {
         html: mail.html,
         attachments: mail.attachments,
       });
-      return null; // success
+      return null;
     } catch (err) {
-      return err as Error & { code?: string; responseCode?: number; response?: string };
+      return err as SMTPErr;
     }
   };
 
-  // Errors that indicate a port-level block or network unreachability (not auth/config).
-  const isConnectivityError = (e: Error & { code?: string }) =>
+  // Errors that indicate a port-level block / network unreachability (not auth/config).
+  const isConnectivityError = (e: SMTPErr) =>
     e.code === "ECONNREFUSED" ||
-    e.code === "ETIMEDOUT" ||
-    e.code === "ESOCKET" ||
-    e.code === "ECONNECTION" ||
+    e.code === "ETIMEDOUT"    ||
+    e.code === "ESOCKET"      ||
+    e.code === "ECONNECTION"  ||
     /timeout|timed out|connect/i.test(e.message);
 
-  // Primary attempt on the configured port.
-  let err = await trySMTPPort(port);
+  // Helper: retry with exponential backoff (2 s → 4 s → 8 s).
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  const sendWithRetry = async (tryPort: number): Promise<null | SMTPErr> => {
+    const MAX_ATTEMPTS = 3;
+    let lastErr: SMTPErr | null = null;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      logger.info({ host, port: tryPort, attempt, maxAttempts: MAX_ATTEMPTS }, "SMTP send attempt");
+      const err = await trySMTPPort(tryPort);
+      if (err === null) return null;  // success
+      lastErr = err;
+      logger.warn({ host, port: tryPort, attempt, code: err.code, message: err.message }, "SMTP attempt failed");
+      // Only retry on connectivity errors; auth/config errors won't be fixed by retrying.
+      if (!isConnectivityError(err)) break;
+      if (attempt < MAX_ATTEMPTS) {
+        const delay = Math.pow(2, attempt) * 1_000; // 2 s, 4 s, 8 s
+        logger.info({ delayMs: delay }, "Waiting before next SMTP attempt");
+        await sleep(delay);
+      }
+    }
+    return lastErr;
+  };
+
+  // Primary attempt on the configured port (with up to 3 retries).
+  let err = await sendWithRetry(port);
   if (err === null) {
     logger.info({ to: recipients, host, port }, "Email sent successfully");
     return { ok: true };
   }
 
-  // If it was a connectivity/timeout error on port 465, automatically retry on
-  // port 587 (STARTTLS) — common fix for environments that block port 465.
+  // If connectivity failure on port 465, automatically fall back to port 587 (STARTTLS).
   if (port === 465 && isConnectivityError(err)) {
-    logger.warn({ host, originalPort: port, fallbackPort: 587, code: err.code }, "Port 465 unreachable — retrying on port 587 (STARTTLS)");
-    const fallbackErr = await trySMTPPort(587);
+    logger.warn({ host, originalPort: 465, fallbackPort: 587, code: err.code }, "Port 465 unreachable — retrying on port 587 (STARTTLS)");
+    const fallbackErr = await sendWithRetry(587);
     if (fallbackErr === null) {
       logger.info({ to: recipients, host, port: 587 }, "Email sent successfully via fallback port 587");
       return { ok: true };
     }
-    // Both ports failed — report the most useful error.
     err = fallbackErr;
   }
 
@@ -405,7 +434,7 @@ async function attemptSendEmail(mail: {
       smtpResponse: err.response,
       message: err.message,
     },
-    "Email send failed"
+    "Email send failed (all attempts exhausted)"
   );
   return { ok: false, error: err.message || "Erro desconhecido ao enviar e-mail." };
 }
