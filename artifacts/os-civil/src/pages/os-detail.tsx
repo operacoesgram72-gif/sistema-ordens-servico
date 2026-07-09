@@ -283,9 +283,19 @@ export default function OSDetail() {
 
   if (!os) return <div className="p-8">OS não encontrada.</div>;
 
+  // Filter out video data-URLs and entries > 2 MB to prevent OOM crashes in browser.
+  const MAX_DISPLAY_CHARS = 2 * 1024 * 1024;
   let photos: string[] = [];
   try {
-    if (os.photos) photos = JSON.parse(os.photos);
+    if (os.photos) {
+      const parsed: unknown[] = JSON.parse(os.photos);
+      photos = parsed.filter(
+        (s): s is string =>
+          typeof s === "string" &&
+          !s.startsWith("data:video/") &&
+          s.length <= MAX_DISPLAY_CHARS
+      );
+    }
   } catch {}
 
   return (

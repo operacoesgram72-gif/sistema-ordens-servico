@@ -23,9 +23,20 @@ import { generatePDF } from "@/lib/pdf-utils";
 type HoveredPhoto = { src: string; x: number; y: number } | null;
 type LightboxState = { photos: string[]; index: number } | null;
 
+// Max size for a display data URL (~2 MB base64 ≈ 1.5 MB image).
+// Entries exceeding this or containing video data are skipped to prevent OOM crashes.
+const MAX_DISPLAY_CHARS = 2 * 1024 * 1024;
 function parsePhotos(photosStr: string | null | undefined): string[] {
   if (!photosStr) return [];
-  try { return JSON.parse(photosStr); } catch { return []; }
+  try {
+    const arr: unknown[] = JSON.parse(photosStr);
+    return arr.filter(
+      (s): s is string =>
+        typeof s === "string" &&
+        !s.startsWith("data:video/") &&
+        s.length <= MAX_DISPLAY_CHARS
+    );
+  } catch { return []; }
 }
 
 const formatCurrency = (val?: number) => {

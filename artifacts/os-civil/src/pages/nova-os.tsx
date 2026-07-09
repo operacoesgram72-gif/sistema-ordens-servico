@@ -9,7 +9,7 @@ import {
   MapPin, Camera, LocateFixed, Loader2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import {
   useCreateServiceOrder,
@@ -84,6 +84,7 @@ export default function NovaOS() {
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  const videoUrlsRef = useRef<string[]>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const { unit } = useUnit();
@@ -104,6 +105,11 @@ export default function NovaOS() {
     },
   });
 
+  // Revoke video object URLs on unmount to avoid memory leaks
+  useEffect(() => {
+    return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
+  }, []);
+
   const formatoServico = form.watch("formatoServico");
   const tipoOS = form.watch("tipo");
   const estimativaAuto = formatoServico
@@ -115,32 +121,56 @@ export default function NovaOS() {
       )
     : null;
 
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;   // 8 MB per photo
+  const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100 MB per video (object URL, not sent to server)
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    const processed = await Promise.all(
-      files.map(
-        (file) =>
-          new Promise<MediaFile>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () =>
-              resolve({
-                src: reader.result as string,
-                type: file.type.startsWith("video/") ? "video" : "image",
-                name: file.name,
-              });
-            reader.onerror = reject;
-          })
-      )
-    );
-    try {
-      const updated = [...mediaFiles, ...processed];
-      setMediaFiles(updated);
-      form.setValue("photos", JSON.stringify(updated.map((f) => f.src)));
-    } catch {
-      toast({ title: "Erro", description: "Falha ao processar arquivo", variant: "destructive" });
+
+    const videoList = files.filter(f => f.type.startsWith("video/"));
+    const imageList = files.filter(f => f.type.startsWith("image/"));
+
+    // ── Videos: object URL preview only — no base64, no crash ────────────
+    const newVideos: MediaFile[] = [];
+    for (const file of videoList) {
+      if (file.size > MAX_VIDEO_BYTES) {
+        toast({ title: "Vídeo muito grande", description: `"${file.name}" ultrapassa 100 MB. Grave um clipe mais curto.`, variant: "destructive" });
+        continue;
+      }
+      const url = URL.createObjectURL(file);
+      videoUrlsRef.current.push(url);
+      newVideos.push({ src: url, type: "video", name: file.name });
     }
+
+    // ── Images: base64 with size guard ───────────────────────────────────
+    const oversized = imageList.filter(f => f.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      toast({ title: "Imagem muito grande", description: `${oversized.length} arquivo(s) ignorado(s) — máx. 8 MB por imagem.`, variant: "destructive" });
+    }
+    const validImages = imageList.filter(f => f.size <= MAX_IMAGE_BYTES);
+    const newImages: MediaFile[] = [];
+    if (validImages.length > 0) {
+      try {
+        const b64s = await Promise.all(validImages.map(file => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload  = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        })));
+        b64s.forEach((src, i) => newImages.push({ src, type: "image", name: validImages[i].name }));
+      } catch {
+        toast({ title: "Erro", description: "Falha ao processar imagem", variant: "destructive" });
+      }
+    }
+
+    if (newVideos.length > 0 || newImages.length > 0) {
+      const updated = [...mediaFiles, ...newVideos, ...newImages];
+      setMediaFiles(updated);
+      // Only images go in the JSON payload; video object URLs are local-only
+      form.setValue("photos", JSON.stringify(updated.filter(f => f.type === "image").map(f => f.src)));
+    }
+    e.target.value = "";
   };
 
   const handleCameraCapture = () => {
@@ -180,9 +210,14 @@ export default function NovaOS() {
   };
 
   const removeMedia = (index: number) => {
+    const item = mediaFiles[index];
+    if (item.type === "video") {
+      URL.revokeObjectURL(item.src);
+      videoUrlsRef.current = videoUrlsRef.current.filter(u => u !== item.src);
+    }
     const updated = mediaFiles.filter((_, i) => i !== index);
     setMediaFiles(updated);
-    form.setValue("photos", JSON.stringify(updated.map((f) => f.src)));
+    form.setValue("photos", JSON.stringify(updated.filter(f => f.type === "image").map(f => f.src)));
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
