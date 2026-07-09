@@ -317,10 +317,10 @@ async function attemptSendEmail(mail: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const settings = await getAllSettings();
   const toRaw = settings.notificationEmail || "";
-  const host = settings.smtpHost || process.env.SMTP_HOST || "";
+  const host = (settings.smtpHost || process.env.SMTP_HOST || "").trim().toLowerCase();
   const port = Number(settings.smtpPort || process.env.SMTP_PORT || 587);
-  const user = settings.smtpUser || process.env.SMTP_USER || "";
-  const pass = settings.smtpPass || process.env.SMTP_PASS || "";
+  const user = (settings.smtpUser || process.env.SMTP_USER || "").trim();
+  const pass = (settings.smtpPass || process.env.SMTP_PASS || "").trim();
 
   // Support multiple recipients: comma-separated list
   const recipients = toRaw
@@ -345,24 +345,6 @@ async function attemptSendEmail(mail: {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  // ── Zoho HTTP API path ────────────────────────────────────────────────────
-  // When the configured host is a Zoho SMTP host, use Zoho's REST API over
-  // HTTPS instead of direct SMTP — bypasses port blocks on Render/cloud hosts.
-  // In this mode smtpPass = Zoho OAuth access token (generated at api-console.zoho.com).
-  const ZOHO_SMTP_HOSTS = new Set([
-    "smtppro.zoho.com", "smtp.zoho.com",
-    "smtp.zoho.eu",     "smtp.zoho.in",
-    "smtp.zoho.com.au", "smtp.zoho.jp",
-  ]);
-
-  const zohoApiBase = (): string => {
-    if (host.endsWith(".eu"))    return "https://mail.zoho.eu";
-    if (host.endsWith(".in"))    return "https://mail.zoho.in";
-    if (host.endsWith(".com.au"))return "https://mail.zoho.com.au";
-    if (host.endsWith(".jp"))    return "https://mail.zoho.jp";
-    return "https://mail.zoho.com";
-  };
-
   const fetchWithTimeout = async (url: string, opts: RequestInit, ms = 25_000): Promise<Response> => {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), ms);
@@ -370,65 +352,65 @@ async function attemptSendEmail(mail: {
     finally { clearTimeout(t); }
   };
 
-  const sendViaZohoAPI = async (): Promise<null | SMTPErr> => {
-    const base  = zohoApiBase();
-    const token = pass; // smtpPass reused as OAuth access token for Zoho HTTP mode
+  // ── Resend API path ───────────────────────────────────────────────────────
+  // host = "api.resend.com", smtpUser = from-email, smtpPass = API key (re_…)
+  const sendViaResend = async (): Promise<null | SMTPErr> => {
     try {
-      // 1. Fetch account list to get numeric accountId
-      logger.info({ user, base }, "Zoho HTTP API: fetching account list");
-      const acRes = await fetchWithTimeout(`${base}/api/accounts`, {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      logger.info({ to: recipients, from: user }, "Resend API: sending email");
+      const res = await fetchWithTimeout("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${pass}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: `Painel de Serviços <${user}>`,
+          to: recipients,
+          subject: mail.subject,
+          html: mail.html,
+        }),
       });
-      if (!acRes.ok) {
-        const body = await acRes.text().catch(() => "");
-        const msg = acRes.status === 401
-          ? "Token OAuth Zoho inválido ou expirado — gere um novo em api-console.zoho.com"
-          : `Zoho API erro ${acRes.status}: ${body}`;
-        return Object.assign(new Error(msg), { code: acRes.status === 401 ? "ZOHO_UNAUTHORIZED" : "ZOHO_API_ERROR" });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const msg = res.status === 401 || res.status === 403
+          ? "Resend: API Key inválida ou sem permissão. Verifique a chave em resend.com/api-keys"
+          : `Resend API erro ${res.status}: ${body}`;
+        return Object.assign(new Error(msg), { code: `RESEND_${res.status}` });
       }
-      const acData = (await acRes.json()) as { data?: { accountId: string; emailAddress?: string }[] };
-      const accounts = acData.data ?? [];
-      const account  = accounts.find(a => a.emailAddress === user) ?? accounts[0];
-      if (!account) {
-        return Object.assign(
-          new Error("Nenhuma conta Zoho encontrada para o e-mail configurado."),
-          { code: "ZOHO_NO_ACCOUNT" }
-        );
-      }
-      const accountId = account.accountId;
-      logger.info({ accountId, email: account.emailAddress }, "Zoho HTTP API: account resolved");
-
-      // 2. Send the message
-      logger.info({ accountId, to: recipients }, "Zoho HTTP API: sending message");
-      const sendRes = await fetchWithTimeout(
-        `${base}/api/accounts/${accountId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Zoho-oauthtoken ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            fromAddress: user,
-            toAddress:   recipients.join(","),
-            subject:     mail.subject,
-            content:     mail.html,
-            mailFormat:  "html",
-          }),
-        }
-      );
-      if (!sendRes.ok) {
-        const body = await sendRes.text().catch(() => "");
-        const msg = sendRes.status === 401
-          ? "Token OAuth Zoho inválido ou expirado."
-          : `Zoho API envio falhou ${sendRes.status}: ${body}`;
-        return Object.assign(new Error(msg), { code: sendRes.status === 401 ? "ZOHO_UNAUTHORIZED" : "ZOHO_SEND_ERROR" });
-      }
-      logger.info({ to: recipients, via: "zoho-http-api" }, "Email sent successfully via Zoho HTTP API");
+      logger.info({ to: recipients, via: "resend" }, "Email sent successfully via Resend");
       return null;
-    } catch (err) {
-      return err as SMTPErr;
-    }
+    } catch (err) { return err as SMTPErr; }
+  };
+
+  // ── SendGrid API path ─────────────────────────────────────────────────────
+  // host = "api.sendgrid.com", smtpUser = from-email, smtpPass = API key (SG.…)
+  const sendViaSendGrid = async (): Promise<null | SMTPErr> => {
+    try {
+      logger.info({ to: recipients, from: user }, "SendGrid API: sending email");
+      const res = await fetchWithTimeout("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${pass}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: recipients.map(e => ({ email: e })) }],
+          from: { email: user, name: "Painel de Serviços" },
+          subject: mail.subject,
+          content: [{ type: "text/html", value: mail.html }],
+        }),
+      });
+      // SendGrid returns 202 Accepted (no body) on success
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const msg = res.status === 401 || res.status === 403
+          ? "SendGrid: API Key inválida ou sem permissão. Verifique a chave em app.sendgrid.com/settings/api_keys"
+          : `SendGrid API erro ${res.status}: ${body}`;
+        return Object.assign(new Error(msg), { code: `SENDGRID_${res.status}` });
+      }
+      logger.info({ to: recipients, via: "sendgrid" }, "Email sent successfully via SendGrid");
+      return null;
+    } catch (err) { return err as SMTPErr; }
   };
 
   // ── SMTP path ─────────────────────────────────────────────────────────────
@@ -470,33 +452,32 @@ async function attemptSendEmail(mail: {
       if (err === null) return null;
       lastErr = err;
       logger.warn({ host, port: tryPort, attempt, code: err.code, message: err.message }, "SMTP attempt failed");
-      if (!isConnectivityError(err)) break; // auth/config errors won't improve with retry
+      if (!isConnectivityError(err)) break;
       if (attempt < 3) {
-        const delay = Math.pow(2, attempt) * 1_000;
-        logger.info({ delayMs: delay }, "Waiting before next SMTP attempt");
-        await sleep(delay);
+        await sleep(Math.pow(2, attempt) * 1_000);
       }
     }
     return lastErr;
   };
 
-  // ── Routing: Zoho hosts → HTTP API first; all others → SMTP ───────────────
-  if (ZOHO_SMTP_HOSTS.has(host)) {
-    logger.info({ host }, "Zoho host detected — using HTTP API to bypass SMTP port restrictions");
-    const zohoErr = await sendViaZohoAPI();
-    if (zohoErr === null) return { ok: true };
-
-    // Auth errors from Zoho → no point falling back to SMTP (same credentials)
-    const code = (zohoErr as any).code as string | undefined;
-    if (code === "ZOHO_UNAUTHORIZED" || code === "ZOHO_NO_ACCOUNT") {
-      logger.error({ code, message: zohoErr.message }, "Zoho HTTP API auth/config error — not retrying via SMTP");
-      return { ok: false, error: zohoErr.message };
-    }
-
-    // Non-auth errors (network, etc.) → try SMTP as last resort
-    logger.warn({ code, message: zohoErr.message }, "Zoho HTTP API failed — attempting SMTP fallback");
+  // ── Routing: API providers first; fallback to SMTP ────────────────────────
+  if (host === "api.resend.com") {
+    logger.info({}, "Resend API mode — bypassing SMTP");
+    const e = await sendViaResend();
+    if (e === null) return { ok: true };
+    logger.error({ message: e.message, code: (e as any).code }, "Resend send failed");
+    return { ok: false, error: e.message };
   }
 
+  if (host === "api.sendgrid.com") {
+    logger.info({}, "SendGrid API mode — bypassing SMTP");
+    const e = await sendViaSendGrid();
+    if (e === null) return { ok: true };
+    logger.error({ message: e.message, code: (e as any).code }, "SendGrid send failed");
+    return { ok: false, error: e.message };
+  }
+
+  // Standard SMTP (Gmail, Outlook, etc.)
   let err = await sendWithRetry(port);
   if (err === null) { logger.info({ to: recipients, host, port }, "Email sent via SMTP"); return { ok: true }; }
 

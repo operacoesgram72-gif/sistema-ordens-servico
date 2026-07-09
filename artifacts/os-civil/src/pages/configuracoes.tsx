@@ -698,29 +698,49 @@ export default function Configuracoes() {
             <div className="rounded-md bg-primary/5 border border-primary/20 p-4 space-y-3">
               <div className="flex items-center gap-2 text-sm font-semibold text-primary">
                 <Info className="w-4 h-4 shrink-0" />
-                Zoho Mail (smtppro.zoho.com) — Modo API HTTP
+                Provedores via API HTTP (recomendado no Render)
               </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Para evitar o bloqueio de portas SMTP no Render, use <strong className="text-foreground">Resend</strong> ou <strong className="text-foreground">SendGrid</strong>. A API Key é estática e não expira.
+              </p>
+
+              {/* Resend */}
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Quando o host for <span className="font-mono bg-muted px-1 rounded text-foreground">smtppro.zoho.com</span>, o sistema usa a <strong className="text-foreground">API HTTP do Zoho</strong> em vez de SMTP direto — evita bloqueios de porta no Render e outros provedores de hospedagem.
-                </p>
-                <p className="text-xs font-semibold text-foreground mt-2">No modo API HTTP, o campo "Senha de App" deve conter um Token OAuth do Zoho:</p>
-                <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
-                  <li>Acesse <a href="https://api-console.zoho.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">api-console.zoho.com</a> e crie um cliente do tipo <strong className="text-foreground">Self Client</strong></li>
-                  <li>Escopos necessários: <span className="font-mono bg-muted px-1 rounded">ZohoMail.messages.CREATE, ZohoMail.accounts.READ</span></li>
-                  <li>Gere um <strong className="text-foreground">código de autorização</strong> e troque-o por um <strong className="text-foreground">access token</strong></li>
-                  <li>Cole o access token no campo <strong className="text-foreground">Senha de App</strong> abaixo</li>
-                </ol>
-                <a href="https://www.zoho.com/mail/help/api/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 underline underline-offset-2 mt-1">
-                  <ExternalLink className="w-3 h-3" />Documentação da API Zoho Mail
-                </a>
+                <p className="text-xs font-semibold text-foreground">Resend (recomendado)</p>
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span className="font-mono text-foreground">Host</span>
+                  <span><span className="font-mono bg-muted px-1 rounded text-foreground">api.resend.com</span></span>
+                  <span className="font-mono text-foreground">Porta</span>
+                  <span><span className="font-mono bg-muted px-1 rounded text-foreground">443</span> (ignorada — comunicação é HTTPS)</span>
+                  <span className="font-mono text-foreground">Usuário</span>
+                  <span>e-mail remetente com domínio verificado no Resend</span>
+                  <span className="font-mono text-foreground">Senha</span>
+                  <span>API Key gerada em <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">resend.com/api-keys</a> (começa com <span className="font-mono">re_</span>)</span>
+                </div>
               </div>
+
+              {/* SendGrid */}
               <div className="border-t border-primary/20 pt-2 space-y-1">
-                <p className="text-xs font-semibold text-foreground">Gmail (smtp.gmail.com) — Modo SMTP</p>
+                <p className="text-xs font-semibold text-foreground">SendGrid</p>
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span className="font-mono text-foreground">Host</span>
+                  <span><span className="font-mono bg-muted px-1 rounded text-foreground">api.sendgrid.com</span></span>
+                  <span className="font-mono text-foreground">Porta</span>
+                  <span><span className="font-mono bg-muted px-1 rounded text-foreground">443</span> (ignorada — comunicação é HTTPS)</span>
+                  <span className="font-mono text-foreground">Usuário</span>
+                  <span>e-mail remetente verificado no SendGrid</span>
+                  <span className="font-mono text-foreground">Senha</span>
+                  <span>API Key em <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">app.sendgrid.com/settings/api_keys</a> (começa com <span className="font-mono">SG.</span>)</span>
+                </div>
+              </div>
+
+              {/* Gmail SMTP */}
+              <div className="border-t border-primary/20 pt-2 space-y-1">
+                <p className="text-xs font-semibold text-foreground">Gmail (SMTP direto)</p>
                 <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
-                  <li>Ative a <strong className="text-foreground">Verificação em duas etapas</strong> na sua conta Google</li>
-                  <li>Acesse <span className="font-mono bg-muted px-1 rounded">myaccount.google.com/apppasswords</span> e crie uma <strong className="text-foreground">Senha de App</strong></li>
-                  <li>Use essa senha de 16 caracteres — <strong className="text-primary">nunca a senha normal da conta</strong></li>
+                  <li>Host: <span className="font-mono bg-muted px-1 rounded text-foreground">smtp.gmail.com</span> · Porta: <span className="font-mono bg-muted px-1 rounded text-foreground">587</span></li>
+                  <li>Ative a <strong className="text-foreground">Verificação em duas etapas</strong> na conta Google</li>
+                  <li>Crie uma <strong className="text-foreground">Senha de App</strong> em <span className="font-mono bg-muted px-1 rounded">myaccount.google.com/apppasswords</span> e use-a no campo Senha</li>
                 </ol>
               </div>
             </div>
@@ -738,8 +758,8 @@ export default function Configuracoes() {
                 <Input type="email" placeholder="remetente@gmail.com" value={form.smtpUser} onChange={e => setForm(f => ({ ...f, smtpUser: e.target.value }))} />
               </div>
               <div className="space-y-1.5">
-                <Label>Senha de App</Label>
-                <Input type="password" placeholder="Senha de 16 dígitos gerada pelo Google" value={form.smtpPass} onChange={e => setForm(f => ({ ...f, smtpPass: e.target.value }))} />
+                <Label>Senha / API Key</Label>
+                <Input type="password" placeholder="Senha de App (Gmail) ou API Key (Resend / SendGrid)" value={form.smtpPass} onChange={e => setForm(f => ({ ...f, smtpPass: e.target.value }))} />
               </div>
             </div>
             <div className="space-y-1.5">
