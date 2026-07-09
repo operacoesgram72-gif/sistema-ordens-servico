@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 import { useCreateServiceOrder, getListServiceOrdersQueryKey } from "@workspace/api-client-react";
 import { useSystemStatus } from "@/hooks/use-system-status";
@@ -55,6 +55,8 @@ export default function RegistrarOS() {
   const createOrder = useCreateServiceOrder();
   const [, setLocation] = useLocation();
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
+  const [videoFiles, setVideoFiles] = useState<{ name: string; url: string }[]>([]);
+  const videoUrlsRef = useRef<string[]>([]);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [submittedOffline, setSubmittedOffline] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -91,32 +93,81 @@ export default function RegistrarOS() {
     ? Math.round(MARKET_RATES[formatoServico] * (TIPO_MULT[tipoOS ?? "corretiva"] ?? 1.0) * 4 * 1.046)
     : null;
 
+  // Revoke object URLs when component unmounts to avoid memory leaks
+  useEffect(() => {
+    return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
+  }, []);
+
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;  // 8 MB per photo
+  const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100 MB per video (preview only, not sent to server)
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    const base64Promises = files.map(
-      (file) =>
-        new Promise<string>((resolve, reject) => {
+
+    const imageFiles  = files.filter(f => f.type.startsWith("image/"));
+    const videoList   = files.filter(f => f.type.startsWith("video/"));
+
+    // ── Handle videos: object URL preview only (no base64 → no crash) ─────
+    for (const file of videoList) {
+      if (file.size > MAX_VIDEO_BYTES) {
+        toast({
+          title: "Vídeo muito grande",
+          description: `"${file.name}" ultrapassa 100 MB. Grave um clipe mais curto.`,
+          variant: "destructive",
+        });
+        continue;
+      }
+      const url = URL.createObjectURL(file);
+      videoUrlsRef.current.push(url);
+      setVideoFiles(prev => [...prev, { name: file.name, url }]);
+    }
+
+    // ── Handle images: base64 for payload ────────────────────────────────
+    const oversized = imageFiles.filter(f => f.size > MAX_IMAGE_BYTES);
+    if (oversized.length > 0) {
+      toast({
+        title: "Imagem muito grande",
+        description: `${oversized.length} arquivo(s) ignorado(s) — máximo 8 MB por imagem.`,
+        variant: "destructive",
+      });
+    }
+    const validImages = imageFiles.filter(f => f.size <= MAX_IMAGE_BYTES);
+    if (validImages.length > 0) {
+      const base64Promises = validImages.map(
+        file => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(file);
           reader.onload = () => resolve(reader.result as string);
-          reader.onerror = (error) => reject(error);
+          reader.onerror = reject;
         })
-    );
-    try {
-      const base64Files = await Promise.all(base64Promises);
-      const newPhotos = [...photosBase64, ...base64Files];
-      setPhotosBase64(newPhotos);
-      form.setValue("photos", JSON.stringify(newPhotos));
-    } catch {
-      toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
+      );
+      try {
+        const base64Files = await Promise.all(base64Promises);
+        const newPhotos = [...photosBase64, ...base64Files];
+        setPhotosBase64(newPhotos);
+        form.setValue("photos", JSON.stringify(newPhotos));
+      } catch {
+        toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
+      }
     }
+
+    // Reset input so the same file can be selected again
+    e.target.value = "";
   };
 
   const removePhoto = (index: number) => {
     const newPhotos = photosBase64.filter((_, i) => i !== index);
     setPhotosBase64(newPhotos);
     form.setValue("photos", JSON.stringify(newPhotos));
+  };
+
+  const removeVideo = (index: number) => {
+    setVideoFiles(prev => {
+      URL.revokeObjectURL(prev[index].url);
+      videoUrlsRef.current = videoUrlsRef.current.filter(u => u !== prev[index].url);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
@@ -546,14 +597,29 @@ export default function RegistrarOS() {
                             <input id="photo-camera-pub" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
                             <input id="video-camera-pub" type="file" accept="video/*" capture="environment" className="hidden" onChange={handleFileChange} />
                           </div>
-                          {photosBase64.length > 0 && (
+                          {(photosBase64.length > 0 || videoFiles.length > 0) && (
                             <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mt-3">
                               {photosBase64.map((src, idx) => (
-                                <div key={idx} className="relative group rounded-md overflow-hidden border border-border">
+                                <div key={`photo-${idx}`} className="relative group rounded-md overflow-hidden border border-border">
                                   <img src={src} alt="Preview" className="w-full h-20 object-cover" />
                                   <button
                                     type="button"
                                     onClick={() => removePhoto(idx)}
+                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                              {videoFiles.map((v, idx) => (
+                                <div key={`video-${idx}`} className="relative group rounded-md overflow-hidden border border-primary/40 bg-black">
+                                  <video src={v.url} className="w-full h-20 object-cover" muted playsInline preload="metadata" />
+                                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <Video className="w-6 h-6 text-white/80 drop-shadow" />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeVideo(idx)}
                                     className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="w-3 h-3" />

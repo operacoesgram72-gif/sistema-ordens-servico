@@ -695,32 +695,29 @@ export default function Configuracoes() {
         </CardHeader>
         {sectOpen.smtp && (
           <CardContent className="space-y-4 sect-content">
-            <div className="rounded-md bg-destructive/10 border border-destructive/30 p-4 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+            <div className="rounded-md bg-primary/5 border border-primary/20 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
                 <Info className="w-4 h-4 shrink-0" />
-                O Render bloqueia portas SMTP — use uma API de e-mail
+                Erro 535 Authentication Failed? Veja como corrigir:
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                O servidor está hospedado no <strong className="text-foreground">Render</strong>, que bloqueia conexões SMTP saintes (portas 465 e 587).
-                Configure um dos provedores abaixo — a API Key é estática e nunca expira.
-              </p>
-
               <div className="space-y-1">
-                <p className="text-xs font-semibold text-foreground">✦ Resend <span className="font-normal text-muted-foreground">(recomendado — 3.000 e-mails/mês grátis)</span></p>
+                <p className="text-xs font-semibold text-foreground">Zoho Mail (smtppro.zoho.com)</p>
                 <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
-                  <li>Crie uma conta em <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">resend.com</a> e verifique seu domínio</li>
-                  <li>Gere uma API Key em <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">resend.com/api-keys</a></li>
-                  <li>Configure abaixo: <span className="font-mono bg-muted px-1 rounded text-foreground">Host = api.resend.com</span> · <span className="font-mono bg-muted px-1 rounded text-foreground">Porta = 443</span></li>
-                  <li><strong className="text-foreground">Usuário</strong> = e-mail remetente do domínio verificado · <strong className="text-foreground">Senha</strong> = API Key (<span className="font-mono">re_…</span>)</li>
+                  <li>Acesse <span className="font-mono bg-muted px-1 rounded">mail.zoho.com → Configurações → Segurança</span></li>
+                  <li>Ative <strong className="text-foreground">Autenticação de Dois Fatores</strong></li>
+                  <li>Em seguida, crie uma <strong className="text-foreground">Senha de Aplicativo</strong> e use-a no campo abaixo</li>
+                  <li>Confirme que SMTP está habilitado em <span className="font-mono bg-muted px-1 rounded">Configurações → E-mail → IMAP/POP/SMTP</span></li>
                 </ol>
+                <a href="https://www.zoho.com/mail/help/zoho-smtp.html" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 underline underline-offset-2 mt-1">
+                  <ExternalLink className="w-3 h-3" />Documentação SMTP do Zoho
+                </a>
               </div>
-
-              <div className="border-t border-destructive/20 pt-2 space-y-1">
-                <p className="text-xs font-semibold text-foreground">SendGrid <span className="font-normal text-muted-foreground">(alternativa — 100 e-mails/dia grátis)</span></p>
+              <div className="border-t border-primary/20 pt-2 space-y-1">
+                <p className="text-xs font-semibold text-foreground">Gmail (smtp.gmail.com)</p>
                 <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside leading-relaxed">
-                  <li>Crie conta em <a href="https://sendgrid.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">sendgrid.com</a> e verifique o remetente</li>
-                  <li>Configure: <span className="font-mono bg-muted px-1 rounded text-foreground">Host = api.sendgrid.com</span> · <span className="font-mono bg-muted px-1 rounded text-foreground">Porta = 443</span></li>
-                  <li><strong className="text-foreground">Senha</strong> = API Key (<span className="font-mono">SG.…</span>) gerada em <a href="https://app.sendgrid.com/settings/api_keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">app.sendgrid.com/settings/api_keys</a></li>
+                  <li>Ative a <strong className="text-foreground">Verificação em duas etapas</strong> na sua conta Google</li>
+                  <li>Acesse <span className="font-mono bg-muted px-1 rounded">myaccount.google.com/apppasswords</span> e crie uma <strong className="text-foreground">Senha de App</strong></li>
+                  <li>Use essa senha de 16 caracteres — <strong className="text-primary">nunca a senha normal da conta</strong></li>
                 </ol>
               </div>
             </div>
