@@ -341,7 +341,97 @@ async function attemptSendEmail(mail: {
   if (!user) return { ok: false, error: "Usuário SMTP não configurado." };
   if (!pass) return { ok: false, error: "Senha SMTP não configurada." };
 
-  // Timeouts generous enough for Render free-tier cold starts / hibernation.
+  type SMTPErr = Error & { code?: string; responseCode?: number; response?: string };
+
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  // ── Zoho HTTP API path ────────────────────────────────────────────────────
+  // When the configured host is a Zoho SMTP host, use Zoho's REST API over
+  // HTTPS instead of direct SMTP — bypasses port blocks on Render/cloud hosts.
+  // In this mode smtpPass = Zoho OAuth access token (generated at api-console.zoho.com).
+  const ZOHO_SMTP_HOSTS = new Set([
+    "smtppro.zoho.com", "smtp.zoho.com",
+    "smtp.zoho.eu",     "smtp.zoho.in",
+    "smtp.zoho.com.au", "smtp.zoho.jp",
+  ]);
+
+  const zohoApiBase = (): string => {
+    if (host.endsWith(".eu"))    return "https://mail.zoho.eu";
+    if (host.endsWith(".in"))    return "https://mail.zoho.in";
+    if (host.endsWith(".com.au"))return "https://mail.zoho.com.au";
+    if (host.endsWith(".jp"))    return "https://mail.zoho.jp";
+    return "https://mail.zoho.com";
+  };
+
+  const fetchWithTimeout = async (url: string, opts: RequestInit, ms = 25_000): Promise<Response> => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+    finally { clearTimeout(t); }
+  };
+
+  const sendViaZohoAPI = async (): Promise<null | SMTPErr> => {
+    const base  = zohoApiBase();
+    const token = pass; // smtpPass reused as OAuth access token for Zoho HTTP mode
+    try {
+      // 1. Fetch account list to get numeric accountId
+      logger.info({ user, base }, "Zoho HTTP API: fetching account list");
+      const acRes = await fetchWithTimeout(`${base}/api/accounts`, {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+      });
+      if (!acRes.ok) {
+        const body = await acRes.text().catch(() => "");
+        const msg = acRes.status === 401
+          ? "Token OAuth Zoho inválido ou expirado — gere um novo em api-console.zoho.com"
+          : `Zoho API erro ${acRes.status}: ${body}`;
+        return Object.assign(new Error(msg), { code: acRes.status === 401 ? "ZOHO_UNAUTHORIZED" : "ZOHO_API_ERROR" });
+      }
+      const acData = (await acRes.json()) as { data?: { accountId: string; emailAddress?: string }[] };
+      const accounts = acData.data ?? [];
+      const account  = accounts.find(a => a.emailAddress === user) ?? accounts[0];
+      if (!account) {
+        return Object.assign(
+          new Error("Nenhuma conta Zoho encontrada para o e-mail configurado."),
+          { code: "ZOHO_NO_ACCOUNT" }
+        );
+      }
+      const accountId = account.accountId;
+      logger.info({ accountId, email: account.emailAddress }, "Zoho HTTP API: account resolved");
+
+      // 2. Send the message
+      logger.info({ accountId, to: recipients }, "Zoho HTTP API: sending message");
+      const sendRes = await fetchWithTimeout(
+        `${base}/api/accounts/${accountId}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Zoho-oauthtoken ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fromAddress: user,
+            toAddress:   recipients.join(","),
+            subject:     mail.subject,
+            content:     mail.html,
+            mailFormat:  "html",
+          }),
+        }
+      );
+      if (!sendRes.ok) {
+        const body = await sendRes.text().catch(() => "");
+        const msg = sendRes.status === 401
+          ? "Token OAuth Zoho inválido ou expirado."
+          : `Zoho API envio falhou ${sendRes.status}: ${body}`;
+        return Object.assign(new Error(msg), { code: sendRes.status === 401 ? "ZOHO_UNAUTHORIZED" : "ZOHO_SEND_ERROR" });
+      }
+      logger.info({ to: recipients, via: "zoho-http-api" }, "Email sent successfully via Zoho HTTP API");
+      return null;
+    } catch (err) {
+      return err as SMTPErr;
+    }
+  };
+
+  // ── SMTP path ─────────────────────────────────────────────────────────────
   const SMTP_TIMEOUTS = {
     connectionTimeout: 90_000,
     greetingTimeout:   90_000,
@@ -350,15 +440,10 @@ async function attemptSendEmail(mail: {
     maxMessages:       100,
   } as const;
 
-  type SMTPErr = Error & { code?: string; responseCode?: number; response?: string };
-
-  // Try sending via a specific port. Returns null on success, error otherwise.
   const trySMTPPort = async (tryPort: number): Promise<null | SMTPErr> => {
     try {
       const transporter = nodemailer.createTransport({
-        host,
-        port: tryPort,
-        secure: tryPort === 465,
+        host, port: tryPort, secure: tryPort === 465,
         auth: { user, pass },
         tls: { rejectUnauthorized: false },
         ...SMTP_TIMEOUTS,
@@ -366,40 +451,28 @@ async function attemptSendEmail(mail: {
       await transporter.sendMail({
         from: `"Painel de Serviços" <${user}>`,
         to: recipients.join(", "),
-        subject: mail.subject,
-        html: mail.html,
-        attachments: mail.attachments,
+        subject: mail.subject, html: mail.html, attachments: mail.attachments,
       });
       return null;
-    } catch (err) {
-      return err as SMTPErr;
-    }
+    } catch (err) { return err as SMTPErr; }
   };
 
-  // Errors that indicate a port-level block / network unreachability (not auth/config).
   const isConnectivityError = (e: SMTPErr) =>
-    e.code === "ECONNREFUSED" ||
-    e.code === "ETIMEDOUT"    ||
-    e.code === "ESOCKET"      ||
-    e.code === "ECONNECTION"  ||
+    e.code === "ECONNREFUSED" || e.code === "ETIMEDOUT" ||
+    e.code === "ESOCKET"      || e.code === "ECONNECTION" ||
     /timeout|timed out|connect/i.test(e.message);
 
-  // Helper: retry with exponential backoff (2 s → 4 s → 8 s).
-  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
   const sendWithRetry = async (tryPort: number): Promise<null | SMTPErr> => {
-    const MAX_ATTEMPTS = 3;
     let lastErr: SMTPErr | null = null;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      logger.info({ host, port: tryPort, attempt, maxAttempts: MAX_ATTEMPTS }, "SMTP send attempt");
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      logger.info({ host, port: tryPort, attempt }, "SMTP send attempt");
       const err = await trySMTPPort(tryPort);
-      if (err === null) return null;  // success
+      if (err === null) return null;
       lastErr = err;
       logger.warn({ host, port: tryPort, attempt, code: err.code, message: err.message }, "SMTP attempt failed");
-      // Only retry on connectivity errors; auth/config errors won't be fixed by retrying.
-      if (!isConnectivityError(err)) break;
-      if (attempt < MAX_ATTEMPTS) {
-        const delay = Math.pow(2, attempt) * 1_000; // 2 s, 4 s, 8 s
+      if (!isConnectivityError(err)) break; // auth/config errors won't improve with retry
+      if (attempt < 3) {
+        const delay = Math.pow(2, attempt) * 1_000;
         logger.info({ delayMs: delay }, "Waiting before next SMTP attempt");
         await sleep(delay);
       }
@@ -407,33 +480,35 @@ async function attemptSendEmail(mail: {
     return lastErr;
   };
 
-  // Primary attempt on the configured port (with up to 3 retries).
-  let err = await sendWithRetry(port);
-  if (err === null) {
-    logger.info({ to: recipients, host, port }, "Email sent successfully");
-    return { ok: true };
+  // ── Routing: Zoho hosts → HTTP API first; all others → SMTP ───────────────
+  if (ZOHO_SMTP_HOSTS.has(host)) {
+    logger.info({ host }, "Zoho host detected — using HTTP API to bypass SMTP port restrictions");
+    const zohoErr = await sendViaZohoAPI();
+    if (zohoErr === null) return { ok: true };
+
+    // Auth errors from Zoho → no point falling back to SMTP (same credentials)
+    const code = (zohoErr as any).code as string | undefined;
+    if (code === "ZOHO_UNAUTHORIZED" || code === "ZOHO_NO_ACCOUNT") {
+      logger.error({ code, message: zohoErr.message }, "Zoho HTTP API auth/config error — not retrying via SMTP");
+      return { ok: false, error: zohoErr.message };
+    }
+
+    // Non-auth errors (network, etc.) → try SMTP as last resort
+    logger.warn({ code, message: zohoErr.message }, "Zoho HTTP API failed — attempting SMTP fallback");
   }
 
-  // If connectivity failure on port 465, automatically fall back to port 587 (STARTTLS).
+  let err = await sendWithRetry(port);
+  if (err === null) { logger.info({ to: recipients, host, port }, "Email sent via SMTP"); return { ok: true }; }
+
   if (port === 465 && isConnectivityError(err)) {
-    logger.warn({ host, originalPort: 465, fallbackPort: 587, code: err.code }, "Port 465 unreachable — retrying on port 587 (STARTTLS)");
-    const fallbackErr = await sendWithRetry(587);
-    if (fallbackErr === null) {
-      logger.info({ to: recipients, host, port: 587 }, "Email sent successfully via fallback port 587");
-      return { ok: true };
-    }
-    err = fallbackErr;
+    logger.warn({ host, fallbackPort: 587 }, "Port 465 unreachable — retrying on 587");
+    const fb = await sendWithRetry(587);
+    if (fb === null) { logger.info({ to: recipients, host, port: 587 }, "Email sent via SMTP fallback 587"); return { ok: true }; }
+    err = fb;
   }
 
   logger.error(
-    {
-      smtp: { host, port, user },
-      to: recipients,
-      errorCode: err.code,
-      responseCode: err.responseCode,
-      smtpResponse: err.response,
-      message: err.message,
-    },
+    { smtp: { host, port, user }, to: recipients, errorCode: err.code, message: err.message },
     "Email send failed (all attempts exhausted)"
   );
   return { ok: false, error: err.message || "Erro desconhecido ao enviar e-mail." };
