@@ -341,7 +341,81 @@ async function attemptSendEmail(mail: {
   if (!user) return { ok: false, error: "Usuário SMTP não configurado." };
   if (!pass) return { ok: false, error: "Senha SMTP não configurada." };
 
-  // Timeouts generous enough for Render free-tier cold starts / hibernation.
+  type SMTPErr = Error & { code?: string; responseCode?: number; response?: string };
+
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  const fetchWithTimeout = async (url: string, opts: RequestInit, ms = 25_000): Promise<Response> => {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try { return await fetch(url, { ...opts, signal: ctrl.signal }); }
+    finally { clearTimeout(t); }
+  };
+
+  const hostNorm = host.trim().toLowerCase();
+
+  // ── Resend API ─────────────────────────────────────────────────────────────
+  // Host = "api.resend.com" → smtpUser = remetente, smtpPass = API key (re_…)
+  if (hostNorm === "api.resend.com") {
+    try {
+      logger.info({ to: recipients, from: user }, "Resend API: sending email");
+      const res = await fetchWithTimeout("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${pass}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: `Painel de Serviços <${user}>`, to: recipients, subject: mail.subject, html: mail.html }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const msg = res.status === 401 || res.status === 403
+          ? "Resend: API Key inválida ou sem permissão — verifique em resend.com/api-keys"
+          : `Resend API erro ${res.status}: ${body}`;
+        logger.error({ status: res.status, body }, "Resend send failed");
+        return { ok: false, error: msg };
+      }
+      logger.info({ to: recipients }, "Email sent via Resend");
+      return { ok: true };
+    } catch (err) {
+      const msg = (err as Error).message || "Erro de rede ao chamar Resend";
+      logger.error({ message: msg }, "Resend fetch error");
+      return { ok: false, error: msg };
+    }
+  }
+
+  // ── SendGrid API ───────────────────────────────────────────────────────────
+  // Host = "api.sendgrid.com" → smtpUser = remetente, smtpPass = API key (SG.…)
+  if (hostNorm === "api.sendgrid.com") {
+    try {
+      logger.info({ to: recipients, from: user }, "SendGrid API: sending email");
+      const res = await fetchWithTimeout("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${pass}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          personalizations: [{ to: recipients.map(e => ({ email: e })) }],
+          from: { email: user, name: "Painel de Serviços" },
+          subject: mail.subject,
+          content: [{ type: "text/html", value: mail.html }],
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const msg = res.status === 401 || res.status === 403
+          ? "SendGrid: API Key inválida — verifique em app.sendgrid.com/settings/api_keys"
+          : `SendGrid API erro ${res.status}: ${body}`;
+        logger.error({ status: res.status, body }, "SendGrid send failed");
+        return { ok: false, error: msg };
+      }
+      logger.info({ to: recipients }, "Email sent via SendGrid");
+      return { ok: true };
+    } catch (err) {
+      const msg = (err as Error).message || "Erro de rede ao chamar SendGrid";
+      logger.error({ message: msg }, "SendGrid fetch error");
+      return { ok: false, error: msg };
+    }
+  }
+
+  // ── SMTP (Gmail, Outlook, etc.) ────────────────────────────────────────────
+  // Nota: o Render bloqueia portas SMTP saintes (465/587). Use Resend ou
+  // SendGrid acima se estiver hospedado no Render.
   const SMTP_TIMEOUTS = {
     connectionTimeout: 90_000,
     greetingTimeout:   90_000,
@@ -350,15 +424,10 @@ async function attemptSendEmail(mail: {
     maxMessages:       100,
   } as const;
 
-  type SMTPErr = Error & { code?: string; responseCode?: number; response?: string };
-
-  // Try sending via a specific port. Returns null on success, error otherwise.
   const trySMTPPort = async (tryPort: number): Promise<null | SMTPErr> => {
     try {
       const transporter = nodemailer.createTransport({
-        host,
-        port: tryPort,
-        secure: tryPort === 465,
+        host, port: tryPort, secure: tryPort === 465,
         auth: { user, pass },
         tls: { rejectUnauthorized: false },
         ...SMTP_TIMEOUTS,
@@ -371,72 +440,49 @@ async function attemptSendEmail(mail: {
         attachments: mail.attachments,
       });
       return null;
-    } catch (err) {
-      return err as SMTPErr;
-    }
+    } catch (err) { return err as SMTPErr; }
   };
 
-  // Errors that indicate a port-level block / network unreachability (not auth/config).
   const isConnectivityError = (e: SMTPErr) =>
-    e.code === "ECONNREFUSED" ||
-    e.code === "ETIMEDOUT"    ||
-    e.code === "ESOCKET"      ||
-    e.code === "ECONNECTION"  ||
-    /timeout|timed out|connect/i.test(e.message);
-
-  // Helper: retry with exponential backoff (2 s → 4 s → 8 s).
-  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+    e.code === "ECONNREFUSED" || e.code === "ETIMEDOUT" ||
+    e.code === "ESOCKET"      || e.code === "ECONNECTION" ||
+    /timeout|timed out|connect|socket close/i.test(e.message);
 
   const sendWithRetry = async (tryPort: number): Promise<null | SMTPErr> => {
-    const MAX_ATTEMPTS = 3;
     let lastErr: SMTPErr | null = null;
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      logger.info({ host, port: tryPort, attempt, maxAttempts: MAX_ATTEMPTS }, "SMTP send attempt");
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      logger.info({ host, port: tryPort, attempt }, "SMTP send attempt");
       const err = await trySMTPPort(tryPort);
-      if (err === null) return null;  // success
+      if (err === null) return null;
       lastErr = err;
       logger.warn({ host, port: tryPort, attempt, code: err.code, message: err.message }, "SMTP attempt failed");
-      // Only retry on connectivity errors; auth/config errors won't be fixed by retrying.
       if (!isConnectivityError(err)) break;
-      if (attempt < MAX_ATTEMPTS) {
-        const delay = Math.pow(2, attempt) * 1_000; // 2 s, 4 s, 8 s
-        logger.info({ delayMs: delay }, "Waiting before next SMTP attempt");
-        await sleep(delay);
-      }
+      if (attempt < 3) await sleep(Math.pow(2, attempt) * 1_000);
     }
     return lastErr;
   };
 
-  // Primary attempt on the configured port (with up to 3 retries).
   let err = await sendWithRetry(port);
-  if (err === null) {
-    logger.info({ to: recipients, host, port }, "Email sent successfully");
-    return { ok: true };
+  if (err === null) { logger.info({ to: recipients, host, port }, "Email sent via SMTP"); return { ok: true }; }
+
+  if (port === 465 && isConnectivityError(err)) {
+    logger.warn({ host, fallbackPort: 587, code: err.code }, "Port 465 unreachable — retrying on 587");
+    const fb = await sendWithRetry(587);
+    if (fb === null) { logger.info({ to: recipients, host, port: 587 }, "Email sent via SMTP port 587"); return { ok: true }; }
+    err = fb;
   }
 
-  // If connectivity failure on port 465, automatically fall back to port 587 (STARTTLS).
-  if (port === 465 && isConnectivityError(err)) {
-    logger.warn({ host, originalPort: 465, fallbackPort: 587, code: err.code }, "Port 465 unreachable — retrying on port 587 (STARTTLS)");
-    const fallbackErr = await sendWithRetry(587);
-    if (fallbackErr === null) {
-      logger.info({ to: recipients, host, port: 587 }, "Email sent successfully via fallback port 587");
-      return { ok: true };
-    }
-    err = fallbackErr;
-  }
+  // Detecta bloqueio de porta do Render e sugere alternativa
+  const renderBlocked = isConnectivityError(err);
+  const friendlyMsg = renderBlocked
+    ? `Falha de conexão SMTP (${err.message}). O Render bloqueia portas SMTP — configure Host como "api.resend.com" ou "api.sendgrid.com" com a respectiva API Key no campo Senha.`
+    : (err.message || "Erro desconhecido ao enviar e-mail.");
 
   logger.error(
-    {
-      smtp: { host, port, user },
-      to: recipients,
-      errorCode: err.code,
-      responseCode: err.responseCode,
-      smtpResponse: err.response,
-      message: err.message,
-    },
+    { smtp: { host, port, user }, to: recipients, errorCode: err.code, message: err.message },
     "Email send failed (all attempts exhausted)"
   );
-  return { ok: false, error: err.message || "Erro desconhecido ao enviar e-mail." };
+  return { ok: false, error: friendlyMsg };
 }
 
 function parsePhotoAttachments(photos?: string | null): { filename: string; content: Buffer; contentType: string }[] {
