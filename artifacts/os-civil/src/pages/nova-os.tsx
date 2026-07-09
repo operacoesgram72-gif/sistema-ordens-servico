@@ -84,6 +84,12 @@ export default function NovaOS() {
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+
+  type VideoEntry = {
+    id: string; name: string; localUrl: string;
+    objectPath: string | null; uploading: boolean; progress: number; error: string | null;
+  };
+  const [videoEntries, setVideoEntries] = useState<VideoEntry[]>([]);
   const videoUrlsRef = useRef<string[]>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -110,6 +116,40 @@ export default function NovaOS() {
     return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
   }, []);
 
+  const uploadVideoToStorage = async (file: File, entryId: string) => {
+    try {
+      const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const resp = await fetch(`${BASE}/api/storage/uploads/video-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type }),
+      });
+      if (!resp.ok) throw new Error("Falha ao obter URL de envio");
+      const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadURL);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setVideoEntries(prev => prev.map(v => v.id === entryId ? { ...v, progress: pct } : v));
+          }
+        };
+        xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}`)));
+        xhr.onerror = () => reject(new Error("Falha de rede ao enviar vídeo"));
+        xhr.send(file);
+      });
+
+      setVideoEntries(prev => prev.map(v => v.id === entryId ? { ...v, uploading: false, progress: 100, objectPath } : v));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      setVideoEntries(prev => prev.map(v => v.id === entryId ? { ...v, uploading: false, error: msg } : v));
+      toast({ title: "Falha ao enviar vídeo", description: msg, variant: "destructive" });
+    }
+  };
+
   const formatoServico = form.watch("formatoServico");
   const tipoOS = form.watch("tipo");
   const estimativaAuto = formatoServico
@@ -121,8 +161,8 @@ export default function NovaOS() {
       )
     : null;
 
-  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;   // 8 MB per photo
-  const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100 MB per video (object URL, not sent to server)
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;    // 8 MB per photo
+  const MAX_VIDEO_BYTES = 300 * 1024 * 1024;  // 300 MB per video
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -131,16 +171,17 @@ export default function NovaOS() {
     const videoList = files.filter(f => f.type.startsWith("video/"));
     const imageList = files.filter(f => f.type.startsWith("image/"));
 
-    // ── Videos: object URL preview only — no base64, no crash ────────────
-    const newVideos: MediaFile[] = [];
+    // ── Videos: upload to storage immediately (no base64 → no crash) ────
     for (const file of videoList) {
       if (file.size > MAX_VIDEO_BYTES) {
-        toast({ title: "Vídeo muito grande", description: `"${file.name}" ultrapassa 100 MB. Grave um clipe mais curto.`, variant: "destructive" });
+        toast({ title: "Vídeo muito grande", description: `"${file.name}" ultrapassa 300 MB.`, variant: "destructive" });
         continue;
       }
-      const url = URL.createObjectURL(file);
-      videoUrlsRef.current.push(url);
-      newVideos.push({ src: url, type: "video", name: file.name });
+      const entryId = crypto.randomUUID();
+      const localUrl = URL.createObjectURL(file);
+      videoUrlsRef.current.push(localUrl);
+      setVideoEntries(prev => [...prev, { id: entryId, name: file.name, localUrl, objectPath: null, uploading: true, progress: 0, error: null }]);
+      uploadVideoToStorage(file, entryId);
     }
 
     // ── Images: base64 with size guard ───────────────────────────────────
@@ -164,10 +205,9 @@ export default function NovaOS() {
       }
     }
 
-    if (newVideos.length > 0 || newImages.length > 0) {
-      const updated = [...mediaFiles, ...newVideos, ...newImages];
+    if (newImages.length > 0) {
+      const updated = [...mediaFiles, ...newImages];
       setMediaFiles(updated);
-      // Only images go in the JSON payload; video object URLs are local-only
       form.setValue("photos", JSON.stringify(updated.filter(f => f.type === "image").map(f => f.src)));
     }
     e.target.value = "";
@@ -210,14 +250,20 @@ export default function NovaOS() {
   };
 
   const removeMedia = (index: number) => {
-    const item = mediaFiles[index];
-    if (item.type === "video") {
-      URL.revokeObjectURL(item.src);
-      videoUrlsRef.current = videoUrlsRef.current.filter(u => u !== item.src);
-    }
     const updated = mediaFiles.filter((_, i) => i !== index);
     setMediaFiles(updated);
     form.setValue("photos", JSON.stringify(updated.filter(f => f.type === "image").map(f => f.src)));
+  };
+
+  const removeVideoEntry = (id: string) => {
+    setVideoEntries(prev => {
+      const item = prev.find(v => v.id === id);
+      if (item) {
+        URL.revokeObjectURL(item.localUrl);
+        videoUrlsRef.current = videoUrlsRef.current.filter(u => u !== item.localUrl);
+      }
+      return prev.filter(v => v.id !== id);
+    });
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {

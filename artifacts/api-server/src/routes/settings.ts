@@ -493,6 +493,8 @@ function parsePhotoAttachments(photos?: string | null): { filename: string; cont
     const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
     list.forEach((entry, idx) => {
       if (typeof entry !== "string") return;
+      // Skip object-storage paths (videos) — they're handled as links, not attachments
+      if (entry.startsWith("/objects/")) return;
       const match = entry.match(/^data:(.+);base64,(.*)$/);
       if (!match) return;
       const [, mime, base64] = match;
@@ -507,6 +509,25 @@ function parsePhotoAttachments(photos?: string | null): { filename: string; cont
   } catch {
     return [];
   }
+}
+
+/** Extract /objects/... video paths stored alongside base64 photos. */
+function parseVideoPaths(photos?: string | null): string[] {
+  if (!photos) return [];
+  try {
+    const list: unknown[] = JSON.parse(photos);
+    return list.filter((e): e is string => typeof e === "string" && e.startsWith("/objects/"));
+  } catch { return []; }
+}
+
+/** Construct the full public URL for a stored video, or null if the domain is unknown. */
+function buildVideoUrl(objectPath: string): string | null {
+  const devDomain = process.env["REPLIT_DEV_DOMAIN"];
+  if (!devDomain) return null;
+  // objectPath is like /objects/videos/uuid; serving endpoint strips leading /objects
+  const servePath = objectPath.replace(/^\/objects\//, "");
+  const base = (process.env["BASE_PATH"] || "").replace(/\/$/, "");
+  return `https://${devDomain}${base}/api/storage/objects/${servePath}`;
 }
 
 export async function sendOsNotification(os: {
@@ -533,6 +554,20 @@ export async function sendOsNotification(os: {
     ? `<tr><td style="padding:6px 0;color:#666">Fotos anexadas</td><td>${attachments.length} arquivo(s) em anexo</td></tr>`
     : "";
 
+  // Build clickable download buttons for any videos stored in object storage
+  const videoPaths = parseVideoPaths(os.photos);
+  const videoButtons = videoPaths
+    .map((p, i) => {
+      const url = buildVideoUrl(p);
+      return url
+        ? `<a href="${url}" style="display:inline-block;background:#f59e0b;color:#fff;padding:7px 16px;border-radius:5px;text-decoration:none;font-size:13px;font-weight:600;margin-right:6px;margin-bottom:4px">▶ Baixar Vídeo ${videoPaths.length > 1 ? i + 1 : ""}</a>`
+        : `<span style="color:#666;font-size:13px">Vídeo ${i + 1} disponível no sistema.</span>`;
+    })
+    .join(" ");
+  const videosRow = videoButtons
+    ? `<tr><td style="padding:8px 0;color:#666;vertical-align:top">Vídeos</td><td style="padding:8px 0">${videoButtons}</td></tr>`
+    : "";
+
   const result = await attemptSendEmail({
     subject: `[Nova OS] ${os.number} — ${os.location}`,
     html: `
@@ -551,6 +586,7 @@ export async function sendOsNotification(os: {
             ${descriptionRow}
             <tr><td style="padding:6px 0;color:#666">Valor Estimado</td><td style="color:#f59e0b;font-weight:bold">${valor}</td></tr>
             ${photosRow}
+            ${videosRow}
           </table>
         </div>
         <div style="background:#f9f9f9;padding:12px 20px;font-size:12px;color:#999">

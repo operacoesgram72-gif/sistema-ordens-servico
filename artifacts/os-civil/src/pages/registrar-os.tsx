@@ -55,7 +55,12 @@ export default function RegistrarOS() {
   const createOrder = useCreateServiceOrder();
   const [, setLocation] = useLocation();
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
-  const [videoFiles, setVideoFiles] = useState<{ name: string; url: string }[]>([]);
+
+  type VideoEntry = {
+    id: string; name: string; localUrl: string;
+    objectPath: string | null; uploading: boolean; progress: number; error: string | null;
+  };
+  const [videoFiles, setVideoFiles] = useState<VideoEntry[]>([]);
   const videoUrlsRef = useRef<string[]>([]);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [submittedOffline, setSubmittedOffline] = useState(false);
@@ -98,8 +103,42 @@ export default function RegistrarOS() {
     return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
   }, []);
 
-  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;  // 8 MB per photo
-  const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100 MB per video (preview only, not sent to server)
+  const uploadVideoToStorage = async (file: File, entryId: string) => {
+    try {
+      const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const resp = await fetch(`${BASE}/api/storage/uploads/video-url`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contentType: file.type }),
+      });
+      if (!resp.ok) throw new Error("Falha ao obter URL de envio");
+      const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadURL);
+        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setVideoFiles(prev => prev.map(v => v.id === entryId ? { ...v, progress: pct } : v));
+          }
+        };
+        xhr.onload = () => (xhr.status < 300 ? resolve() : reject(new Error(`HTTP ${xhr.status}`)));
+        xhr.onerror = () => reject(new Error("Falha de rede ao enviar vídeo"));
+        xhr.send(file);
+      });
+
+      setVideoFiles(prev => prev.map(v => v.id === entryId ? { ...v, uploading: false, progress: 100, objectPath } : v));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      setVideoFiles(prev => prev.map(v => v.id === entryId ? { ...v, uploading: false, error: msg } : v));
+      toast({ title: "Falha ao enviar vídeo", description: msg, variant: "destructive" });
+    }
+  };
+
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;    // 8 MB per photo
+  const MAX_VIDEO_BYTES = 300 * 1024 * 1024;  // 300 MB per video
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -108,19 +147,21 @@ export default function RegistrarOS() {
     const imageFiles  = files.filter(f => f.type.startsWith("image/"));
     const videoList   = files.filter(f => f.type.startsWith("video/"));
 
-    // ── Handle videos: object URL preview only (no base64 → no crash) ─────
+    // ── Handle videos: upload to storage immediately (no base64 → no crash) ─
     for (const file of videoList) {
       if (file.size > MAX_VIDEO_BYTES) {
         toast({
           title: "Vídeo muito grande",
-          description: `"${file.name}" ultrapassa 100 MB. Grave um clipe mais curto.`,
+          description: `"${file.name}" ultrapassa 300 MB.`,
           variant: "destructive",
         });
         continue;
       }
-      const url = URL.createObjectURL(file);
-      videoUrlsRef.current.push(url);
-      setVideoFiles(prev => [...prev, { name: file.name, url }]);
+      const entryId = crypto.randomUUID();
+      const localUrl = URL.createObjectURL(file);
+      videoUrlsRef.current.push(localUrl);
+      setVideoFiles(prev => [...prev, { id: entryId, name: file.name, localUrl, objectPath: null, uploading: true, progress: 0, error: null }]);
+      uploadVideoToStorage(file, entryId);
     }
 
     // ── Handle images: base64 for payload ────────────────────────────────
@@ -162,11 +203,14 @@ export default function RegistrarOS() {
     form.setValue("photos", JSON.stringify(newPhotos));
   };
 
-  const removeVideo = (index: number) => {
+  const removeVideo = (id: string) => {
     setVideoFiles(prev => {
-      URL.revokeObjectURL(prev[index].url);
-      videoUrlsRef.current = videoUrlsRef.current.filter(u => u !== prev[index].url);
-      return prev.filter((_, i) => i !== index);
+      const item = prev.find(v => v.id === id);
+      if (item) {
+        URL.revokeObjectURL(item.localUrl);
+        videoUrlsRef.current = videoUrlsRef.current.filter(u => u !== item.localUrl);
+      }
+      return prev.filter(v => v.id !== id);
     });
   };
 

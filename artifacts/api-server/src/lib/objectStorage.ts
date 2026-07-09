@@ -111,6 +111,19 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
+  /**
+   * Generate a presigned PUT URL for a video file.
+   * Uses a 1-hour TTL so that large (≤300 MB) uploads over slow connections don't time out.
+   * Videos are stored under {PRIVATE_OBJECT_DIR}/videos/{uuid} — separate from technician photos.
+   */
+  async getVideoUploadURL(): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/videos/${objectId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    return signObjectURL({ bucketName, objectName, method: 'PUT', ttlSec: 3600 });
+  }
+
   async getObjectEntityUploadURL(): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {

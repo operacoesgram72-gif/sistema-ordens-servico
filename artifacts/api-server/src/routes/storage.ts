@@ -64,6 +64,32 @@ router.post(
 );
 
 /**
+ * POST /storage/uploads/video-url
+ *
+ * Request a presigned PUT URL for a video upload from any OS registration form.
+ * No unit restriction — all units may record videos.
+ * Returns { uploadURL, objectPath } where objectPath can be served via GET /storage/objects/*.
+ */
+router.post(
+  "/storage/uploads/video-url",
+  async (req: Request, res: Response) => {
+    const { contentType } = req.body;
+    if (!contentType || !String(contentType).startsWith("video/")) {
+      res.status(400).json({ error: "Only video files are accepted" });
+      return;
+    }
+    try {
+      const uploadURL = await objectStorageService.getVideoUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      req.log.error({ err: error }, "Error generating video upload URL");
+      res.status(500).json({ error: "Failed to generate upload URL" });
+    }
+  },
+);
+
+/**
  * GET /storage/public-objects/*
  *
  * Serve public assets from PUBLIC_OBJECT_SEARCH_PATHS.
