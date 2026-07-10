@@ -6,6 +6,8 @@
  */
 
 export const QUEUE_KEY = "gram-offline-queue";
+/** Stores IDs of items that were successfully sent before the queue was written. */
+export const SENT_IDS_KEY = "gram-offline-sent-ids";
 
 export interface QueueItem {
   id: string;
@@ -54,6 +56,35 @@ export function writeQueue(items: QueueItem[]): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+/** Read the set of item IDs already sent successfully (persisted across reload). */
+export function readSentIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SENT_IDS_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Persist one successfully-sent item ID so a reload won't re-submit it. */
+export function markSent(id: string): void {
+  try {
+    const ids = readSentIds();
+    ids.add(id);
+    localStorage.setItem(SENT_IDS_KEY, JSON.stringify([...ids]));
+  } catch {
+    // quota exceeded — best effort; item may be re-sent after a reload
+  }
+}
+
+/** Clear all tracked sent IDs (called after the queue is cleanly rewritten). */
+export function clearSentIds(): void {
+  try {
+    localStorage.removeItem(SENT_IDS_KEY);
+  } catch {}
 }
 
 /**

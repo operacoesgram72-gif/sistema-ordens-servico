@@ -11,6 +11,18 @@
  *
  * Each drain run retries failed items up to MAX_DRAIN_RETRIES times with
  * exponential back-off before giving up and surfacing an error toast.
+ *
+ * Cross-tab sync: a `storage` event listener keeps pendingCount in sync
+ * across all tabs open simultaneously (task #8).
+ *
+ * Re-submission prevention: successfully-sent item IDs are persisted to
+ * localStorage so a page reload mid-drain does not re-submit them (task #9).
+ *
+ * Per-item timeout: each fetch uses AbortSignal.timeout so a hanging request
+ * does not block the entire drain indefinitely (task #10).
+ *
+ * Storage-full guard: writeQueue failures during drain are handled explicitly
+ * and surfaced to the user rather than silently dropped (task #11).
  */
 import { useState, useEffect, useRef } from "react";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -20,6 +32,10 @@ import {
   writeQueue,
   enqueueOffline,
   enqueueOfflineBatch,
+  readSentIds,
+  markSent,
+  clearSentIds,
+  QUEUE_KEY,
 } from "@/lib/offline-queue-storage";
 import type { QueueItem } from "@/lib/offline-queue-storage";
 
@@ -31,6 +47,8 @@ const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const MAX_DRAIN_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 2_000; // 2 s → 4 s → 8 s
+/** Per-request timeout — prevents a single hanging fetch from blocking the drain. */
+const ITEM_FETCH_TIMEOUT_MS = 15_000;
 
 /**
  * Module-level drain guard — prevents concurrent drains from multiple hook
@@ -62,6 +80,16 @@ function runDrain(callbacks: DrainCallbacks) {
   if (isDraining) return;
   if (!callbacks.isOnlineRef.current) return;
 
+  // ── Task #9: clean up items that were successfully sent before a reload ──
+  // If the page reloaded while a drain was in progress, some items may have
+  // been sent but not yet removed from the queue. Clear them now.
+  const sentIds = readSentIds();
+  if (sentIds.size > 0) {
+    const cleaned = readQueue().filter(i => !sentIds.has(i.id));
+    writeQueue(cleaned);
+    clearSentIds();
+  }
+
   const queue = readQueue();
   if (queue.length === 0) return;
 
@@ -75,12 +103,16 @@ function runDrain(callbacks: DrainCallbacks) {
       for (const item of queue) {
         if (!callbacks.activeRef.current) break;
         try {
+          // ── Task #10: per-item timeout so a broken connection can't freeze the drain ──
           const res = await fetch(`${BASE_URL}${item.endpoint}`, {
             method: item.method,
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(item.body),
+            signal: AbortSignal.timeout(ITEM_FETCH_TIMEOUT_MS),
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          // ── Task #9: persist successful send so a reload won't re-submit ──
+          markSent(item.id);
         } catch {
           failedItems.push(item);
         }
@@ -92,7 +124,22 @@ function runDrain(callbacks: DrainCallbacks) {
       const currentQueue = readQueue();
       const newItems = currentQueue.filter(i => !processingIds.has(i.id));
       const merged = [...newItems, ...failedItems];
-      writeQueue(merged);
+
+      // ── Task #11: detect storage-full on queue rewrite ──
+      const written = writeQueue(merged);
+      if (!written && failedItems.length > 0) {
+        // Can't persist the failed items — warn the user so they know data
+        // may not be retried automatically on next session.
+        callbacks.toast({
+          title: "Armazenamento cheio",
+          description: `${failedItems.length} item${failedItems.length !== 1 ? "s" : ""} não pôde${failedItems.length !== 1 ? "ram" : ""} ser salvo${failedItems.length !== 1 ? "s" : ""} localmente. Libere espaço no navegador ou sincronize agora.`,
+          variant: "destructive",
+        });
+      }
+
+      // Sent IDs are no longer needed — queue is canonical again.
+      clearSentIds();
+
       callbacks.onCountChange(merged.length);
 
       const sent = queue.length - failedItems.length;
@@ -142,6 +189,7 @@ function runDrain(callbacks: DrainCallbacks) {
  * - Retries failed drain attempts with exponential back-off (up to 3 times).
  * - Shows a toast for each batch of successfully synced items, and an error
  *   toast when retries are exhausted.
+ * - Keeps `pendingCount` in sync across all open tabs via the `storage` event.
  */
 export function useOfflineQueue() {
   const isOnline = useOnlineStatus();
@@ -161,6 +209,18 @@ export function useOfflineQueue() {
     isOnlineRef,
     activeRef,
   };
+
+  // ── Task #8: cross-tab sync via storage event ──────────────────────────────
+  // When another tab modifies the queue, refresh our count.
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === QUEUE_KEY) {
+        setPendingCount(readQueue().length);
+      }
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   // ── Drain on `online` event ────────────────────────────────────────────────
   useEffect(() => {

@@ -4,8 +4,11 @@
  *
  * The hook reconnects automatically with exponential back-off when the
  * connection drops (network glitch, server restart, etc.).
+ *
+ * Returns `{ isConnected }` so consumers can surface a live-stream indicator
+ * in the UI (task #18).
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -26,9 +29,12 @@ type StatusChangedCallback = (event: StatusChangedEvent) => void;
  *
  * @param onStatusChanged - Called whenever a service order status changes.
  *   Stable reference recommended (wrap in useCallback) to avoid reconnects.
+ * @returns `{ isConnected }` — true when the SSE stream is open and healthy.
  */
-export function useStatusEvents(onStatusChanged: StatusChangedCallback): void {
+export function useStatusEvents(onStatusChanged: StatusChangedCallback): { isConnected: boolean } {
   const callbackRef = useRef(onStatusChanged);
+  const [isConnected, setIsConnected] = useState(false);
+
   // Keep ref current without restarting the SSE connection on every render.
   useEffect(() => {
     callbackRef.current = onStatusChanged;
@@ -57,6 +63,7 @@ export function useStatusEvents(onStatusChanged: StatusChangedCallback): void {
       };
 
       es.onerror = () => {
+        setIsConnected(false);
         es?.close();
         es = null;
         if (destroyed) return;
@@ -70,6 +77,7 @@ export function useStatusEvents(onStatusChanged: StatusChangedCallback): void {
       es.onopen = () => {
         // Reset back-off on successful open
         retryDelay = 1_000;
+        setIsConnected(true);
       };
     }
 
@@ -77,8 +85,11 @@ export function useStatusEvents(onStatusChanged: StatusChangedCallback): void {
 
     return () => {
       destroyed = true;
+      setIsConnected(false);
       if (retryTimer) clearTimeout(retryTimer);
       es?.close();
     };
   }, []); // intentionally empty — connection is managed manually
+
+  return { isConnected };
 }
