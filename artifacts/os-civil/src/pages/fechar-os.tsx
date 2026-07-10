@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
 import { format } from "date-fns";
 import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw, Camera, Image as ImageIcon, X } from "lucide-react";
-import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
+import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -64,30 +64,44 @@ export default function FecharOS() {
   const [successId, setSuccessId] = useState<number | null>(null);
   const [addingMediaToId, setAddingMediaToId] = useState<number | null>(null);
 
-  const handleAddMedia = async (osId: number, files: FileList | null) => {
+  const handleAddMedia = async (osId: number, files: FileList | null, fromCamera = false) => {
     if (!files || files.length === 0) return;
     setAddingMediaToId(osId);
     try {
-      const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per image
-      // Use isImageFile / isVideoFile so files with an empty browser-reported MIME type
-      // (common on Android Chrome, Samsung Internet, Google Drive picker) are still
-      // classified correctly via their file extension instead of being silently dropped.
-      const imgFiles = Array.from(files).filter(f => isImageFile(f) && f.size <= MAX_IMAGE_BYTES);
-      const oversized = Array.from(files).filter(f => isImageFile(f) && f.size > MAX_IMAGE_BYTES);
-      if (oversized.length > 0) {
-        toast({ title: "Imagem(ns) ignorada(s)", description: `${oversized.length} arquivo(s) acima de 8 MB foram ignorados.`, variant: "destructive" });
-      }
-      const vidFiles = Array.from(files).filter(isVideoFile);
+      const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per photo (gallery)
 
-      // Convert images to base64
-      const newBase64 = await Promise.all(
-        imgFiles.map(f => new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(f);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-        }))
-      );
+      // Camera inputs (capture="environment") may deliver files with file.type=""
+      // AND no extension in file.name on some Android / iOS OEM browsers (e.g.
+      // Samsung Internet delivers file.name="image" with no .jpg). isImageFile()
+      // would return false for those files and silently drop the photo. Since the
+      // input has accept="image/*", every file from the camera IS an image — skip
+      // the type check for camera files entirely and let compressImage handle them.
+      const allFiles = Array.from(files);
+      const vidFiles = allFiles.filter(isVideoFile);
+      const imgCandidates = fromCamera
+        ? allFiles.filter(f => !isVideoFile(f))          // camera: all non-video files are images
+        : allFiles.filter(f => isImageFile(f) && !isVideoFile(f)); // gallery: use extension/type check
+
+      // Camera photos use MAX_COMPRESS_BYTES (50 MB) — compressImage resizes them to
+      // 1920 px max and re-encodes as JPEG 0.82, reducing 12 MP raw photos (~8 MB) to
+      // ~250 KB before base64 encoding. Gallery photos keep the 8 MB guard.
+      const sizeLimit = fromCamera ? MAX_COMPRESS_BYTES : MAX_IMAGE_BYTES;
+      const oversized = imgCandidates.filter(f => f.size > sizeLimit);
+      if (oversized.length > 0) {
+        toast({
+          title: "Imagem(ns) ignorada(s)",
+          description: `${oversized.length} arquivo(s) acima de ${fromCamera ? "50" : "8"} MB foram ignorados.`,
+          variant: "destructive",
+        });
+      }
+      const imgFiles = imgCandidates.filter(f => f.size <= sizeLimit);
+
+      // Convert images to base64 with Canvas compression.
+      // compressImage resizes to 1920 px max and re-encodes as JPEG 0.82.
+      // Falls back to plain FileReader only when the Canvas 2D context is unavailable.
+      const newBase64 = imgFiles.length > 0
+        ? await Promise.all(imgFiles.map(f => compressImage(f)))
+        : [];
 
       // Upload videos to object storage
       const videoUrls: string[] = [];
@@ -432,8 +446,10 @@ export default function FecharOS() {
                       <span className="text-xs text-primary animate-pulse ml-1">Salvando…</span>
                     )}
                     {/* Gallery includes videos; video camera recording removed for stability */}
-                    <input id={`media-camera-${os.id}`} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
-                    <input id={`media-gallery-${os.id}`} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
+                    {/* fromCamera=true bypasses isImageFile() — camera inputs may deliver
+                        file.type="" on Android OEM browsers (Samsung Internet, etc.) */}
+                    <input id={`media-camera-${os.id}`} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files, true)} />
+                    <input id={`media-gallery-${os.id}`} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files, false)} />
                   </div>
 
                   {/* Editable status */}
