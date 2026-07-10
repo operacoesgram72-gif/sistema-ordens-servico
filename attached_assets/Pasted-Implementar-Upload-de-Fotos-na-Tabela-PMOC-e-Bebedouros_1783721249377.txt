@@ -1,0 +1,61 @@
+Implementar Upload de Fotos na Tabela "PMOC e Bebedouros"
+
+IMPORTANTE: Esta solicitação é apenas para adicionar uma funcionalidade específica na tabela "PMOC e Bebedouros".
+
+Não alterar nenhuma outra funcionalidade do sistema. Não modificar layout, banco de dados, regras de negócio, fluxo do sistema, Supabase ou qualquer recurso que já esteja funcionando.
+
+Objetivo
+
+Na tabela "PMOC e Bebedouros", para todas as unidades (AM, AC, AP, RO, RR e PA), permitir anexar fotos na coluna "Fotos".
+
+A funcionalidade deve estar disponível tanto:
+
+No Link de Funcionários;
+Na Área de Gestão.
+Funcionalidades
+
+A coluna "Fotos" deve permitir:
+
+Selecionar uma ou mais fotos da galeria do celular;
+Selecionar uma ou mais fotos do computador;
+Fazer o upload corretamente;
+Salvar as fotos vinculadas ao respectivo registro de PMOC/Bebedouros;
+Exibir as fotos sempre que o registro for consultado ou editado.
+
+Se possível, permitir o envio de múltiplas fotos no mesmo registro.
+
+Compatibilidade
+
+A funcionalidade deve funcionar corretamente em:
+
+Android;
+iPhone (iOS);
+Computadores (Windows e macOS).
+Aplicação
+
+A implementação deve funcionar para todas as unidades:
+
+AM
+AC
+AP
+RO
+RR
+PA
+
+Mantendo os registros totalmente independentes entre as unidades.
+
+Restrições
+Não alterar nenhuma funcionalidade que já esteja funcionando.
+Não modificar o layout atual da tabela PMOC e Bebedouros.
+Não alterar o banco de dados, tabelas, buckets, Storage Policies, autenticação ou qualquer configuração do Supabase que já esteja funcionando.
+Não alterar o fluxo de cadastro, edição ou consulta dos registros.
+Implementar apenas a funcionalidade de anexar e visualizar fotos na coluna "Fotos" da tabela PMOC e Bebedouros.
+Critério de conclusão
+
+A tarefa será considerada concluída quando for possível:
+
+Anexar uma ou várias fotos da galeria do celular;
+Anexar uma ou várias fotos pelo computador;
+Salvar corretamente as imagens;
+Visualizar as fotos vinculadas ao registro correspondente;
+Utilizar essa funcionalidade tanto no Link de Funcionários quanto na Área de Gestão, em todas as unidades do sistema, sem impactar nenhuma funcionalidade já existente.

@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Camera, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+import { isImageFile, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -148,6 +150,9 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const [photoDialog, setPhotoDialog] = useState<PhotoDialogState>(null);
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
   const [newPhotoLabel, setNewPhotoLabel] = useState("");
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const setRows = useCallback((updater: PmocRow[] | ((prev: PmocRow[]) => PmocRow[])) => {
     setRowsRaw(prev => {
@@ -232,6 +237,59 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
     }));
   };
 
+  // Upload photos from device (camera or gallery/PC).
+  // Applies the same compressImage pattern used in registrar-os and fechar-os:
+  // - Camera inputs bypass isImageFile() (Android OEM browsers deliver file.type="" for camera files)
+  // - compressImage resizes to 1920 px max, re-encodes as JPEG 0.82 (~250 KB per photo)
+  // - Base64 result stored in the PhotoLink.url field (same as OS photos in PostgreSQL)
+  const handlePhotoUpload = async (files: FileList | null, fromCamera = false) => {
+    if (!photoDialog || !files || files.length === 0) return;
+    setUploadingPhotos(true);
+    try {
+      const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB for gallery
+      const allFiles = Array.from(files);
+      // Camera: all files are images (accept="image/*" guarantees it; skip MIME check
+      // because Android OEM browsers deliver file.type="" for camera captures).
+      // Gallery: use isImageFile() which falls back to extension when type is empty.
+      const imgCandidates = fromCamera
+        ? allFiles.filter(f => !f.type.startsWith("video/"))
+        : allFiles.filter(f => isImageFile(f));
+      const sizeLimit = fromCamera ? MAX_COMPRESS_BYTES : MAX_IMAGE_BYTES;
+      const oversized = imgCandidates.filter(f => f.size > sizeLimit);
+      if (oversized.length > 0) {
+        toast({
+          title: "Imagem(ns) ignorada(s)",
+          description: `${oversized.length} arquivo(s) acima de ${fromCamera ? "50" : "8"} MB foram ignorados.`,
+          variant: "destructive",
+        });
+      }
+      const validFiles = imgCandidates.filter(f => f.size <= sizeLimit);
+      if (validFiles.length === 0) return;
+      // compressImage resizes to 1920 px max, re-encodes as JPEG 0.82.
+      // Falls back to plain FileReader only when the Canvas 2D context is unavailable.
+      const base64List = await Promise.all(validFiles.map(f => compressImage(f)));
+      const newPhotos: PhotoLink[] = base64List.map((url, i) => ({
+        id: genId(),
+        url,
+        label: validFiles[i].name?.replace(/\.[^/.]+$/, "") || `Foto ${i + 1}`,
+      }));
+      // Capture photoDialog in a stable reference — state won't change during await
+      const { rowId, quarter } = photoDialog;
+      setRows(prev => prev.map(row => {
+        if (row.id !== rowId) return row;
+        const q = { ...row[quarter], fotos: [...row[quarter].fotos, ...newPhotos] };
+        return { ...row, [quarter]: q };
+      }));
+      toast({ title: `${newPhotos.length} foto(s) adicionada(s) com sucesso!` });
+    } catch {
+      toast({ title: "Erro ao processar imagem(ns)", description: "Tente novamente.", variant: "destructive" });
+    } finally {
+      setUploadingPhotos(false);
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
+    }
+  };
+
   const dialogRow = photoDialog ? rows.find(r => r.id === photoDialog.rowId) : null;
   const dialogPhotos = dialogRow && photoDialog ? dialogRow[photoDialog.quarter].fotos : [];
 
@@ -295,10 +353,19 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
               <div className="space-y-2 max-h-52 overflow-y-auto">
                 {dialogPhotos.map(photo => (
                   <div key={photo.id} className="flex items-center gap-2 text-sm border border-border/60 rounded-md px-3 py-2 bg-muted/20">
-                    <ImageIcon className="w-4 h-4 text-primary shrink-0" />
-                    <a href={photo.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-primary hover:underline truncate" title={photo.url}>
+                    {photo.url.startsWith("data:image") ? (
+                      <img src={photo.url} alt={photo.label} className="w-10 h-10 object-cover rounded shrink-0" />
+                    ) : (
+                      <ImageIcon className="w-4 h-4 text-primary shrink-0" />
+                    )}
+                    <span className="flex-1 text-xs truncate text-muted-foreground" title={photo.label}>
                       {photo.label}
-                    </a>
+                    </span>
+                    {!photo.url.startsWith("data:image") && (
+                      <a href={photo.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 shrink-0" title="Abrir link">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
                     <button onClick={() => removePhoto(photoDialog.rowId, photoDialog.quarter, photo.id)} className="text-muted-foreground hover:text-destructive shrink-0">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -306,13 +373,50 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
                 ))}
               </div>
             )}
+
+            {/* Upload from device — same compressImage pattern as registrar-os / fechar-os */}
             <div className="space-y-2 pt-2 border-t border-border/50">
-              <p className="text-xs text-muted-foreground font-medium">Adicionar novo link de foto</p>
+              <p className="text-xs text-muted-foreground font-medium">Enviar foto do dispositivo</p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 gap-1.5 text-xs"
+                  disabled={uploadingPhotos}
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  Câmera
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 gap-1.5 text-xs"
+                  disabled={uploadingPhotos}
+                  onClick={() => galleryInputRef.current?.click()}
+                >
+                  <ImageIcon className="w-3.5 h-3.5" />
+                  Galeria / PC
+                </Button>
+                {uploadingPhotos && (
+                  <Loader2 className="w-4 h-4 animate-spin text-primary self-center shrink-0" />
+                )}
+              </div>
+              {/* fromCamera=true bypasses isImageFile() — Android OEM browsers deliver file.type="" for camera captures */}
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => void handlePhotoUpload(e.target.files, true)} />
+              <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => void handlePhotoUpload(e.target.files, false)} />
+            </div>
+
+            {/* Add via external link (existing functionality — unchanged) */}
+            <div className="space-y-2 pt-2 border-t border-border/50">
+              <p className="text-xs text-muted-foreground font-medium">Ou adicionar link externo (Google Drive, etc.)</p>
               <div className="space-y-2">
                 <Input placeholder="URL da foto (Google Drive, Photos, etc.)" value={newPhotoUrl} onChange={e => setNewPhotoUrl(e.target.value)} onKeyDown={e => e.key === "Enter" && addPhoto()} className="text-sm" />
                 <Input placeholder="Nome/descrição (opcional)" value={newPhotoLabel} onChange={e => setNewPhotoLabel(e.target.value)} onKeyDown={e => e.key === "Enter" && addPhoto()} className="text-sm" />
                 <Button onClick={addPhoto} size="sm" className="w-full gap-2">
-                  <Plus className="w-4 h-4" />Adicionar Foto
+                  <Plus className="w-4 h-4" />Adicionar Link
                 </Button>
               </div>
             </div>
