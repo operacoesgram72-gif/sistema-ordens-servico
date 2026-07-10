@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useGetDashboardIndicators } from "@workspace/api-client-react";
 import { useUnit } from "@/contexts/unit-context";
 import { useQueryClient } from "@tanstack/react-query";
@@ -9,13 +9,30 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart, Line, Legend,
 } from "recharts";
-import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw } from "lucide-react";
+import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const MONTHS = [
   "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
+
+const FORMATO_LABELS: Record<string, string> = {
+  civil: "Civil",
+  refrigeracao: "Refrigeração",
+  hidraulica: "Hidráulica",
+  mecanica: "Mecânica",
+  eletrica: "Elétrica",
+  outros: "Outros",
+};
+
+const TIPO_LABELS: Record<string, string> = {
+  reforma: "Reforma",
+  revitalizacao: "Revitalização",
+  preventiva: "Preventiva",
+  corretiva: "Corretiva",
+  outros: "Outros",
+};
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -32,6 +49,12 @@ export default function Indicadores() {
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
   const [selectedDate, setSelectedDate] = useState<string>(todayISO());
   const [years, setYears] = useState<number[]>([currentYear]);
+
+  // Desempenho filters — formato/tipo are server-side; técnico is client-side
+  const [filterFormato, setFilterFormato] = useState<string>("all");
+  const [filterTipo, setFilterTipo]       = useState<string>("all");
+  const [filterTecnico, setFilterTecnico] = useState<string>("all");
+
   const { unit } = useUnit();
   const queryClient = useQueryClient();
 
@@ -48,21 +71,53 @@ export default function Indicadores() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unit]);
 
+  // Reset client-side technician filter whenever any server-side filter or period changes
+  // so a previously selected technician doesn't silently remain when the dataset changes.
+  useEffect(() => {
+    setFilterTecnico("all");
+  }, [filterFormato, filterTipo, selectedYear, selectedMonth, selectedDate, unit, periodMode]);
+
   const isDiaMode = periodMode === "dia";
 
-  const { data: indicators, isLoading } = useGetDashboardIndicators(
-    (isDiaMode
+  // Build query params — include server-side filters when set
+  const queryParams = useMemo(() => {
+    const p: Record<string, any> = isDiaMode
       ? { year: selectedYear, unidade: unit, date: selectedDate }
-      : { year: selectedYear, unidade: unit }) as any,
+      : { year: selectedYear, unidade: unit };
+    if (filterFormato !== "all") p.formatoServico = filterFormato;
+    if (filterTipo    !== "all") p.tipo = filterTipo;
+    return p;
+  }, [isDiaMode, selectedYear, unit, selectedDate, filterFormato, filterTipo]);
+
+  const { data: indicators, isLoading } = useGetDashboardIndicators(
+    queryParams as any,
     {
       query: {
         enabled: true,
-        queryKey: isDiaMode
-          ? ["dashboard-indicators", selectedYear, unit, "dia", selectedDate]
-          : ["dashboard-indicators", selectedYear, unit],
+        queryKey: [
+          "dashboard-indicators",
+          selectedYear, unit,
+          filterFormato, filterTipo,
+          ...(isDiaMode ? ["dia", selectedDate] : []),
+        ],
       },
     }
   );
+
+  // Derive technician list from returned data for the Técnico filter dropdown
+  const allTechnicians = useMemo<string[]>(() => {
+    const rows: any[] = (indicators as any)?.byTechnician ?? [];
+    return [...new Set(rows.map((r: any) => r.technicianName).filter(Boolean))].sort() as string[];
+  }, [indicators]);
+
+  // Client-side technician filter applied on top of server-aggregated data
+  const byTechnicianFiltered = useMemo<any[]>(() => {
+    const rows: any[] = (indicators as any)?.byTechnician ?? [];
+    if (filterTecnico === "all") return rows;
+    return rows.filter((r: any) => r.technicianName === filterTecnico);
+  }, [indicators, filterTecnico]);
+
+  const hasActiveFilter = filterFormato !== "all" || filterTipo !== "all" || filterTecnico !== "all";
 
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -89,6 +144,7 @@ export default function Indicadores() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Indicadores de Desempenho</h1>
@@ -162,6 +218,65 @@ export default function Indicadores() {
         </div>
       </div>
 
+      {/* ── Desempenho Filters ─────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground font-medium">Filtros de Desempenho:</span>
+        <Select
+          value={filterFormato}
+          onValueChange={(v) => setFilterFormato(v)}
+        >
+          <SelectTrigger className="w-44 h-8 text-sm">
+            <SelectValue placeholder="Formato de Serviço" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os formatos</SelectItem>
+            {Object.entries(FORMATO_LABELS).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filterTipo}
+          onValueChange={(v) => setFilterTipo(v)}
+        >
+          <SelectTrigger className="w-40 h-8 text-sm">
+            <SelectValue placeholder="Tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            {Object.entries(TIPO_LABELS).map(([k, v]) => (
+              <SelectItem key={k} value={k}>{v}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filterTecnico}
+          onValueChange={(v) => setFilterTecnico(v)}
+        >
+          <SelectTrigger className="w-48 h-8 text-sm">
+            <SelectValue placeholder="Técnico" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os técnicos</SelectItem>
+            {allTechnicians.map((name) => (
+              <SelectItem key={name} value={name}>{name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hasActiveFilter && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-xs text-muted-foreground"
+            onClick={() => { setFilterFormato("all"); setFilterTipo("all"); setFilterTecnico("all"); }}
+          >
+            <X className="w-3 h-3 mr-1" />
+            Limpar filtros
+          </Button>
+        )}
+      </div>
+
+      {/* ── Summary cards ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
@@ -232,6 +347,7 @@ export default function Indicadores() {
         </Card>
       </div>
 
+      {/* ── Charts ─────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border/50">
           <CardHeader><CardTitle className="text-base">Volume Mensal de OS</CardTitle></CardHeader>
@@ -277,6 +393,7 @@ export default function Indicadores() {
         </Card>
       </div>
 
+      {/* ── Por Especialidade ──────────────────────────────────────────────── */}
       {(indicators as any).byFormat && (indicators as any).byFormat.length > 0 && (
         <Card className="bg-card border-border/50">
           <CardHeader><CardTitle className="text-base">Por Especialidade</CardTitle></CardHeader>
@@ -311,9 +428,19 @@ export default function Indicadores() {
         </Card>
       )}
 
+      {/* ── Desempenho por Técnico ─────────────────────────────────────────── */}
       {(indicators as any).byTechnician && (indicators as any).byTechnician.length > 0 && (
         <Card className="bg-card border-border/50">
-          <CardHeader><CardTitle className="text-base">Desempenho por Técnico</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base">Desempenho por Técnico</CardTitle>
+              {hasActiveFilter && (
+                <span className="text-xs text-muted-foreground">
+                  {byTechnicianFiltered.length} de {(indicators as any).byTechnician.length} técnico(s)
+                </span>
+              )}
+            </div>
+          </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
@@ -327,17 +454,25 @@ export default function Indicadores() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(indicators as any).byTechnician.map((row: any) => (
-                    <TableRow key={row.technician}>
-                      <TableCell className="font-medium">{row.technician || "Não atribuído"}</TableCell>
-                      <TableCell className="text-right font-mono">{row.total}</TableCell>
-                      <TableCell className="text-right font-mono text-emerald-500">{row.completed}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {row.total > 0 ? `${Math.round((row.completed / row.total) * 100)}%` : "—"}
+                  {byTechnicianFiltered.length > 0 ? (
+                    byTechnicianFiltered.map((row: any) => (
+                      <TableRow key={row.technicianName}>
+                        <TableCell className="font-medium">{row.technicianName || "Não atribuído"}</TableCell>
+                        <TableCell className="text-right font-mono">{row.total}</TableCell>
+                        <TableCell className="text-right font-mono text-emerald-500">{row.completed}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {row.total > 0 ? `${Math.round((row.completed / row.total) * 100)}%` : "—"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-amber-500">{formatCurrency(row.estimatedValue ?? 0)}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                        Nenhum resultado para os filtros selecionados.
                       </TableCell>
-                      <TableCell className="text-right font-mono text-amber-500">{formatCurrency(row.value ?? 0)}</TableCell>
                     </TableRow>
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>

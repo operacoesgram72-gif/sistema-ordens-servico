@@ -178,6 +178,9 @@ router.get("/dashboard/indicators", async (req, res) => {
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
     const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const dateParam = req.query.date as string | undefined;
+    // Optional filters for the Desempenho section
+    const filterFormato = (req.query.formatoServico as string) || undefined;
+    const filterTipo    = (req.query.tipo as string) || undefined;
 
     let rangeStart: Date;
     let rangeEnd: Date;
@@ -201,17 +204,21 @@ router.get("/dashboard/indicators", async (req, res) => {
       sql`${serviceOrdersTable.createdAt} < ${rangeEnd}`,
     ];
     if (unidade) conditions.push(eq(serviceOrdersTable.unidade, unidade));
+    // Optional content filters — narrow every aggregation (byMonth, byTechnician, etc.)
+    if (filterFormato) conditions.push(eq(serviceOrdersTable.formatoServico, filterFormato as any));
+    if (filterTipo)    conditions.push(eq((serviceOrdersTable as any).tipo, filterTipo));
 
     // Single query with LEFT JOIN — no separate technicians fetch
     const allOrders = await db
       .select({
-        location:          serviceOrdersTable.location,
-        status:            serviceOrdersTable.status,
+        location:           serviceOrdersTable.location,
+        status:             serviceOrdersTable.status,
         technicianNameFree: (serviceOrdersTable as any).technicianNameFree,
-        technicianName:    techniciansTable.name,
-        formatoServico:    serviceOrdersTable.formatoServico,
-        estimatedValue:    serviceOrdersTable.estimatedValue,
-        createdAt:         serviceOrdersTable.createdAt,
+        technicianName:     techniciansTable.name,
+        formatoServico:     serviceOrdersTable.formatoServico,
+        tipo:               (serviceOrdersTable as any).tipo,
+        estimatedValue:     serviceOrdersTable.estimatedValue,
+        createdAt:          serviceOrdersTable.createdAt,
       })
       .from(serviceOrdersTable)
       .leftJoin(techniciansTable, eq(serviceOrdersTable.technicianId, techniciansTable.id))
