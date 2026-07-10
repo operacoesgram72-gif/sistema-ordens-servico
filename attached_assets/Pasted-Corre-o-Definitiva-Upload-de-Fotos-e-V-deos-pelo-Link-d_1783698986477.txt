@@ -1,0 +1,54 @@
+Correção Definitiva - Upload de Fotos e Vídeos pelo Link de Funcionários (Mobile)
+
+O problema ainda não foi resolvido.
+
+No link de Funcionários, quando utilizado pelo celular (Android e iPhone), o sistema permite:
+
+Tirar foto;
+Escolher foto da galeria;
+Gravar vídeo;
+Escolher vídeo da galeria.
+
+Porém, os arquivos não estão sendo gravados corretamente na Ordem de Serviço, e consequentemente não aparecem na Lista de OS da área de Gestão.
+
+Não quero uma alteração visual. Quero que seja corrigida a lógica completa de upload e persistência dos arquivos.
+
+Verificar e corrigir obrigatoriamente:
+O componente HTML (input type="file") deve aceitar corretamente:
+Captura pela câmera;
+Seleção da galeria;
+Captura de vídeo;
+Seleção de vídeo.
+Confirmar que os atributos abaixo estão corretos:
+accept="image/*,video/*"
+capture
+suporte para múltiplos arquivos quando permitido.
+Verificar se os arquivos realmente chegam ao backend.
+Confirmar que o backend recebe corretamente:
+imagens;
+vídeos;
+tamanho dos arquivos;
+tipo MIME;
+nome do arquivo.
+Corrigir qualquer erro de:
+upload;
+serialização;
+FormData;
+multipart/form-data;
+limite de tamanho do arquivo;
+armazenamento temporário;
+persistência no banco.
+Garantir que, após o upload, o registro da OS seja atualizado contendo:
+caminho do arquivo;
+URL;
+identificador do arquivo;
+tipo (imagem ou vídeo).
+Após salvar a OS, os anexos devem aparecer imediatamente na área de Gestão.
+A coluna Fotos deve carregar todas as imagens da OS.
+Caso exista vídeo anexado, ele também deve ficar vinculado à mesma Ordem de Serviço.
+O problema ocorre somente quando a OS é criada ou encerrada pelo celular. Comparar o fluxo do desktop com o fluxo mobile e corrigir a diferença.
+Verificar se existe alguma validação JavaScript impedindo o envio em dispositivos móveis.
+Verificar permissões da câmera e armazenamento no navegador.
+Verificar se existe erro de CORS, Upload API, Storage ou autenticação durante o envio dos arquivos.
+Não utilizar armazenamento temporário. Os arquivos devem ser gravados diretamente no armazenamento definitivo utilizado pelo sistema.
+Após o upload, confirmar que os dados dos anexos sejam persistidos no banco de dados e recuperados corretamente na consulta da Ordem de Serviço.

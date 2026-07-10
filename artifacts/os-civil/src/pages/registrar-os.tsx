@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from "react";
 
 import { useCreateServiceOrder, getListServiceOrdersQueryKey } from "@workspace/api-client-react";
 import { useSystemStatus } from "@/hooks/use-system-status";
+import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -106,10 +107,14 @@ export default function RegistrarOS() {
   const uploadVideoToStorage = async (file: File, entryId: string) => {
     try {
       const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+      // Use extension-based fallback when the browser omits the MIME type
+      // (common on Android Chrome, Samsung Internet, some iOS pickers).
+      // The server rejects empty/non-video content types, so we must supply a valid one.
+      const effectiveMimeType = getVideoContentType(file);
       const resp = await fetch(`${BASE}/api/storage/uploads/video-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: file.type }),
+        body: JSON.stringify({ contentType: effectiveMimeType }),
       });
       if (!resp.ok) throw new Error("Falha ao obter URL de envio");
       const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
@@ -117,7 +122,7 @@ export default function RegistrarOS() {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", uploadURL);
-        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.setRequestHeader("Content-Type", effectiveMimeType);
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
@@ -144,8 +149,12 @@ export default function RegistrarOS() {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
 
-    const imageFiles  = files.filter(f => f.type.startsWith("image/"));
-    const videoList   = files.filter(f => f.type.startsWith("video/"));
+    // Use isImageFile / isVideoFile (from media-utils) so files with an empty
+    // browser-reported MIME type are still classified by their extension.
+    // Without this, photos selected from Google Drive or certain Android gallery
+    // apps have file.type === "" and would be silently dropped.
+    const imageFiles = files.filter(isImageFile);
+    const videoList  = files.filter(isVideoFile);
 
     // ── Handle videos: upload to storage immediately (no base64 → no crash) ─
     for (const file of videoList) {
@@ -185,9 +194,11 @@ export default function RegistrarOS() {
       );
       try {
         const base64Files = await Promise.all(base64Promises);
-        const newPhotos = [...photosBase64, ...base64Files];
-        setPhotosBase64(newPhotos);
-        form.setValue("photos", JSON.stringify(newPhotos));
+        // Use functional update so this never clobbers photos added by a
+        // concurrent handler call (e.g. gallery + camera selected in quick succession).
+        // The form.setValue call is intentionally removed: onSubmit reads photosBase64
+        // state directly, so keeping the zod-schema field in sync is not needed.
+        setPhotosBase64(prev => [...prev, ...base64Files]);
       } catch {
         toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
       }
@@ -198,9 +209,7 @@ export default function RegistrarOS() {
   };
 
   const removePhoto = (index: number) => {
-    const newPhotos = photosBase64.filter((_, i) => i !== index);
-    setPhotosBase64(newPhotos);
-    form.setValue("photos", JSON.stringify(newPhotos));
+    setPhotosBase64(prev => prev.filter((_, i) => i !== index));
   };
 
   const removeVideo = (id: string) => {
@@ -215,12 +224,23 @@ export default function RegistrarOS() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    // Check if any video is still uploading — prevent submission with dangling uploads
+    // Block submission while any video is still uploading
     const pendingVideos = videoFiles.filter(v => v.uploading);
     if (pendingVideos.length > 0) {
       toast({
         title: "Aguarde o envio dos vídeos",
         description: `${pendingVideos.length} vídeo(s) ainda sendo enviado(s). Aguarde antes de registrar.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Warn (non-blocking) if any video upload failed — those videos will be excluded
+    const failedVideos = videoFiles.filter(v => v.error);
+    if (failedVideos.length > 0) {
+      toast({
+        title: `${failedVideos.length} vídeo(s) com erro de envio`,
+        description: "Esses vídeos não serão salvos. Remova-os e tente novamente, ou prossiga sem eles.",
         variant: "destructive",
       });
       return;
@@ -660,7 +680,14 @@ export default function RegistrarOS() {
                               <Video className="w-4 h-4 mr-2" />
                               Gravar Vídeo
                             </Button>
-                            <input id="photo-upload-pub" type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} />
+                            {/*
+                              Gallery: accept images AND videos so users can pick a video
+                              from their photo library (the previous image/*-only accept
+                              prevented all video gallery selection on Android and iOS).
+                              handleFileChange already routes videos to the storage upload
+                              path automatically, so no additional JS change is needed here.
+                            */}
+                            <input id="photo-upload-pub" type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileChange} />
                             <input id="photo-camera-pub" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
                             <input id="video-camera-pub" type="file" accept="video/*" capture="environment" className="hidden" onChange={handleFileChange} />
                           </div>

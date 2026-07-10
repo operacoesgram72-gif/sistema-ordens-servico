@@ -6,6 +6,7 @@ import {
   MessageSquare, Briefcase, CheckCircle2, X, Image, Film, FileText,
   SquarePen, Camera, Video, Loader2,
 } from "lucide-react";
+import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -261,12 +262,15 @@ export default function OSDetail() {
     setAddingMedia(true);
     try {
       const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-      const imgFiles = Array.from(files).filter(f => f.type.startsWith("image/") && f.size <= MAX_IMAGE_BYTES);
-      const oversized = Array.from(files).filter(f => f.type.startsWith("image/") && f.size > MAX_IMAGE_BYTES);
+      // Use isImageFile / isVideoFile so files with an empty browser-reported MIME type
+      // (common on Android Chrome, Samsung Internet, Google Drive picker) are still
+      // classified correctly via their file extension instead of being silently dropped.
+      const imgFiles = Array.from(files).filter(f => isImageFile(f) && f.size <= MAX_IMAGE_BYTES);
+      const oversized = Array.from(files).filter(f => isImageFile(f) && f.size > MAX_IMAGE_BYTES);
       if (oversized.length > 0) {
         toast({ title: "Imagem(ns) ignorada(s)", description: `${oversized.length} arquivo(s) acima de 8 MB.`, variant: "destructive" });
       }
-      const vidFiles = Array.from(files).filter(f => f.type.startsWith("video/"));
+      const vidFiles = Array.from(files).filter(isVideoFile);
 
       const newBase64 = await Promise.all(
         imgFiles.map(f => new Promise<string>((resolve, reject) => {
@@ -281,14 +285,20 @@ export default function OSDetail() {
       const videoUrls: string[] = [];
       for (const vid of vidFiles) {
         try {
+          // getVideoContentType falls back to "video/mp4" when the browser omits the
+          // MIME type — the server rejects empty content types with HTTP 400.
+          const effectiveMimeType = getVideoContentType(vid);
           const resp = await fetch(`${BASE}/api/storage/uploads/video-url`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contentType: vid.type }),
+            body: JSON.stringify({ contentType: effectiveMimeType }),
           });
           if (!resp.ok) continue;
           const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
-          await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": vid.type }, body: vid });
+          const putRes = await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": effectiveMimeType }, body: vid });
+          // Only persist the storage URL when the PUT succeeded — a failed upload
+          // must not be saved as a broken link in the OS photos field.
+          if (!putRes.ok) throw new Error(`Storage upload failed: HTTP ${putRes.status}`);
           // objectPath is already "/objects/UUID" — prepend "/api/storage" only
           videoUrls.push(`${BASE}/api/storage${objectPath}`);
         } catch {}
