@@ -123,7 +123,14 @@ export default function RegistrarOS() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contentType: effectiveMimeType }),
       });
-      if (!resp.ok) throw new Error("Falha ao obter URL de envio");
+      if (!resp.ok) {
+        // Log the full server response for diagnostics — helps identify the
+        // exact failure reason without needing to reproduce on device.
+        let errBody: unknown;
+        try { errBody = await resp.json(); } catch { errBody = await resp.text().catch(() => "(unreadable)"); }
+        console.error("[video-url] server error", { status: resp.status, body: errBody, contentType: effectiveMimeType, fileName: file.name, fileType: file.type, fileSize: file.size });
+        throw new Error("Falha ao obter URL de envio");
+      }
       const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
 
       await new Promise<void>((resolve, reject) => {

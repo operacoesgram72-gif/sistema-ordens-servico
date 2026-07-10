@@ -20,17 +20,37 @@ const VIDEO_EXTENSIONS = new Set([
 ]);
 
 /**
+ * Generic / opaque MIME types that carry no real information about file content.
+ * When a browser reports one of these we fall through to extension-based detection
+ * just as we do for an empty type.
+ *
+ * "application/octet-stream" is delivered by Android camera apps, Google Drive
+ * picker, and some file managers even for recognised video/image files.
+ */
+const OPAQUE_TYPES = new Set(["application/octet-stream", "binary/octet-stream"]);
+
+/**
  * Returns the effective MIME type of a file.
- * Uses the browser-reported type first (fast path), then falls back to
- * extension-based detection for the common Android/iOS case where the picker
- * doesn't set the type (e.g. files from Google Drive, some gallery apps).
+ *
+ * Priority order:
+ *  1. Browser-reported type — used as-is when it is specific (not empty and
+ *     not a generic binary blob type).
+ *  2. Extension-based detection — used when the browser omits the type or
+ *     reports a generic "application/octet-stream" that gives no real info.
+ *  3. The original browser type (possibly empty) as a last-resort fallback.
+ *
+ * This covers three common Android scenarios:
+ *  - file.type = ""                      → extension lookup
+ *  - file.type = "application/octet-stream" → extension lookup
+ *  - file.type = "video/mp4"             → returned as-is (fast path)
  */
 export function getMimeType(file: File): string {
-  if (file.type) return file.type;
+  if (file.type && !OPAQUE_TYPES.has(file.type)) return file.type;
   const ext = (file.name.split(".").pop() ?? "").toLowerCase();
   if (IMAGE_EXTENSIONS.has(ext)) return "image/jpeg";
   if (VIDEO_EXTENSIONS.has(ext)) return "video/mp4";
-  return "";
+  // Extension unrecognised — return the original type (may be "" or opaque).
+  return file.type;
 }
 
 /** Returns true when the file is an image (by MIME type or file extension). */

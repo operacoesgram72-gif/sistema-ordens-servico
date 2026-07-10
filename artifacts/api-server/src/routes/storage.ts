@@ -75,12 +75,19 @@ router.post(
   async (req: Request, res: Response) => {
     const { contentType } = req.body;
     if (!contentType || !String(contentType).startsWith("video/")) {
+      // Log the exact value received so debugging is easy when a browser sends
+      // an unexpected MIME type (e.g. "" or "application/octet-stream").
+      req.log.warn(
+        { receivedContentType: contentType ?? "(missing)" },
+        "video-url rejected: contentType is not a video/* MIME type",
+      );
       res.status(400).json({ error: "Only video files are accepted" });
       return;
     }
     try {
       const uploadURL = await objectStorageService.getVideoUploadURL();
       const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      req.log.info({ contentType }, "video upload URL generated");
       res.json({ uploadURL, objectPath });
     } catch (error) {
       req.log.error({ err: error }, "Error generating video upload URL");
