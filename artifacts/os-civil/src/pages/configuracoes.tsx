@@ -222,14 +222,25 @@ export default function Configuracoes() {
 
   // System Control section: gate behind module password if configured
   const handleSystemControlSectClick = () => {
-    // Always gate behind password verification — never open directly on click.
-    // moduleAccessGranted is session-scoped state; it resets on page load.
-    if (!moduleAccessGranted) {
-      setShowModuleVerifyDialog(true);
-      setModuleAccessPassword("");
-    } else {
+    if (moduleAccessGranted) {
       toggleSect("systemControl");
+      return;
     }
+    // If neither password is configured, grant access immediately without a dialog.
+    // This happens after an admin resets both hashes (e.g. via DB) so they can
+    // define a new password from within the UI.
+    if (!modulePasswordSet && !passwordSet) {
+      setModuleAccessGranted(true);
+      setSectOpen(p => ({ ...p, systemControl: true }));
+      toast({
+        title: "Nenhuma senha configurada",
+        description: "Defina uma senha de acesso ao módulo para protegê-lo adequadamente.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowModuleVerifyDialog(true);
+    setModuleAccessPassword("");
   };
 
   // ── Share URLs ──────────────────────────────────────────────────────────
