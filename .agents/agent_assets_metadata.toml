@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "NNazIbydlugs2aT7RLz3J"
+uri = "file://documentacao-gram-operacoes.pdf"
+type = "pdf"
+title = "Documentação Completa — GRAM Operações"

@@ -1,0 +1,67 @@
+Gerar Documentação Completa do Sistema em PDF (Sem Alterar o Projeto)
+
+IMPORTANTE: Esta tarefa é apenas para documentação.
+
+Não altere nenhum arquivo do projeto, não modifique o código, não atualize dependências, não execute migrações, não altere banco de dados, não faça deploy e não realize nenhuma modificação no sistema.
+
+Sua única tarefa é analisar o projeto existente e gerar um arquivo PDF contendo uma documentação completa e de fácil entendimento.
+
+O PDF deve conter
+
+Visão Geral Objetivo do sistema. Principais funcionalidades. Fluxo geral de utilização.
+Front-End
+Explicar de forma simples:
+
+Estrutura das telas. Organização dos componentes. Navegação entre páginas. Principais funcionalidades da interface. Como ocorre a comunicação com o backend. 3. Back-End
+
+Explicar de forma simples:
+
+Estrutura do backend. Organização das APIs. Fluxo das requisições. Como os dados são processados. Como ocorre a autenticação (se existir). Como funciona o upload de arquivos. 4. Banco de Dados
+
+Descrever:
+
+Estrutura geral. Principais tabelas. Relacionamentos. Finalidade de cada tabela. Fluxo de leitura e gravação dos dados.
+
+Supabase
+Explicar:
+
+Como o projeto utiliza o Supabase. Banco de Dados. Storage. Autenticação (caso exista). Fluxo de upload de anexos. 6. Fluxo Completo do Sistema
+
+Explicar passo a passo, por exemplo:
+
+Usuário acessa o sistema. Login. Cadastro de Ordem de Serviço. Registro de fotos. Salvamento. Consulta. Gestão. Compartilhamento.
+
+Mostrar como essas etapas se conectam.
+
+Estrutura do Projeto
+Explicar a organização das pastas.
+
+Exemplo:
+
+frontend backend components pages hooks services api database storage
+
+Descrever a função de cada uma.
+
+Tecnologias Utilizadas
+Listar todas as tecnologias encontradas no projeto, como por exemplo:
+
+React TypeScript Node.js Express Supabase Tailwind Vite Outras bibliotecas utilizadas
+
+Explicar de forma simples a função de cada tecnologia.
+
+Integrações
+Documentar todas as integrações existentes, como:
+
+Supabase Upload de arquivos APIs externas Serviços utilizados 10. Considerações Técnicas
+
+Informar:
+
+Pontos fortes da arquitetura. Organização do código. Boas práticas utilizadas. Sugestões futuras de melhoria (apenas como observação, sem alterar o sistema).
+
+Formato
+
+Gerar um PDF profissional, organizado com:
+
+Capa. Índice. Títulos. Subtítulos. Diagramas simples de fluxo (quando possível). Linguagem simples e didática. Explicações voltadas para alguém que não desenvolveu o sistema. Importante Não modificar absolutamente nenhum arquivo do projeto. Não alterar nenhuma linha de código. Não alterar banco de dados. Não alterar configurações do Supabase. Não instalar dependências. Não realizar deploy. Não executar correções. Apenas analisar o projeto existente e gerar o PDF de documentação.
+
+O único arquivo que deve ser criado é o PDF contendo a documentação completa do sistema.
