@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearch } from "wouter";
-import { Save, Image as ImageIcon, X, CheckCircle2, ArrowLeft, Plus, Trash2, WifiOff, Clock } from "lucide-react";
+import { Save, Image as ImageIcon, Camera, X, CheckCircle2, ArrowLeft, Plus, Trash2, WifiOff, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -351,18 +351,18 @@ export default function RegistrarMateriais() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <Label>Fotos (opcional)</Label>
-                      <Button variant="outline" type="button" size="sm" onClick={() => document.getElementById("foto-mat")?.click()} className="gap-1.5 h-7 text-xs">
-                        <ImageIcon className="w-3.5 h-3.5" />
-                        Adicionar Fotos
-                      </Button>
-                      <input
-                        id="foto-mat"
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handlePhotos}
-                      />
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" type="button" size="sm" onClick={() => document.getElementById("foto-mat-galeria")?.click()} className="gap-1.5 h-7 text-xs">
+                          <ImageIcon className="w-3.5 h-3.5" />
+                          Galeria
+                        </Button>
+                        <Button variant="outline" type="button" size="sm" onClick={() => document.getElementById("foto-mat-camera")?.click()} className="gap-1.5 h-7 text-xs">
+                          <Camera className="w-3.5 h-3.5" />
+                          Câmera
+                        </Button>
+                      </div>
+                      <input id="foto-mat-galeria" type="file" accept="image/*" multiple className="hidden" onChange={handlePhotos} />
+                      <input id="foto-mat-camera" type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handlePhotos} />
                     </div>
                     {photos.length > 0 && (
                       <div className="flex flex-wrap gap-2">

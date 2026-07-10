@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import {
   ArrowLeft, Clock, MapPin, User, Calendar, Save, Trash2, Edit3,
   MessageSquare, Briefcase, CheckCircle2, X, Image, Film, FileText,
-  SquarePen,
+  SquarePen, Camera, Video, Loader2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -168,6 +168,7 @@ export default function OSDetail() {
   const [notesInput, setNotesInput] = useState("");
   const [gestorName, setGestorName] = useState("");
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [addingMedia, setAddingMedia] = useState(false);
 
   /* ── Edit mode state ── */
   const [editMode, setEditMode] = useState(false);
@@ -250,6 +251,82 @@ export default function OSDetail() {
         },
       }
     );
+  };
+
+  // Add photos/videos to the OS — merges new files with existing ones via PATCH.
+  // Images are stored as base64 strings; videos are uploaded to object storage
+  // and referenced by their storage URL path so the payload stays lean.
+  const handleAddMediaToOS = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !os) return;
+    setAddingMedia(true);
+    try {
+      const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+      const imgFiles = Array.from(files).filter(f => f.type.startsWith("image/") && f.size <= MAX_IMAGE_BYTES);
+      const oversized = Array.from(files).filter(f => f.type.startsWith("image/") && f.size > MAX_IMAGE_BYTES);
+      if (oversized.length > 0) {
+        toast({ title: "Imagem(ns) ignorada(s)", description: `${oversized.length} arquivo(s) acima de 8 MB.`, variant: "destructive" });
+      }
+      const vidFiles = Array.from(files).filter(f => f.type.startsWith("video/"));
+
+      const newBase64 = await Promise.all(
+        imgFiles.map(f => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(f);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        }))
+      );
+
+      const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const videoUrls: string[] = [];
+      for (const vid of vidFiles) {
+        try {
+          const resp = await fetch(`${BASE}/api/storage/uploads/video-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contentType: vid.type }),
+          });
+          if (!resp.ok) continue;
+          const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
+          await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": vid.type }, body: vid });
+          // objectPath is already "/objects/UUID" — prepend "/api/storage" only
+          videoUrls.push(`${BASE}/api/storage${objectPath}`);
+        } catch {}
+      }
+
+      const allNew = [...newBase64, ...videoUrls];
+      if (allNew.length === 0) return;
+
+      // Fetch the latest photos from the server before merging to avoid a
+      // lost-update if another client has appended photos since the page loaded.
+      let latestPhotos: string[] = [...photos]; // fall back to render-time snapshot
+      try {
+        const r = await fetch(`${BASE}/api/service-orders/${id}/photos`);
+        if (r.ok) {
+          const d = await r.json() as { photos: string | null };
+          if (d.photos) latestPhotos = JSON.parse(d.photos) ?? [];
+        }
+      } catch { /* proceed with render-time snapshot */ }
+
+      const merged = [...latestPhotos, ...allNew];
+      updateOs.mutate(
+        { id, data: { photos: JSON.stringify(merged) } as any },
+        {
+          onSuccess: () => {
+            toast({ title: "Mídia salva!", description: `${allNew.length} arquivo(s) adicionado(s) à OS.` });
+            queryClient.invalidateQueries({ queryKey: getGetServiceOrderQueryKey(id) });
+            queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
+          },
+          onError: () => {
+            toast({ title: "Erro ao salvar mídia", description: "Tente novamente.", variant: "destructive" });
+          },
+        }
+      );
+    } catch {
+      toast({ title: "Erro ao processar arquivos", variant: "destructive" });
+    } finally {
+      setAddingMedia(false);
+    }
   };
 
   const handleDelete = () => {
@@ -479,12 +556,52 @@ export default function OSDetail() {
               )}
 
               {/* ── Attachments (always visible) ── */}
-              {photos.length > 0 && (
-                <div className={cn("pt-4 border-t border-border/50", editMode && "mt-4")}>
-                  <div className="text-sm text-muted-foreground mb-4 flex items-center gap-1.5">
+              <div className={cn("pt-4 border-t border-border/50", editMode && "mt-4")}>
+                <div className="text-sm text-muted-foreground mb-3 flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5">
                     <Image className="w-4 h-4" />
-                    Anexos ({photos.length})
+                    Anexos {photos.length > 0 && `(${photos.length})`}
                   </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      title="Tirar foto"
+                      disabled={addingMedia || updateOs.isPending}
+                      onClick={() => document.getElementById("os-detail-camera")?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span className="hidden sm:inline">Câmera</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Galeria de fotos/vídeos"
+                      disabled={addingMedia || updateOs.isPending}
+                      onClick={() => document.getElementById("os-detail-gallery")?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                    >
+                      <Image className="w-4 h-4" />
+                      <span className="hidden sm:inline">Galeria</span>
+                    </button>
+                    <button
+                      type="button"
+                      title="Gravar ou selecionar vídeo"
+                      disabled={addingMedia || updateOs.isPending}
+                      onClick={() => document.getElementById("os-detail-video")?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                    >
+                      <Video className="w-4 h-4" />
+                      <span className="hidden sm:inline">Vídeo</span>
+                    </button>
+                    {(addingMedia || updateOs.isPending) && (
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    )}
+                    <input id="os-detail-camera" type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                    <input id="os-detail-gallery" type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                    <input id="os-detail-video" type="file" accept="video/*" capture="environment" className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                  </div>
+                </div>
+                {photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {photos.map((src, i) => (
                       <MediaThumbnail
@@ -494,8 +611,12 @@ export default function OSDetail() {
                       />
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-xs text-muted-foreground/60 italic py-2">
+                    Nenhum anexo. Use os botões acima para adicionar fotos ou vídeos.
+                  </p>
+                )}
+              </div>
             </CardContent>
           </Card>
 

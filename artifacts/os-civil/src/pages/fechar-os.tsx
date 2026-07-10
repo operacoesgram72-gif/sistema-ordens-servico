@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
 import { format } from "date-fns";
-import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw } from "lucide-react";
+import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw, Camera, Image as ImageIcon, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,6 +20,8 @@ type OS = {
   number: string;
   title: string;
   location: string;
+  description?: string | null;
+  department?: string | null;
   status: string;
   priority: string;
   technicianName?: string | null;
@@ -58,6 +60,77 @@ export default function FecharOS() {
   const [fromCache, setFromCache] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successId, setSuccessId] = useState<number | null>(null);
+  const [addingMediaToId, setAddingMediaToId] = useState<number | null>(null);
+
+  const handleAddMedia = async (osId: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setAddingMediaToId(osId);
+    try {
+      const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB per image
+      const imgFiles = Array.from(files).filter(f => f.type.startsWith("image/") && f.size <= MAX_IMAGE_BYTES);
+      const oversized = Array.from(files).filter(f => f.type.startsWith("image/") && f.size > MAX_IMAGE_BYTES);
+      if (oversized.length > 0) {
+        toast({ title: "Imagem(ns) ignorada(s)", description: `${oversized.length} arquivo(s) acima de 8 MB foram ignorados.`, variant: "destructive" });
+      }
+      const vidFiles = Array.from(files).filter(f => f.type.startsWith("video/"));
+
+      // Convert images to base64
+      const newBase64 = await Promise.all(
+        imgFiles.map(f => new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(f);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+        }))
+      );
+
+      // Upload videos to object storage
+      const videoUrls: string[] = [];
+      for (const vid of vidFiles) {
+        try {
+          const resp = await fetch(`${BASE_URL}/api/storage/uploads/video-url`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contentType: vid.type }),
+          });
+          if (!resp.ok) continue;
+          const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
+          await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": vid.type }, body: vid });
+          // objectPath is already "/objects/UUID" — prepend "/api/storage" only
+          videoUrls.push(`${BASE_URL}/api/storage${objectPath}`);
+        } catch {}
+      }
+
+      const allNew = [...newBase64, ...videoUrls];
+      if (allNew.length === 0) {
+        if (files.length > 0) toast({ title: "Nenhum arquivo válido foi processado", variant: "destructive" });
+        return;
+      }
+
+      // Fetch current photos from the lightweight endpoint and merge
+      let existing: string[] = [];
+      try {
+        const r = await fetch(`${BASE_URL}/api/service-orders/${osId}/photos`);
+        if (r.ok) { const d = await r.json(); existing = JSON.parse(d.photos || "[]") || []; }
+      } catch {}
+
+      const merged = [...existing, ...allNew];
+      const patchRes = await fetch(`${BASE_URL}/api/service-orders/${osId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos: JSON.stringify(merged) }),
+      });
+      if (patchRes.ok) {
+        toast({ title: "Mídia salva!", description: `${allNew.length} arquivo(s) vinculados à OS.` });
+      } else {
+        throw new Error("Erro ao salvar");
+      }
+    } catch {
+      toast({ title: "Erro ao salvar mídia", variant: "destructive" });
+    } finally {
+      setAddingMediaToId(null);
+    }
+  };
 
   // Real-time SSE updates — apply status changes broadcast by other clients
   useStatusEvents(
@@ -263,8 +336,13 @@ export default function FecharOS() {
                         <span className="font-medium text-sm truncate">{os.title}</span>
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        Local: {os.location} · {os.technicianName ? `Técnico: ${os.technicianName}` : "Sem técnico"} · {format(new Date(os.createdAt), "dd/MM/yyyy")}
+                        Local: {os.location}{os.department ? ` · ${os.department}` : ""} · {os.technicianName ? `Técnico: ${os.technicianName}` : "Sem técnico"} · {format(new Date(os.createdAt), "dd/MM/yyyy")}
                       </div>
+                      {os.description && (
+                        <div className="text-xs text-muted-foreground/80 mt-0.5 line-clamp-2 italic">
+                          {os.description}
+                        </div>
+                      )}
                     </div>
                     {successId === os.id && (
                       <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
@@ -276,6 +354,44 @@ export default function FecharOS() {
                     <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority] ?? ""}>
                       {PRIORITY_LABELS[os.priority as ServiceOrderPriority] || os.priority}
                     </Badge>
+                  </div>
+
+                  {/* Photo / video upload */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-border/30">
+                    <span className="text-xs text-muted-foreground shrink-0">Fotos/Vídeo:</span>
+                    <button
+                      type="button"
+                      title="Tirar foto"
+                      disabled={addingMediaToId === os.id}
+                      onClick={() => document.getElementById(`media-camera-${os.id}`)?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <Camera className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Galeria"
+                      disabled={addingMediaToId === os.id}
+                      onClick={() => document.getElementById(`media-gallery-${os.id}`)?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Gravar vídeo"
+                      disabled={addingMediaToId === os.id}
+                      onClick={() => document.getElementById(`media-video-${os.id}`)?.click()}
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      <span className="text-[10px] font-mono border border-current rounded px-1">VID</span>
+                    </button>
+                    {addingMediaToId === os.id && (
+                      <span className="text-xs text-primary animate-pulse ml-1">Salvando…</span>
+                    )}
+                    <input id={`media-camera-${os.id}`} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
+                    <input id={`media-gallery-${os.id}`} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
+                    <input id={`media-video-${os.id}`} type="file" accept="video/*" capture="environment" className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
                   </div>
 
                   {/* Editable status */}

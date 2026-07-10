@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { Download, Plus, Search, FileSpreadsheet, Camera, FileText, RefreshCw } from "lucide-react";
@@ -56,6 +56,38 @@ export default function Ordens() {
   const [hoveredPhoto, setHoveredPhoto] = useState<HoveredPhoto>(null);
   const [lightbox, setLightbox] = useState<LightboxState>(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Lazy-load first photo per OS for the list thumbnail.
+  // Photos are excluded from the list payload for performance; when the user
+  // hovers over a row with photos, we fetch from the lightweight /photos endpoint
+  // and cache the result so subsequent hovers are instant.
+  const [loadedPhotos, setLoadedPhotos] = useState<Record<number, string>>({});
+  const loadingPhotosRef = useRef(new Set<number>());
+  const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+  const loadFirstPhoto = useCallback(async (id: number) => {
+    if (loadedPhotos[id] || loadingPhotosRef.current.has(id)) return;
+    loadingPhotosRef.current.add(id);
+    try {
+      const res = await fetch(`${BASE_URL}/api/service-orders/${id}/photos`);
+      if (!res.ok) return;
+      const { photos: raw } = await res.json() as { photos: string | null };
+      if (!raw) return;
+      const arr: unknown[] = JSON.parse(raw);
+      const MAX_THUMB = 500 * 1024; // 500 KB — enough for a clear thumbnail
+      const first = arr.find(
+        (s): s is string =>
+          typeof s === "string" &&
+          s.startsWith("data:image/") &&
+          s.length <= MAX_THUMB
+      );
+      if (first) setLoadedPhotos(prev => ({ ...prev, [id]: first }));
+    } catch {
+      // silently ignore — camera icon stays, user can open detail page
+    } finally {
+      loadingPhotosRef.current.delete(id);
+    }
+  }, [loadedPhotos, BASE_URL]);
 
   // Stable key — prevents handleRefresh from re-creating on every render
   const queryKey = useMemo(
@@ -299,8 +331,11 @@ export default function Ordens() {
               </TableRow>
             ) : (
               ordens?.map((os) => {
-                const photos = parsePhotos((os as any).photos);
-                const firstPhoto = photos[0];
+                // hasPhotos comes from the SQL computed column in LIST_COLUMNS.
+                // The actual photo data is excluded from the list for performance and
+                // lazy-loaded from /service-orders/:id/photos on hover.
+                const hasPhotos = Boolean((os as any).hasPhotos);
+                const loadedPhoto = loadedPhotos[os.id];
                 return (
                   <TableRow key={os.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation(`/ordens/${os.id}`)}>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(new Date(os.createdAt), "dd/MM/yyyy")}</TableCell>
@@ -324,11 +359,31 @@ export default function Ordens() {
                     </TableCell>
                     <TableCell className="text-sm">{os.technicianName || <span className="text-muted-foreground italic">Não atribuído</span>}</TableCell>
                     <TableCell>
-                      {firstPhoto ? (
-                        <div className="relative inline-block cursor-pointer transition-transform duration-150 hover:scale-110" onClick={e => { e.stopPropagation(); setLightbox({ photos, index: 0 }); }} onMouseEnter={e => setHoveredPhoto({ src: firstPhoto, x: e.clientX, y: e.clientY })} onMouseLeave={() => setHoveredPhoto(null)}>
-                          <img src={firstPhoto} alt="foto" className="w-9 h-9 rounded object-cover border-2 border-border shadow-sm" />
-                          {photos.length > 1 && (
-                            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">{photos.length}</span>
+                      {hasPhotos ? (
+                        <div
+                          className="relative inline-block cursor-pointer transition-transform duration-150 hover:scale-110"
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (loadedPhoto) {
+                              setLightbox({ photos: [loadedPhoto], index: 0 });
+                            } else {
+                              setLocation(`/ordens/${os.id}`);
+                            }
+                          }}
+                          onMouseEnter={e => {
+                            if (loadedPhoto) {
+                              setHoveredPhoto({ src: loadedPhoto, x: e.clientX, y: e.clientY });
+                            } else {
+                              void loadFirstPhoto(os.id);
+                            }
+                          }}
+                          onMouseLeave={() => setHoveredPhoto(null)}
+                          title="Ver fotos"
+                        >
+                          {loadedPhoto ? (
+                            <img src={loadedPhoto} alt="foto" className="w-9 h-9 rounded object-cover border-2 border-border shadow-sm" />
+                          ) : (
+                            <Camera className="w-5 h-5 text-primary mx-auto" />
                           )}
                         </div>
                       ) : (

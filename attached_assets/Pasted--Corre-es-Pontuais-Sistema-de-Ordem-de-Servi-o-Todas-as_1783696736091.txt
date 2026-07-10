@@ -1,0 +1,110 @@
+## Correções Pontuais - Sistema de Ordem de Serviço (Todas as Unidades)
+
+Realize **somente as correções abaixo**, sem alterar layouts, fluxos ou funcionalidades já existentes. O objetivo é corrigir problemas de funcionamento mantendo toda a estrutura atual do sistema.
+
+### 1. Registro de Fotos e Vídeos pelo Link de Funcionários
+
+No **link de Funcionários** (todas as unidades), ao abrir ou fechar uma Ordem de Serviço pelo celular, existem as opções de:
+
+* Tirar foto;
+* Selecionar foto da galeria;
+* Gravar vídeo;
+* Selecionar vídeo da galeria.
+
+Entretanto, os arquivos enviados **não estão sendo gravados corretamente na Ordem de Serviço**, nem aparecem posteriormente na área de Gestão.
+
+**Corrigir para que:**
+
+* Todas as fotos e vídeos enviados sejam realmente armazenados no banco de dados;
+* Os arquivos permaneçam vinculados à OS correta;
+* Funcionem em Android, iPhone e navegadores modernos;
+* Após o envio, os anexos fiquem imediatamente disponíveis na área de Gestão.
+
+---
+
+### 2. Coluna de Fotos/Vídeos na Lista de OS (Gestão)
+
+Na **Lista de OS** da área de Gestão, a coluna responsável pelos anexos não exibe corretamente as fotos e vídeos enviados pelo funcionário através do celular.
+
+Corrigir para que:
+
+* Todos os anexos enviados apareçam corretamente;
+* Fotos e vídeos registrados pelo link de Funcionário sejam exibidos normalmente;
+* Não exista diferença entre anexos enviados pelo computador ou pelo celular;
+* Os anexos permaneçam associados à OS mesmo após atualização da página.
+
+---
+
+### 3. Fechar OS - Exibir Resumo da Ordem
+
+No link destinado aos Funcionários, ao selecionar **"Fechar OS"**, atualmente aparece apenas a lista das Ordens.
+
+Antes do fechamento, exibir um pequeno resumo da OS contendo, por exemplo:
+
+* Número da OS;
+* Solicitante;
+* Local;
+* Descrição da atividade (mesmo que resumida);
+* Data de abertura.
+
+O objetivo é permitir que o funcionário confirme que está encerrando a Ordem correta.
+
+---
+
+### 4. Retirada de Materiais e Ferramentas (Celular)
+
+Na tela **Retirada de Materiais e Ferramentas**, quando utilizada pelo celular, atualmente é possível apenas selecionar fotos da galeria.
+
+Corrigir para permitir:
+
+* Tirar foto diretamente pela câmera;
+* Selecionar fotos existentes;
+* Suporte para múltiplas fotos;
+* Funcionamento em Android e iPhone.
+
+Os arquivos devem ser gravados corretamente no banco e permanecer vinculados ao respectivo registro.
+
+---
+
+### 5. Link Direto da Ordem de Serviço
+
+No link direto da Ordem de Serviço, atualmente é possível:
+
+* Tirar fotos;
+* Gravar vídeos.
+
+Porém, os arquivos enviados não são persistidos no sistema e não aparecem posteriormente na área de Gestão.
+
+Corrigir para que:
+
+* Fotos e vídeos sejam enviados corretamente;
+* Os arquivos sejam armazenados de forma permanente;
+* Os anexos apareçam na Lista de OS;
+* Os anexos permaneçam vinculados à Ordem correspondente.
+
+---
+
+## Aplicação Global
+
+Todas essas correções devem ser aplicadas para todas as unidades do sistema:
+
+* AM
+* AC
+* AP
+* RO
+* RR
+* PA
+
+Como todas utilizam o mesmo backend, as correções devem ser implementadas uma única vez, refletindo automaticamente em todas as unidades.
+
+---
+
+## Importante
+
+* Não alterar o layout atual;
+* Não modificar regras de negócio existentes;
+* Não remover funcionalidades;
+* Não criar um novo fluxo de anexos;
+* Corrigir apenas a persistência, associação e exibição de fotos e vídeos;
+* Garantir compatibilidade com desktop e dispositivos móveis;
+* Validar o funcionamento completo realizando testes de abertura, fechamento e consulta de OS utilizando computador, Android e iPhone.

@@ -59,6 +59,9 @@ const LIST_COLUMNS = {
   tipo:             serviceOrdersTable.tipo,
   formatoServico:   serviceOrdersTable.formatoServico,
   // photos and signature intentionally omitted from list — heavy base64 blobs
+  // hasPhotos is a lightweight boolean so the list UI can show a camera indicator
+  // without loading the actual base64 payload.
+  hasPhotos:        sql<boolean>`(photos IS NOT NULL AND photos NOT IN ('[]', 'null', ''))`.as("has_photos"),
   signedBy:         serviceOrdersTable.signedBy,
   signedAt:         serviceOrdersTable.signedAt,
   estimatedValue:   serviceOrdersTable.estimatedValue,
@@ -248,6 +251,23 @@ router.get("/service-orders/available-years", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.json([new Date().getFullYear()]);
+  }
+});
+
+// GET /service-orders/:id/photos — lightweight: returns only the photos field
+// Used by the list page to lazy-load thumbnails without fetching the full OS payload.
+router.get("/service-orders/:id/photos", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [row] = await db
+      .select({ photos: serviceOrdersTable.photos })
+      .from(serviceOrdersTable)
+      .where(eq(serviceOrdersTable.id, id));
+    if (!row) { res.status(404).json({ error: "Não encontrada" }); return; }
+    res.json({ photos: row.photos ?? null });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
   }
 });
 

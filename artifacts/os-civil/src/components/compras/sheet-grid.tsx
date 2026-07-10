@@ -1,9 +1,28 @@
 import { useState } from "react";
-import { Plus, Trash2, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Workbook, SheetTab } from "@/types/purchase-sheet";
 import { emptyTab } from "@/types/purchase-sheet";
+
+// Returns true when value looks like an absolute http/https URL.
+function isAbsoluteUrl(value: string): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+// Detect if a column header is an "attachment" / URL column.
+// The column name must contain "anexo" or "link" or "url" (case-insensitive)
+// for its cells to be auto-rendered as clickable links.
+function isLinkColumn(colName: string): boolean {
+  const n = colName.toLowerCase();
+  return n.includes("anexo") || n === "link" || n === "url" || n === "links";
+}
 
 type SheetGridProps = {
   workbook: Workbook;
@@ -201,19 +220,41 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                       <span className="py-1 block">{rowIdx + 1}</span>
                     )}
                   </td>
-                  {row.map((cell, colIdx) => (
-                    <td key={colIdx} className="border-r border-b border-border/50 p-0">
-                      {readOnly ? (
-                        <div className="px-2 py-1.5 text-xs min-h-[30px]">{cell || <span className="text-muted-foreground/40">—</span>}</div>
-                      ) : (
-                        <input
-                          value={cell}
-                          onChange={(e) => setCell(rowIdx, colIdx, e.target.value)}
-                          className="w-full bg-transparent px-2 py-1.5 text-xs outline-none focus:bg-primary/5"
-                        />
-                      )}
-                    </td>
-                  ))}
+                  {row.map((cell, colIdx) => {
+                    const colName = activeTab.columns[colIdx] ?? "";
+                    const linkCol = isLinkColumn(colName);
+                    const cellIsUrl = linkCol && isAbsoluteUrl(cell);
+                    return (
+                      <td key={colIdx} className="border-r border-b border-border/50 p-0">
+                        {readOnly ? (
+                          <div className="px-2 py-1.5 text-xs min-h-[30px]">
+                            {cellIsUrl ? (
+                              <a
+                                href={cell}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-primary hover:underline max-w-full truncate"
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <ExternalLink className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{cell}</span>
+                              </a>
+                            ) : (
+                              cell || <span className="text-muted-foreground/40">—</span>
+                            )}
+                          </div>
+                        ) : (
+                          <input
+                            value={cell}
+                            onChange={(e) => setCell(rowIdx, colIdx, e.target.value)}
+                            className={`w-full bg-transparent px-2 py-1.5 text-xs outline-none focus:bg-primary/5 ${linkCol && cell && !isAbsoluteUrl(cell) ? "text-amber-500/80" : linkCol && cellIsUrl ? "text-primary" : ""}`}
+                            placeholder={linkCol ? "https://..." : undefined}
+                            title={linkCol && cell && !isAbsoluteUrl(cell) ? "URL inválida — use https://..." : undefined}
+                          />
+                        )}
+                      </td>
+                    );
+                  })}
                   {!readOnly && <td className="border-b border-border/50" />}
                 </tr>
               ))

@@ -215,6 +215,17 @@ export default function RegistrarOS() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Check if any video is still uploading — prevent submission with dangling uploads
+    const pendingVideos = videoFiles.filter(v => v.uploading);
+    if (pendingVideos.length > 0) {
+      toast({
+        title: "Aguarde o envio dos vídeos",
+        description: `${pendingVideos.length} vídeo(s) ainda sendo enviado(s). Aguarde antes de registrar.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     const tipoLabel = values.tipo ? TIPO_LABELS[values.tipo] : "";
     const formatoLabel = values.formatoServico ? FORMATO_SERVICO_LABELS[values.formatoServico] : "";
     const autoTitle = [formatoLabel, tipoLabel, values.location]
@@ -223,6 +234,18 @@ export default function RegistrarOS() {
 
     const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
     const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
+
+    // Merge base64 photos and successfully uploaded video storage paths into one array.
+    // Videos from storage are referenced as absolute API paths so the detail page can
+    // stream them on demand without bloating the payload with base64 data.
+    const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+    // objectPath is already normalized as "/objects/UUID" by the server, so just
+    // append it to "/api/storage" — do NOT add "/objects/" again.
+    const videoUrls = videoFiles
+      .filter(v => v.objectPath && !v.error)
+      .map(v => `${BASE}/api/storage${v.objectPath}`);
+    const allMedia = [...photosBase64, ...videoUrls];
+    const photosField = allMedia.length > 0 ? JSON.stringify(allMedia) : undefined;
 
     const payload = {
       title: autoTitle,
@@ -235,7 +258,7 @@ export default function RegistrarOS() {
       tipo: values.tipo,
       formatoServico: values.formatoServico,
       technicianName: values.technicianName || undefined,
-      photos: values.photos || undefined,
+      photos: photosField,
       unidade: unitFromUrl,
       origem: "manual",
       estimatedValue: estimativaAuto || undefined,

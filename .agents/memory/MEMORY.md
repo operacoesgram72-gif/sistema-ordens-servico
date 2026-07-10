@@ -5,3 +5,4 @@
 - [Data persistence root causes fixed](data-persistence-fixes.md) — supabase.ts bypass, PMOC localStorage-only, auto-migration pattern, and Express router path prefix rules
 - [Production 502/503 root causes](production-stability.md) — migration path, Express 5 wildcard syntax, DB pool config, global error handlers, health check, offline queue AbortSignal compat
 - [API response size — photos/signature blobs](api-response-size.md) — list endpoints must use LIST_COLUMNS (no photos/signature); bare db.select() on serviceOrdersTable returns 76MB+
+- [Video object storage URL construction](video-storage-url.md) — objectPath returned by server is already "/objects/UUID"; URL must be BASE+"/api/storage"+objectPath (not BASE+"/api/storage/objects/"+objectPath)
