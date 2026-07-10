@@ -710,20 +710,14 @@ export default function RegistrarOS() {
                               <Camera className="w-4 h-4 mr-2" />
                               Tirar Foto
                             </Button>
-                            <Button variant="outline" type="button" onClick={() => document.getElementById("video-camera-pub")?.click()}>
-                              <Video className="w-4 h-4 mr-2" />
-                              Gravar Vídeo
-                            </Button>
                             {/*
-                              Gallery: accept images AND videos so users can pick a video
-                              from their photo library (the previous image/*-only accept
-                              prevented all video gallery selection on Android and iOS).
-                              handleFileChange already routes videos to the storage upload
-                              path automatically, so no additional JS change is needed here.
+                              Gallery: accept images AND videos — handleFileChange
+                              routes videos to storage upload automatically.
+                              Video camera recording removed for stability; users
+                              select videos from the gallery input above.
                             */}
                             <input id="photo-upload-pub" type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileChange} />
                             <input id="photo-camera-pub" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
-                            <input id="video-camera-pub" type="file" accept="video/*" capture="environment" className="hidden" onChange={handleFileChange} />
                           </div>
                           {(photosBase64.length > 0 || videoFiles.length > 0) && (
                             <div className="grid grid-cols-3 md:grid-cols-5 gap-3 mt-3">

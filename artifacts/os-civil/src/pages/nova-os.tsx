@@ -28,7 +28,8 @@ import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
 import { useUnit } from "@/contexts/unit-context";
-import { useCamera, useGps, useVibration } from "@/hooks/use-native";
+import { useGps, useVibration } from "@/hooks/use-native";
+import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
 
 const MARKET_RATES: Record<string, number> = {
   civil: 280,
@@ -93,8 +94,11 @@ export default function NovaOS() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
   const { unit } = useUnit();
-  const { capture } = useCamera();
   const { getLocation } = useGps();
+
+  // Tracks in-flight FileReader operations to prevent submitting before
+  // base64 encoding completes (race condition on slow Android devices).
+  const processingPhotosRef = useRef(0);
   const { vibrate } = useVibration();
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -118,18 +122,27 @@ export default function NovaOS() {
   const uploadVideoToStorage = async (file: File, entryId: string) => {
     try {
       const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+      // getVideoContentType falls back to "video/mp4" when the browser omits the
+      // MIME type (common on Android Chrome, Samsung Internet, Google Drive picker).
+      // The server rejects empty/non-video content types with HTTP 400.
+      const effectiveMimeType = getVideoContentType(file);
       const resp = await fetch(`${BASE}/api/storage/uploads/video-url`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contentType: file.type }),
+        body: JSON.stringify({ contentType: effectiveMimeType }),
       });
-      if (!resp.ok) throw new Error("Falha ao obter URL de envio");
+      if (!resp.ok) {
+        let errBody: unknown;
+        try { errBody = await resp.json(); } catch { errBody = await resp.text().catch(() => "(unreadable)"); }
+        console.error("[nova-os video-url] server error", { status: resp.status, body: errBody, contentType: effectiveMimeType, fileName: file.name });
+        throw new Error("Falha ao obter URL de envio");
+      }
       const { uploadURL, objectPath } = await resp.json() as { uploadURL: string; objectPath: string };
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("PUT", uploadURL);
-        xhr.setRequestHeader("Content-Type", file.type);
+        xhr.setRequestHeader("Content-Type", effectiveMimeType);
         xhr.upload.onprogress = (e) => {
           if (e.lengthComputable) {
             const pct = Math.round((e.loaded / e.total) * 100);
@@ -167,8 +180,11 @@ export default function NovaOS() {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
 
-    const videoList = files.filter(f => f.type.startsWith("video/"));
-    const imageList = files.filter(f => f.type.startsWith("image/"));
+    // Use isVideoFile / isImageFile from media-utils so files with an empty
+    // browser-reported MIME type (common on Android Chrome, Samsung Internet,
+    // Google Drive picker) are still classified correctly via file extension.
+    const videoList  = files.filter(isVideoFile);
+    const imageList  = files.filter(f => isImageFile(f) && !isVideoFile(f));
 
     // ── Videos: upload to storage immediately (no base64 → no crash) ────
     for (const file of videoList) {
@@ -183,14 +199,16 @@ export default function NovaOS() {
       uploadVideoToStorage(file, entryId);
     }
 
-    // ── Images: base64 with size guard ───────────────────────────────────
+    // ── Images: base64 with size guard + race-condition protection ───────
     const oversized = imageList.filter(f => f.size > MAX_IMAGE_BYTES);
     if (oversized.length > 0) {
       toast({ title: "Imagem muito grande", description: `${oversized.length} arquivo(s) ignorado(s) — máx. 8 MB por imagem.`, variant: "destructive" });
     }
     const validImages = imageList.filter(f => f.size <= MAX_IMAGE_BYTES);
-    const newImages: MediaFile[] = [];
     if (validImages.length > 0) {
+      // Increment BEFORE starting FileReader work so onSubmit sees the in-flight
+      // operation even if the user taps submit in the same micro-task.
+      processingPhotosRef.current++;
       try {
         const b64s = await Promise.all(validImages.map(file => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -198,31 +216,18 @@ export default function NovaOS() {
           reader.onload  = () => resolve(reader.result as string);
           reader.onerror = reject;
         })));
-        b64s.forEach((src, i) => newImages.push({ src, type: "image", name: validImages[i].name }));
+        const newImages: MediaFile[] = b64s.map((src, i) => ({ src, type: "image" as const, name: validImages[i].name }));
+        // Use functional update to avoid stale closure if multiple handlers run concurrently
+        setMediaFiles(prev => [...prev, ...newImages]);
+        // onSubmit reads mediaFiles state directly — form.setValue no longer needed
       } catch {
         toast({ title: "Erro", description: "Falha ao processar imagem", variant: "destructive" });
+      } finally {
+        processingPhotosRef.current--;
       }
     }
 
-    if (newImages.length > 0) {
-      const updated = [...mediaFiles, ...newImages];
-      setMediaFiles(updated);
-      form.setValue("photos", JSON.stringify(updated.filter(f => f.type === "image").map(f => f.src)));
-    }
     e.target.value = "";
-  };
-
-  const handleCameraCapture = () => {
-    capture((dataUrl, mimeType) => {
-      const newFile: MediaFile = {
-        src: dataUrl,
-        type: mimeType.startsWith("video/") ? "video" : "image",
-        name: `foto-${Date.now()}.${mimeType.split("/")[1] || "jpg"}`,
-      };
-      const updated = [...mediaFiles, newFile];
-      setMediaFiles(updated);
-      form.setValue("photos", JSON.stringify(updated.map((f) => f.src)));
-    });
   };
 
   const handleGpsCapture = async () => {
@@ -249,9 +254,8 @@ export default function NovaOS() {
   };
 
   const removeMedia = (index: number) => {
-    const updated = mediaFiles.filter((_, i) => i !== index);
-    setMediaFiles(updated);
-    form.setValue("photos", JSON.stringify(updated.filter(f => f.type === "image").map(f => f.src)));
+    // onSubmit reads mediaFiles state directly — no form.setValue needed
+    setMediaFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const removeVideoEntry = (id: string) => {
@@ -266,6 +270,33 @@ export default function NovaOS() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Block while FileReader is still encoding a photo — race condition on slow Android
+    if (processingPhotosRef.current > 0) {
+      toast({ title: "Aguarde", description: "Processando imagem(ns), tente novamente em instantes." });
+      return;
+    }
+
+    // Block while any video is still uploading
+    const pendingVideos = videoEntries.filter(v => v.uploading);
+    if (pendingVideos.length > 0) {
+      toast({
+        title: "Aguarde o envio dos vídeos",
+        description: `${pendingVideos.length} vídeo(s) ainda sendo enviado(s). Aguarde antes de salvar.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Warn about failed video uploads (non-blocking — OS is still saved with photos)
+    const failedVideos = videoEntries.filter(v => v.error);
+    if (failedVideos.length > 0) {
+      toast({
+        title: `${failedVideos.length} vídeo(s) com erro não serão salvos`,
+        description: "A OS será criada sem esses vídeos.",
+        variant: "destructive",
+      });
+    }
+
     const tipoLabel = values.tipo ? TIPO_LABELS[values.tipo] : "";
     const formatoLabel = values.formatoServico ? FORMATO_SERVICO_LABELS[values.formatoServico] : "";
     const autoTitle =
@@ -274,6 +305,17 @@ export default function NovaOS() {
 
     const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
     const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
+
+    // Merge base64 photos (from mediaFiles state) and successfully uploaded video
+    // paths (from videoEntries state) into one array — videoEntries was previously
+    // ignored here, causing all video uploads to be silently discarded.
+    const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const base64Photos = mediaFiles.filter(f => f.type === "image").map(f => f.src);
+    const videoUrls = videoEntries
+      .filter(v => v.objectPath && !v.error)
+      .map(v => `${BASE}/api/storage${v.objectPath}`);
+    const allMedia = [...base64Photos, ...videoUrls];
+    const photosField = allMedia.length > 0 ? JSON.stringify(allMedia) : undefined;
 
     createOrder.mutate(
       {
@@ -287,7 +329,7 @@ export default function NovaOS() {
           tipo: values.tipo,
           formatoServico: values.formatoServico,
           technicianName: values.technicianName || undefined,
-          photos: values.photos || undefined,
+          photos: photosField,
           unidade: unit,
           origem: values.origem || "manual",
           estimatedValue: estimativaAuto || undefined,
@@ -582,19 +624,21 @@ export default function NovaOS() {
                 <div className="md:col-span-2 space-y-3">
                   <Label>Anexos (Imagens e Vídeos)</Label>
                   <div className="flex items-center gap-3 flex-wrap">
+                    {/* Galeria: aceita imagens e vídeos */}
                     <Button
                       variant="outline"
                       type="button"
-                      onClick={() => document.getElementById("media-upload")?.click()}
+                      onClick={() => document.getElementById("nova-os-gallery")?.click()}
                       className="gap-2"
                     >
                       <Paperclip className="w-4 h-4" />
                       Arquivo
                     </Button>
+                    {/* Câmera: apenas fotos — gravação de vídeo removida por instabilidade */}
                     <Button
                       variant="outline"
                       type="button"
-                      onClick={handleCameraCapture}
+                      onClick={() => document.getElementById("nova-os-camera")?.click()}
                       className="gap-2 md:hidden"
                       title="Tirar foto com câmera"
                     >
@@ -604,35 +648,39 @@ export default function NovaOS() {
                     <span className="text-xs text-muted-foreground">
                       Imagens e vídeos suportados
                     </span>
-                    <input
-                      id="media-upload"
-                      type="file"
-                      accept="image/*,video/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
+                    <input id="nova-os-gallery" type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileChange} />
+                    <input id="nova-os-camera" type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
                   </div>
-                  {mediaFiles.length > 0 && (
+                  {(mediaFiles.length > 0 || videoEntries.length > 0) && (
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-4">
+                      {/* Fotos (base64) */}
                       {mediaFiles.map((file, idx) => (
                         <div
-                          key={idx}
+                          key={`img-${idx}`}
                           className="relative group rounded-md overflow-hidden border border-border bg-muted/20"
                         >
-                          {file.type === "image" ? (
-                            <img src={file.src} alt="Preview" className="w-full h-24 object-cover" />
-                          ) : (
-                            <div className="w-full h-24 flex flex-col items-center justify-center gap-1 text-muted-foreground">
-                              <Film className="w-6 h-6 text-primary" />
-                              <span className="text-[10px] text-center px-1 truncate w-full leading-tight">
-                                {file.name}
-                              </span>
-                            </div>
-                          )}
+                          <img src={file.src} alt="Preview" className="w-full h-24 object-cover" />
                           <button
                             type="button"
                             onClick={() => removeMedia(idx)}
+                            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      {/* Vídeos em upload para storage */}
+                      {videoEntries.map((v) => (
+                        <div key={v.id} className="relative group rounded-md overflow-hidden border border-primary/40 bg-black">
+                          <video src={v.localUrl} className="w-full h-24 object-cover" muted playsInline preload="metadata" />
+                          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none gap-1">
+                            <Film className="w-5 h-5 text-white/80 drop-shadow" />
+                            {v.uploading && <span className="text-[10px] text-white/80 font-mono">{v.progress}%</span>}
+                            {v.error && <span className="text-[10px] text-red-400 font-mono">Falha</span>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeVideoEntry(v.id)}
                             className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <X className="w-3.5 h-3.5" />

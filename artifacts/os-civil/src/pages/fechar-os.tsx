@@ -387,21 +387,12 @@ export default function FecharOS() {
                     >
                       <ImageIcon className="w-4 h-4" />
                     </button>
-                    <button
-                      type="button"
-                      title="Gravar vídeo"
-                      disabled={addingMediaToId === os.id}
-                      onClick={() => document.getElementById(`media-video-${os.id}`)?.click()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                    >
-                      <span className="text-[10px] font-mono border border-current rounded px-1">VID</span>
-                    </button>
                     {addingMediaToId === os.id && (
                       <span className="text-xs text-primary animate-pulse ml-1">Salvando…</span>
                     )}
+                    {/* Gallery includes videos; video camera recording removed for stability */}
                     <input id={`media-camera-${os.id}`} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
                     <input id={`media-gallery-${os.id}`} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
-                    <input id={`media-video-${os.id}`} type="file" accept="video/*" capture="environment" className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files)} />
                   </div>
 
                   {/* Editable status */}

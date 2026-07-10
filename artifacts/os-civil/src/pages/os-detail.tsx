@@ -595,7 +595,7 @@ export default function OSDetail() {
                     </button>
                     <button
                       type="button"
-                      title="Gravar ou selecionar vídeo"
+                      title="Selecionar vídeo da galeria"
                       disabled={addingMedia || updateOs.isPending}
                       onClick={() => document.getElementById("os-detail-video")?.click()}
                       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
@@ -606,9 +606,10 @@ export default function OSDetail() {
                     {(addingMedia || updateOs.isPending) && (
                       <Loader2 className="w-4 h-4 animate-spin text-primary" />
                     )}
+                    {/* Video camera recording removed for stability; users select from gallery */}
                     <input id="os-detail-camera" type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
                     <input id="os-detail-gallery" type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
-                    <input id="os-detail-video" type="file" accept="video/*" capture="environment" className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                    <input id="os-detail-video" type="file" accept="video/*" className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
                   </div>
                 </div>
                 {photos.length > 0 ? (
