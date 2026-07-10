@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { useStatusEvents } from "@/hooks/use-status-events";
@@ -142,27 +143,6 @@ export default function FecharOS() {
     }
   };
 
-  // Real-time SSE updates — apply status changes broadcast by other clients
-  useStatusEvents(
-    useCallback((event) => {
-      // Only apply events for the current unit
-      if (event.unidade !== unitFromUrl) return;
-      setOrdens(prev => {
-        const exists = prev.some(o => o.id === event.id);
-        if (!exists) return prev;
-        const updated = prev.map(o =>
-          o.id === event.id ? { ...o, status: event.status } : o
-        );
-        writeCache(unitFromUrl, updated);
-        return updated;
-      });
-      toast({
-        title: `OS ${event.number} atualizada`,
-        description: `Status → ${STATUS_LABELS[event.status as ServiceOrderStatus] || event.status}`,
-      });
-    }, [unitFromUrl, toast]) // eslint-disable-line react-hooks/exhaustive-deps
-  );
-
   const loadOrdens = useCallback(async () => {
     setLoading(true);
     setFromCache(false);
@@ -188,6 +168,31 @@ export default function FecharOS() {
       setLoading(false);
     }
   }, [unitFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Real-time SSE updates — apply status changes broadcast by other clients
+  const connectionState = useStatusEvents(
+    useCallback((event) => {
+      // Only apply events for the current unit
+      if (event.unidade !== unitFromUrl) return;
+      setOrdens(prev => {
+        const exists = prev.some(o => o.id === event.id);
+        if (!exists) return prev;
+        const updated = prev.map(o =>
+          o.id === event.id ? { ...o, status: event.status } : o
+        );
+        writeCache(unitFromUrl, updated);
+        return updated;
+      });
+      toast({
+        title: `OS ${event.number} atualizada`,
+        description: `Status → ${STATUS_LABELS[event.status as ServiceOrderStatus] || event.status}`,
+      });
+    }, [unitFromUrl, toast]), // eslint-disable-line react-hooks/exhaustive-deps
+    useCallback(() => {
+      // Re-sync the list to catch anything missed while the stream was down.
+      void loadOrdens();
+    }, [loadOrdens])
+  );
 
   useEffect(() => {
     void loadOrdens();
@@ -285,6 +290,42 @@ export default function FecharOS() {
             </Badge>
             <span className="hidden sm:inline text-muted-foreground/60">— {unitInfo.name}</span>
           </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-default">
+                  <span className="relative flex h-2 w-2">
+                    {connectionState === "reconnecting" && (
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    )}
+                    <span
+                      className={`relative inline-flex rounded-full h-2 w-2 ${
+                        connectionState === "connected"
+                          ? "bg-emerald-500"
+                          : connectionState === "reconnecting"
+                            ? "bg-amber-400"
+                            : "bg-red-500"
+                      }`}
+                    />
+                  </span>
+                  <span className="hidden sm:inline">
+                    {connectionState === "connected"
+                      ? "Ao vivo"
+                      : connectionState === "reconnecting"
+                        ? "Reconectando…"
+                        : "Sem conexão"}
+                  </span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {connectionState === "connected"
+                  ? "Recebendo atualizações em tempo real"
+                  : connectionState === "reconnecting"
+                    ? "Reconectando…"
+                    : "Sem conexão com o servidor"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           {isOnline && (
             <button
               onClick={() => void loadOrdens()}

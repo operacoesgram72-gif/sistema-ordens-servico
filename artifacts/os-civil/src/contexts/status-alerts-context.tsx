@@ -77,7 +77,8 @@ export function StatusAlertsProvider({ children }: { children: React.ReactNode }
   }, [toast]);
 
   // ── Task #18: expose live-stream connection state ──
-  const { isConnected } = useStatusEvents(handleStatusChanged);
+  const connectionState = useStatusEvents(handleStatusChanged);
+  const isConnected = connectionState === "connected";
 
   const markAllRead = useCallback(() => {
     setAlerts(prev => prev.map(a => ({ ...a, read: true })));

@@ -75,4 +75,24 @@ app.listen(boundPort, (err) => {
     process.exit(1);
   }
   logger.info({ port: boundPort }, "Server listening");
+
+  // ── Self-ping — keeps the Render free-tier instance awake ───────────────
+  // Render suspends free services after 15 min of inactivity, causing a
+  // ~50 s cold start for the next real user. We ping ourselves every 12 min
+  // so the host never sees 15 consecutive minutes without traffic.
+  const APP_URL = process.env["APP_URL"];
+  if (APP_URL) {
+    const PING_INTERVAL_MS = 12 * 60 * 1000; // 12 minutes
+    setInterval(async () => {
+      try {
+        await fetch(`${APP_URL}/health`);
+        logger.info("Self-ping executado com sucesso");
+      } catch (pingErr) {
+        logger.warn({ err: pingErr }, "Self-ping falhou — servidor continuará normalmente");
+      }
+    }, PING_INTERVAL_MS);
+    logger.info({ url: APP_URL, intervalMinutes: 12 }, "Self-ping agendado");
+  } else {
+    logger.info("APP_URL não definida — self-ping desativado");
+  }
 });
