@@ -1,6 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { salvarArquivo } from "@/lib/supabase";
 import {
   Folder, FolderPlus, File, Plus, Trash2, Upload,
   ChevronRight, FileText, Image as ImageIcon, Sheet, ArrowLeft,
@@ -165,7 +164,6 @@ export default function Arquivos() {
         body: JSON.stringify({ unidade: unit, parentId: currentFolder, name: newFolderName.trim(), isFolder: 1 }),
       });
       if (!res.ok) throw new Error();
-      salvarArquivo({ unidade: unit, parentId: currentFolder ?? undefined, name: newFolderName.trim(), isFolder: 1 });
       setNewFolderName("");
       setShowNewFolder(false);
       queryClient.invalidateQueries({ queryKey: fileEntriesKey });
@@ -200,7 +198,6 @@ export default function Arquivos() {
               fileSize: file.size,
             }),
           });
-          salvarArquivo({ unidade: unit, parentId: currentFolder ?? undefined, name: file.name, isFolder: 0, fileType: file.type, fileSize: file.size });
           queryClient.invalidateQueries({ queryKey: fileEntriesKey });
           toast({ title: `${file.name} enviado!` });
         } catch {

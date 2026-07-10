@@ -1,3 +1,5 @@
+import { execFile } from "node:child_process";
+import { resolve } from "node:path";
 import app from "./app";
 import { logger } from "./lib/logger";
 
@@ -12,6 +14,23 @@ function validateEnv() {
   for (const w of warnings) logger.warn(w);
 }
 validateEnv();
+
+// Run migrations before accepting traffic so schema is always up-to-date.
+async function runMigrations(): Promise<void> {
+  const scriptPath = resolve(process.cwd(), "../../scripts/migrate.mjs");
+  return new Promise((resolve_, reject) => {
+    execFile(process.execPath, [scriptPath], (err, stdout, stderr) => {
+      if (stdout) logger.info({ msg: "migrate", out: stdout.trim() });
+      if (stderr) logger.warn({ msg: "migrate stderr", out: stderr.trim() });
+      if (err) {
+        logger.error({ err }, "Migration failed — continuing anyway");
+      }
+      resolve_();
+    });
+  });
+}
+
+await runMigrations();
 
 const rawPort = process.env["PORT"];
 

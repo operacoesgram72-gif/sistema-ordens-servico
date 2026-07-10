@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { salvarPmoc } from "@/lib/supabase";
 import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 const QUARTERS = [
   { key: "q1", label: "JAN - MAR", months: "Janeiro / Fevereiro / Março" },
@@ -99,8 +100,15 @@ function loadRows(storageKey: string, fallback: PmocRow[]): PmocRow[] {
 function saveRows(storageKey: string, rows: PmocRow[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(rows));
-    salvarPmoc(storageKey, rows);
   } catch {}
+  // Persist to server in the background; failures are non-blocking.
+  // localStorage already has the data for the current session, so this is
+  // a best-effort background sync.
+  fetch(`${BASE_URL}/api/pmoc/${encodeURIComponent(storageKey)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rows }),
+  }).catch(() => undefined);
 }
 
 interface PmocTableProps {
@@ -112,6 +120,30 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const { toast } = useToast();
   const [rows, setRowsRaw] = useState<PmocRow[]>(() => loadRows(storageKey, initialRows));
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
+
+  // On mount: fetch server data and update state + localStorage cache.
+  // The server is the source of truth.
+  // 404 → key not yet saved server-side; keep local data (first-time use).
+  // 200 → server has authoritative rows, even if empty; overwrite local.
+  // Network error → keep whatever localStorage / initialRows gave us.
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/pmoc/${encodeURIComponent(storageKey)}`)
+      .then(r => {
+        if (r.status === 404) return null;        // no server record yet
+        if (!r.ok) return Promise.reject(r.status);
+        return r.json() as Promise<{ rows: PmocRow[] }>;
+      })
+      .then((payload) => {
+        if (payload === null) return;             // 404 → keep local data
+        const serverRows = Array.isArray(payload.rows) ? payload.rows : [];
+        setRowsRaw(serverRows);
+        try { localStorage.setItem(storageKey, JSON.stringify(serverRows)); } catch {}
+      })
+      .catch(() => {
+        // Network/server error — keep whatever localStorage / initialRows gave us
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
   const [editValue, setEditValue] = useState("");
   const [photoDialog, setPhotoDialog] = useState<PhotoDialogState>(null);
   const [newPhotoUrl, setNewPhotoUrl] = useState("");

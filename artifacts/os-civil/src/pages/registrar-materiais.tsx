@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { salvarRetiradaMateriais } from "@/lib/supabase";
 import { Link, useSearch } from "wouter";
 import { Save, Image as ImageIcon, X, CheckCircle2, ArrowLeft, Plus, Trash2, WifiOff, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -124,14 +123,6 @@ export default function RegistrarMateriais() {
             }),
           });
           if (!res.ok) throw new Error("Erro ao registrar");
-          // Also persist to Supabase as backup
-          salvarRetiradaMateriais({
-            ...form,
-            tipoMaterial: mat.tipoMaterial,
-            quantidade: mat.quantidade,
-            foto: fotoJson,
-            unidade: unitFromUrl,
-          });
           successCount++;
         } catch {
           failedMaterials.push(mat);

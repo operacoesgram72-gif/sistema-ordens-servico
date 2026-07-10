@@ -138,6 +138,13 @@ const migrations = [
   `ALTER TABLE purchase_sheets DROP CONSTRAINT IF EXISTS purchase_sheets_unidade_unique`,
   `ALTER TABLE purchase_sheets ADD CONSTRAINT purchase_sheets_unidade_unique UNIQUE (unidade)`,
 
+  // ── pmoc data ─────────────────────────────────────────────────────────────
+  `CREATE TABLE IF NOT EXISTS pmoc_data (
+    storage_key text PRIMARY KEY,
+    rows        jsonb NOT NULL DEFAULT '[]'::jsonb,
+    updated_at  timestamptz NOT NULL DEFAULT now()
+  )`,
+
   // ── performance indexes ────────────────────────────────────────────────────
   // Composite indexes for the most common filtered queries
   `CREATE INDEX IF NOT EXISTS idx_so_unidade_created ON service_orders (unidade, created_at DESC)`,
