@@ -104,6 +104,13 @@ export default function RegistrarOS() {
     return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
   }, []);
 
+  // Tracks the number of in-flight FileReader operations.
+  // Used in onSubmit to prevent submitting before base64 encoding completes.
+  // A race condition is possible on slow Android devices: the user can tap
+  // "Registrar" within the ~200-500ms window while FileReader is still running,
+  // causing photosBase64 = [] in the onSubmit closure even though a photo was selected.
+  const processingPhotosRef = useRef(0);
+
   const uploadVideoToStorage = async (file: File, entryId: string) => {
     try {
       const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -184,6 +191,9 @@ export default function RegistrarOS() {
     }
     const validImages = imageFiles.filter(f => f.size <= MAX_IMAGE_BYTES);
     if (validImages.length > 0) {
+      // Increment BEFORE starting any FileReader work so onSubmit sees the
+      // in-flight operation even if the user taps submit in the same micro-task.
+      processingPhotosRef.current++;
       const base64Promises = validImages.map(
         file => new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -192,6 +202,7 @@ export default function RegistrarOS() {
           reader.onerror = reject;
         })
       );
+      // Decrement in finally so it always clears even on error.
       try {
         const base64Files = await Promise.all(base64Promises);
         // Use functional update so this never clobbers photos added by a
@@ -201,6 +212,8 @@ export default function RegistrarOS() {
         setPhotosBase64(prev => [...prev, ...base64Files]);
       } catch {
         toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
+      } finally {
+        processingPhotosRef.current--;
       }
     }
 
@@ -224,6 +237,18 @@ export default function RegistrarOS() {
   };
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Block while FileReader is still base64-encoding a photo.
+    // Race condition on slow Android: camera delivers the file, the user taps
+    // "Registrar" before readAsDataURL finishes → photosBase64 is still [] in the
+    // closure → photo silently excluded. processingPhotosRef prevents that.
+    if (processingPhotosRef.current > 0) {
+      toast({
+        title: "Aguarde",
+        description: "Processando imagem(ns), tente novamente em instantes.",
+      });
+      return;
+    }
+
     // Block submission while any video is still uploading
     const pendingVideos = videoFiles.filter(v => v.uploading);
     if (pendingVideos.length > 0) {
@@ -235,15 +260,17 @@ export default function RegistrarOS() {
       return;
     }
 
-    // Warn (non-blocking) if any video upload failed — those videos will be excluded
+    // Warn about failed video uploads — they will be excluded from the payload automatically
+    // (filtered by v.objectPath && !v.error below). Do NOT return/block: the user must
+    // still be able to save the OS with their photos even if a video upload failed.
     const failedVideos = videoFiles.filter(v => v.error);
     if (failedVideos.length > 0) {
       toast({
-        title: `${failedVideos.length} vídeo(s) com erro de envio`,
-        description: "Esses vídeos não serão salvos. Remova-os e tente novamente, ou prossiga sem eles.",
+        title: `${failedVideos.length} vídeo(s) com erro não serão salvos`,
+        description: "A OS será registrada sem esses vídeos. Remova-os e grave novamente se necessário.",
         variant: "destructive",
       });
-      return;
+      // intentionally no return — submission continues without the failed videos
     }
 
     const tipoLabel = values.tipo ? TIPO_LABELS[values.tipo] : "";

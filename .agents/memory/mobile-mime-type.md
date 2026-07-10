@@ -35,3 +35,22 @@ as the Content-Type header for storage PUT requests.
 **Additional rule**: always validate the storage PUT response (`putRes.ok`) before
 appending the resulting URL to the OS photos array — a failed PUT must not persist
 a broken link.
+
+## Race condition — photo processing vs. form submit
+
+`FileReader.readAsDataURL` is async. On slow Android devices it can take 200–500ms
+for a 5–8 MB photo. If the user taps submit during that window, `photosBase64 = []`
+in the `onSubmit` closure → photos silently excluded.
+
+Fix: use a `processingPhotosRef = useRef(0)` counter.
+- Increment **before** creating any FileReaders (strictly before `.map(...)`).
+- Decrement in `finally` so it always clears.
+- In `onSubmit`, check `processingPhotosRef.current > 0` and show a toast + return early.
+
+## Failed video uploads must NOT block form submission
+
+If a video upload fails, `videoFiles` gets an entry with `error !== null`. Do NOT
+`return` from `onSubmit` in the failed-video guard — just show a warning toast and
+let submission proceed. Failed videos are already excluded by the existing
+`.filter(v => v.objectPath && !v.error)` in the URL-building step.
+Blocking here prevents saving photos even when the user only wanted to attach the OS without the failed video.
