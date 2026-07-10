@@ -267,7 +267,27 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
       if (validFiles.length === 0) return;
       // compressImage resizes to 1920 px max, re-encodes as JPEG 0.82.
       // Falls back to plain FileReader only when the Canvas 2D context is unavailable.
-      const base64List = await Promise.all(validFiles.map(f => compressImage(f)));
+      // For each file: try canvas compression first.
+      // If compressImage rejects (e.g. browser cannot decode the format — HEIC on
+      // Chrome Android, AVIF on older browsers, JPEGs with unusual colour profiles),
+      // fall back to a plain FileReader.readAsDataURL so the raw bytes are stored
+      // as base64. Gallery files are already limited to 8 MB above, so the
+      // uncompressed base64 is safe to store. Camera path is unaffected.
+      const readAsDataUrl = (f: File): Promise<string> =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("FileReader failed"));
+          reader.readAsDataURL(f);
+        });
+
+      const base64List = await Promise.all(
+        validFiles.map(f =>
+          fromCamera
+            ? compressImage(f)
+            : compressImage(f).catch(() => readAsDataUrl(f)),
+        ),
+      );
       const newPhotos: PhotoLink[] = base64List.map((url, i) => ({
         id: genId(),
         url,
