@@ -29,7 +29,7 @@ import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
 import { useUnit } from "@/contexts/unit-context";
 import { useGps, useVibration } from "@/hooks/use-native";
-import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
+import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 
 const MARKET_RATES: Record<string, number> = {
   civil: 280,
@@ -180,11 +180,15 @@ export default function NovaOS() {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
 
-    // Use isVideoFile / isImageFile from media-utils so files with an empty
-    // browser-reported MIME type (common on Android Chrome, Samsung Internet,
-    // Google Drive picker) are still classified correctly via file extension.
+    // Camera inputs (capture="environment") may deliver files with file.type=""
+    // AND no extension in file.name on some Android / iOS OEM browsers (e.g.
+    // Samsung Internet delivers file.name="image" with no .jpg). isImageFile()
+    // would return false for those files and silently drop the photo. Since the
+    // input has accept="image/*", every file from the camera IS an image — skip
+    // the type check for camera files entirely and let compressImage handle them.
+    const fromCamera = e.target.id === "nova-os-camera";
     const videoList  = files.filter(isVideoFile);
-    const imageList  = files.filter(f => isImageFile(f) && !isVideoFile(f));
+    const imageList  = fromCamera ? files : files.filter(f => isImageFile(f) && !isVideoFile(f));
 
     // ── Videos: upload to storage immediately (no base64 → no crash) ────
     for (const file of videoList) {
@@ -199,27 +203,27 @@ export default function NovaOS() {
       uploadVideoToStorage(file, entryId);
     }
 
-    // ── Images: base64 with size guard + race-condition protection ───────
-    const oversized = imageList.filter(f => f.size > MAX_IMAGE_BYTES);
+    // ── Images: compress then base64 ─────────────────────────────────────
+    // Camera photos use MAX_COMPRESS_BYTES (50 MB) — compressImage will shrink
+    // a 12 MP raw photo (~8 MB) to ~250 KB. The 50 MB cap prevents Canvas OOM
+    // before the resize starts. Gallery photos keep the 8 MB guard.
+    const sizeLimit = fromCamera ? MAX_COMPRESS_BYTES : MAX_IMAGE_BYTES;
+    const oversized = imageList.filter(f => f.size > sizeLimit);
     if (oversized.length > 0) {
-      toast({ title: "Imagem muito grande", description: `${oversized.length} arquivo(s) ignorado(s) — máx. 8 MB por imagem.`, variant: "destructive" });
+      toast({ title: "Imagem muito grande", description: `${oversized.length} arquivo(s) ignorado(s) — máx. ${fromCamera ? "50" : "8"} MB por imagem.`, variant: "destructive" });
     }
-    const validImages = imageList.filter(f => f.size <= MAX_IMAGE_BYTES);
+    const validImages = imageList.filter(f => f.size <= sizeLimit);
     if (validImages.length > 0) {
-      // Increment BEFORE starting FileReader work so onSubmit sees the in-flight
+      // Increment BEFORE starting compression so onSubmit sees the in-flight
       // operation even if the user taps submit in the same micro-task.
       processingPhotosRef.current++;
       try {
-        const b64s = await Promise.all(validImages.map(file => new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload  = () => resolve(reader.result as string);
-          reader.onerror = reject;
-        })));
+        // compressImage resizes to 1920 px max and re-encodes as JPEG 0.82.
+        // Falls back to plain FileReader if the Canvas context is unavailable.
+        const b64s = await Promise.all(validImages.map(f => compressImage(f)));
         const newImages: MediaFile[] = b64s.map((src, i) => ({ src, type: "image" as const, name: validImages[i].name }));
         // Use functional update to avoid stale closure if multiple handlers run concurrently
         setMediaFiles(prev => [...prev, ...newImages]);
-        // onSubmit reads mediaFiles state directly — form.setValue no longer needed
       } catch {
         toast({ title: "Erro", description: "Falha ao processar imagem", variant: "destructive" });
       } finally {

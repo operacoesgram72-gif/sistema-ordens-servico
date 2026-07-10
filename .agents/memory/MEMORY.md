@@ -7,3 +7,4 @@
 - [API response size — photos/signature blobs](api-response-size.md) — list endpoints must use LIST_COLUMNS (no photos/signature); bare db.select() on serviceOrdersTable returns 76MB+
 - [Video object storage URL construction](video-storage-url.md) — objectPath returned by server is already "/objects/UUID"; URL must be BASE+"/api/storage"+objectPath (not BASE+"/api/storage/objects/"+objectPath)
 - [Mobile file MIME type empty on Android](mobile-mime-type.md) — Android Chrome/Samsung/Drive pickers deliver file.type="" for valid images/videos; use media-utils.ts getMimeType/isImageFile/isVideoFile for all file classification
+- [Camera photo compression via Canvas API](camera-compress.md) — camera inputs bypass isImageFile check (file.name="image", no ext on Samsung); compressImage() in media-utils.ts handles 12MP→250KB; Promise always settles via try/catch around drawImage/toDataURL

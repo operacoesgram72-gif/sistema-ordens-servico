@@ -12,7 +12,7 @@ import { useState, useEffect, useRef } from "react";
 
 import { useCreateServiceOrder, getListServiceOrdersQueryKey } from "@workspace/api-client-react";
 import { useSystemStatus } from "@/hooks/use-system-status";
-import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
+import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -163,11 +163,14 @@ export default function RegistrarOS() {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
 
-    // Use isImageFile / isVideoFile (from media-utils) so files with an empty
-    // browser-reported MIME type are still classified by their extension.
-    // Without this, photos selected from Google Drive or certain Android gallery
-    // apps have file.type === "" and would be silently dropped.
-    const imageFiles = files.filter(isImageFile);
+    // Camera inputs (capture="environment") may deliver files with file.type=""
+    // AND no extension in file.name on some Android / iOS OEM browsers (e.g.
+    // Samsung Internet delivers file.name="image" with no .jpg). isImageFile()
+    // would return false for those files and silently drop the photo. Since the
+    // input has accept="image/*", every file from the camera IS an image — skip
+    // the type check for camera files entirely and let compressImage handle them.
+    const fromCamera = e.target.id === "photo-camera-pub";
+    const imageFiles = fromCamera ? files : files.filter(isImageFile);
     const videoList  = files.filter(isVideoFile);
 
     // ── Handle videos: upload to storage immediately (no base64 → no crash) ─
@@ -187,35 +190,33 @@ export default function RegistrarOS() {
       uploadVideoToStorage(file, entryId);
     }
 
-    // ── Handle images: base64 for payload ────────────────────────────────
-    const oversized = imageFiles.filter(f => f.size > MAX_IMAGE_BYTES);
+    // ── Handle images: compress then base64 ──────────────────────────────
+    // Camera photos use MAX_COMPRESS_BYTES (50 MB) — compressImage will shrink
+    // a 12 MP raw photo (~8 MB) to ~250 KB. The 50 MB cap prevents Canvas OOM
+    // on very large files before the resize even starts.
+    // Gallery photos keep the original 8 MB guard since they're already
+    // pre-compressed by the gallery app.
+    const sizeLimit = fromCamera ? MAX_COMPRESS_BYTES : MAX_IMAGE_BYTES;
+    const oversized = imageFiles.filter(f => f.size > sizeLimit);
     if (oversized.length > 0) {
       toast({
         title: "Imagem muito grande",
-        description: `${oversized.length} arquivo(s) ignorado(s) — máximo 8 MB por imagem.`,
+        description: `${oversized.length} arquivo(s) ignorado(s) — máximo ${fromCamera ? "50" : "8"} MB por imagem.`,
         variant: "destructive",
       });
     }
-    const validImages = imageFiles.filter(f => f.size <= MAX_IMAGE_BYTES);
+    const validImages = imageFiles.filter(f => f.size <= sizeLimit);
     if (validImages.length > 0) {
-      // Increment BEFORE starting any FileReader work so onSubmit sees the
-      // in-flight operation even if the user taps submit in the same micro-task.
+      // Increment BEFORE starting compression so onSubmit sees the in-flight
+      // operation even if the user taps submit in the same micro-task.
       processingPhotosRef.current++;
-      const base64Promises = validImages.map(
-        file => new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-        })
-      );
-      // Decrement in finally so it always clears even on error.
       try {
-        const base64Files = await Promise.all(base64Promises);
+        // compressImage resizes to 1920 px max and re-encodes as JPEG 0.82.
+        // On camera failure path it falls back to plain FileReader so no photo
+        // is ever silently dropped due to a Canvas context unavailability.
+        const base64Files = await Promise.all(validImages.map(f => compressImage(f)));
         // Use functional update so this never clobbers photos added by a
         // concurrent handler call (e.g. gallery + camera selected in quick succession).
-        // The form.setValue call is intentionally removed: onSubmit reads photosBase64
-        // state directly, so keeping the zod-schema field in sync is not needed.
         setPhotosBase64(prev => [...prev, ...base64Files]);
       } catch {
         toast({ title: "Erro", description: "Falha ao processar imagens", variant: "destructive" });
