@@ -3,6 +3,15 @@ import { resolve } from "node:path";
 import app from "./app";
 import { logger } from "./lib/logger";
 
+// ── Global safety nets — must be registered before any async code ────────────
+// These prevent silent crashes from unhandled rejections / exceptions.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ reason }, "Unhandled promise rejection — server continues");
+});
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Uncaught exception — server continues");
+});
+
 // Validate SMTP env vars at startup so misconfiguration is caught immediately
 // in logs rather than silently failing on the first email send.
 function validateEnv() {
@@ -15,15 +24,33 @@ function validateEnv() {
 }
 validateEnv();
 
-// Run migrations before accepting traffic so schema is always up-to-date.
+// ── Migration runner ─────────────────────────────────────────────────────────
+// Resolve the script path relative to __dirname (set by the esbuild banner to
+// the directory of the bundled file — e.g. artifacts/api-server/dist/).
+// This is correct in both development (after local build) and production
+// (Render runs `node artifacts/api-server/dist/index.mjs` from project root).
+//
+// Do NOT use process.cwd() — in production cwd is the project root, so
+// resolve(cwd, "../../scripts/...") would point outside the repository.
+
 async function runMigrations(): Promise<void> {
-  const scriptPath = resolve(process.cwd(), "../../scripts/migrate.mjs");
-  return new Promise((resolve_, reject) => {
-    execFile(process.execPath, [scriptPath], (err, stdout, stderr) => {
+  // __dirname is injected by the esbuild build banner — it equals the directory
+  // containing dist/index.mjs, i.e. artifacts/api-server/dist/.
+  // Going ../../ from there reaches the project root where scripts/ lives.
+  const distDir: string =
+    typeof __dirname !== "undefined"
+      ? __dirname
+      : resolve(process.cwd(), "artifacts/api-server/dist");
+
+  // dist/ → api-server/ → artifacts/ → project-root/ → scripts/migrate.mjs
+  const scriptPath = resolve(distDir, "../../../scripts/migrate.mjs");
+
+  return new Promise((resolve_) => {
+    execFile(process.execPath, [scriptPath], { timeout: 60_000 }, (err, stdout, stderr) => {
       if (stdout) logger.info({ msg: "migrate", out: stdout.trim() });
       if (stderr) logger.warn({ msg: "migrate stderr", out: stderr.trim() });
       if (err) {
-        logger.error({ err }, "Migration failed — continuing anyway");
+        logger.error({ err }, "Migration script error — server starts anyway");
       }
       resolve_();
     });
@@ -32,25 +59,20 @@ async function runMigrations(): Promise<void> {
 
 await runMigrations();
 
+// ── Start server ─────────────────────────────────────────────────────────────
 const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
+const port = rawPort ? Number(rawPort) : 8080; // default to 8080 so Render always binds
 
 if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+  logger.error({ rawPort }, "Invalid PORT value — defaulting to 8080");
 }
 
-app.listen(port, (err) => {
+const boundPort = Number.isNaN(port) || port <= 0 ? 8080 : port;
+
+app.listen(boundPort, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
     process.exit(1);
   }
-
-  logger.info({ port }, "Server listening");
+  logger.info({ port: boundPort }, "Server listening");
 });

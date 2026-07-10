@@ -104,12 +104,21 @@ function runDrain(callbacks: DrainCallbacks) {
         if (!callbacks.activeRef.current) break;
         try {
           // ── Task #10: per-item timeout so a broken connection can't freeze the drain ──
-          const res = await fetch(`${BASE_URL}${item.endpoint}`, {
-            method: item.method,
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(item.body),
-            signal: AbortSignal.timeout(ITEM_FETCH_TIMEOUT_MS),
-          });
+          // AbortSignal.timeout() is not available in all browsers/webviews.
+          // Use a manual AbortController + setTimeout as a universal fallback.
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), ITEM_FETCH_TIMEOUT_MS);
+          let res: Response;
+          try {
+            res = await fetch(`${BASE_URL}${item.endpoint}`, {
+              method: item.method,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(item.body),
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timeoutId);
+          }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           // ── Task #9: persist successful send so a reload won't re-submit ──
           markSent(item.id);

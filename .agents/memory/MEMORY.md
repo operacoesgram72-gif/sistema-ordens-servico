@@ -3,3 +3,4 @@
 - [api-client-react TypeScript project references](api-client-rebuild.md) — after editing src/ in lib/api-client-react, always run `pnpm --filter @workspace/api-client-react exec tsc --build` to regenerate dist/*.d.ts before typechecking consumers
 - [Performance indexes and query patterns](perf-query-patterns.md) — all performance indexes are in migrate.mjs; dashboard endpoints use single-pass SQL aggregations; enrichWithTechnician uses inArray not full table fetch
 - [Data persistence root causes fixed](data-persistence-fixes.md) — supabase.ts bypass, PMOC localStorage-only, auto-migration pattern, and Express router path prefix rules
+- [Production 502/503 root causes](production-stability.md) — migration path, Express 5 wildcard syntax, DB pool config, global error handlers, health check, offline queue AbortSignal compat

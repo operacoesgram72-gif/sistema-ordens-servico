@@ -7,6 +7,14 @@ dns.setDefaultResultOrder("ipv6first");
 
 const { Pool } = pg;
 
+// ── Connection pool tunables ─────────────────────────────────────────────────
+const POOL_CONFIG = {
+  max: 10,                          // max simultaneous DB connections
+  connectionTimeoutMillis: 10_000,  // fail fast if no connection available in 10 s
+  idleTimeoutMillis: 30_000,        // release idle connections after 30 s
+  ssl: { rejectUnauthorized: false },
+} as const;
+
 // ── Parse Supabase project ref from VITE_SUPABASE_URL ───────────────────────
 
 function getProjectRef(): string | null {
@@ -62,10 +70,10 @@ async function buildPool(): Promise<pg.Pool> {
   const password =
     process.env.PGPASSWORD || process.env.SUPABASE_DB_PASSWORD || "";
 
-  // 1. DATABASE_URL
+  // 1. DATABASE_URL (fastest path — skip all DNS probing)
   const databaseUrl = process.env.DATABASE_URL;
   if (databaseUrl) {
-    return new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false } });
+    return new Pool({ connectionString: databaseUrl, ...POOL_CONFIG });
   }
 
   const projectRef = getProjectRef();
@@ -79,7 +87,7 @@ async function buildPool(): Promise<pg.Pool> {
       user: process.env.PGUSER || "postgres",
       password: password || process.env.PGPASSWORD || "",
       database: process.env.PGDATABASE || "postgres",
-      ssl: { rejectUnauthorized: false },
+      ...POOL_CONFIG,
     });
   }
 
@@ -94,7 +102,7 @@ async function buildPool(): Promise<pg.Pool> {
         user: `postgres.${projectRef}`,
         password,
         database: "postgres",
-        ssl: { rejectUnauthorized: false },
+        ...POOL_CONFIG,
       });
     }
   }
@@ -113,11 +121,26 @@ async function buildPool(): Promise<pg.Pool> {
     user: process.env.PGUSER || "postgres",
     password: process.env.PGPASSWORD || "",
     database: process.env.PGDATABASE || "postgres",
-    ssl: { rejectUnauthorized: false },
+    ...POOL_CONFIG,
   });
 }
 
-// Top-level await — valid in ESM (.mjs output)
-export const pool = await buildPool();
-export const db = drizzle(pool, { schema });
+// Top-level await — valid in ESM (.mjs output).
+// Wrap in try/catch so a misconfigured DB doesn't crash the entire import
+// chain before the server has a chance to bind a port and log the error.
+let pool: pg.Pool;
+let db: ReturnType<typeof drizzle<typeof schema>>;
+
+try {
+  pool = await buildPool();
+  db = drizzle(pool, { schema });
+} catch (err) {
+  // Log the error and create a dummy pool that fails clearly at query time
+  // rather than crashing the process during module load.
+  console.error("[db] FATAL — could not build DB pool:", err);
+  pool = new Pool({ ...POOL_CONFIG }); // will fail on connect, not on import
+  db = drizzle(pool, { schema });
+}
+
+export { pool, db };
 export * from "./schema";

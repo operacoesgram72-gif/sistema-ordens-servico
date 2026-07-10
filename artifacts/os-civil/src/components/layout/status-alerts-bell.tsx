@@ -3,9 +3,15 @@
  *
  * Shows a badge with the unread count; clicking opens a popover with recent
  * status-change alerts. Clicking an alert navigates to that order's detail page.
+ *
+ * Additions:
+ *  - Live-stream connection dot on the bell icon (task #18)
+ *  - Sticky connection status bar inside the popover (task #19)
+ *  - Unit filter dropdown inside the popover (task #13)
  */
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { Bell, BellRing, ClipboardList, Trash2 } from "lucide-react";
+import { Bell, BellRing, ClipboardList, Trash2, Wifi, WifiOff, Filter } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -28,15 +34,30 @@ interface StatusAlertsBellProps {
 
 export function StatusAlertsBell({ variant = "topbar", onNavigate }: StatusAlertsBellProps) {
   const [, setLocation] = useLocation();
-  const { alerts, unreadCount, markAllRead, clearAll } = useStatusAlerts();
+  const { alerts, unreadCount, isConnected, markAllRead, clearAll } = useStatusAlerts();
+  const [filterUnit, setFilterUnit] = useState<string>("");
 
-  const hasAlerts = alerts.length > 0;
+  // ── Task #13: derive unique units from the current alert list ──────────────
+  const availableUnits = useMemo(
+    () => [...new Set(alerts.map(a => a.unidade))].sort(),
+    [alerts],
+  );
+
+  const filteredAlerts = useMemo(
+    () => filterUnit ? alerts.filter(a => a.unidade === filterUnit) : alerts,
+    [alerts, filterUnit],
+  );
+
+  const hasAlerts = filteredAlerts.length > 0;
   const hasUnread = unreadCount > 0;
 
   const handleOpen = (open: boolean) => {
     if (open && hasUnread) {
-      // Mark all read when the popover opens
       markAllRead();
+    }
+    if (!open) {
+      // Reset unit filter when popover closes
+      setFilterUnit("");
     }
   };
 
@@ -69,6 +90,16 @@ export function StatusAlertsBell({ variant = "topbar", onNavigate }: StatusAlert
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
           )}
+          {/* ── Task #18: live-stream connection dot on the bell ── */}
+          {!hasUnread && (
+            <span
+              className={cn(
+                "absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background",
+                isConnected ? "bg-emerald-500" : "bg-amber-500 animate-pulse",
+              )}
+              title={isConnected ? "Tempo real: conectado" : "Tempo real: reconectando..."}
+            />
+          )}
         </button>
       </PopoverTrigger>
 
@@ -77,18 +108,33 @@ export function StatusAlertsBell({ variant = "topbar", onNavigate }: StatusAlert
         align="end"
         sideOffset={8}
       >
+        {/* ── Task #19: sticky connection status bar ─────────────────────── */}
+        <div
+          className={cn(
+            "sticky top-0 z-10 flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-medium border-b",
+            isConnected
+              ? "bg-emerald-500/10 text-emerald-400 border-emerald-600/20"
+              : "bg-amber-500/10 text-amber-400 border-amber-600/20 animate-pulse",
+          )}
+        >
+          {isConnected
+            ? <><Wifi className="w-3 h-3" />Tempo real: conectado</>
+            : <><WifiOff className="w-3 h-3" />Reconectando ao servidor...</>
+          }
+        </div>
+
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
             <Bell className="w-3.5 h-3.5 text-primary" />
             <span className="text-sm font-semibold">Atualizações de OS</span>
-            {hasAlerts && (
+            {alerts.length > 0 && (
               <Badge variant="outline" className="text-[10px] px-1.5 h-4">
-                {alerts.length}
+                {filteredAlerts.length}{filterUnit ? `/${alerts.length}` : ""}
               </Badge>
             )}
           </div>
-          {hasAlerts && (
+          {alerts.length > 0 && (
             <button
               onClick={clearAll}
               className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-destructive transition-colors"
@@ -100,18 +146,37 @@ export function StatusAlertsBell({ variant = "topbar", onNavigate }: StatusAlert
           )}
         </div>
 
+        {/* ── Task #13: unit filter ──────────────────────────────────────── */}
+        {availableUnits.length > 1 && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-border/50 bg-muted/20">
+            <Filter className="w-3 h-3 text-muted-foreground shrink-0" />
+            <select
+              value={filterUnit}
+              onChange={e => setFilterUnit(e.target.value)}
+              className="flex-1 text-[11px] bg-transparent text-foreground border-0 outline-none cursor-pointer appearance-none"
+            >
+              <option value="">Todas as unidades</option>
+              {availableUnits.map(u => (
+                <option key={u} value={u}>{u}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Alert list */}
         {!hasAlerts ? (
           <div className="px-4 py-8 text-center">
             <Bell className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Nenhuma atualização ainda</p>
+            <p className="text-sm text-muted-foreground">
+              {filterUnit ? `Nenhuma atualização para ${filterUnit}` : "Nenhuma atualização ainda"}
+            </p>
             <p className="text-xs text-muted-foreground/60 mt-1">
               Alertas de mudança de status aparecerão aqui em tempo real.
             </p>
           </div>
         ) : (
-          <ul className="max-h-[340px] overflow-y-auto divide-y divide-border/50">
-            {alerts.map((alert, idx) => {
+          <ul className="max-h-[300px] overflow-y-auto divide-y divide-border/50">
+            {filteredAlerts.map((alert, idx) => {
               const statusLabel = STATUS_LABELS[alert.status as ServiceOrderStatus] || alert.status;
               const statusColor = STATUS_COLORS[alert.status as ServiceOrderStatus] || "";
               const timeAgo = formatDistanceToNow(new Date(alert.receivedAt), {
