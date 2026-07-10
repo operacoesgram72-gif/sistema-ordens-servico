@@ -1,3 +1,4 @@
 - [Supabase DB connection via env vars](supabase-db-connection.md) — DATABASE_URL secret must be set to pooler URL; direct host is IPv6-only (EAFNOSUPPORT in this container)
 - [Schema changes on this Supabase DB](supabase-db-connection.md) — drizzle-kit push needs a TTY; run raw SQL via `node scripts/migrate.mjs` instead; script is idempotent
 - [api-client-react TypeScript project references](api-client-rebuild.md) — after editing src/ in lib/api-client-react, always run `pnpm --filter @workspace/api-client-react exec tsc --build` to regenerate dist/*.d.ts before typechecking consumers
+- [Performance indexes and query patterns](perf-query-patterns.md) — all performance indexes are in migrate.mjs; dashboard endpoints use single-pass SQL aggregations; enrichWithTechnician uses inArray not full table fetch

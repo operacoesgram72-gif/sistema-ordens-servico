@@ -655,15 +655,15 @@ export default function RegistrarOS() {
                                   </button>
                                 </div>
                               ))}
-                              {videoFiles.map((v, idx) => (
-                                <div key={`video-${idx}`} className="relative group rounded-md overflow-hidden border border-primary/40 bg-black">
-                                  <video src={v.url} className="w-full h-20 object-cover" muted playsInline preload="metadata" />
+                              {videoFiles.map((v) => (
+                                <div key={v.id} className="relative group rounded-md overflow-hidden border border-primary/40 bg-black">
+                                  <video src={v.localUrl} className="w-full h-20 object-cover" muted playsInline preload="metadata" />
                                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                     <Video className="w-6 h-6 text-white/80 drop-shadow" />
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={() => removeVideo(idx)}
+                                    onClick={() => removeVideo(v.id)}
                                     className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                                   >
                                     <X className="w-3 h-3" />

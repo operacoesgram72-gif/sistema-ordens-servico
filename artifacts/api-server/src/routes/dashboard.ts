@@ -1,81 +1,78 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { serviceOrdersTable, techniciansTable } from "@workspace/db";
-import { eq, gte, and, sql, count, sum } from "drizzle-orm";
+import { eq, and, sql, count } from "drizzle-orm";
 import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
 
-// Market value reference per formato_servico
-const MARKET_RATES: Record<string, number> = {
-  civil: 280,
-  refrigeracao: 350,
-  hidraulica: 250,
-  mecanica: 320,
-  eletrica: 290,
-  outros: 180,
-};
-
-function getFormatoAvg(formato: string | null): number {
-  if (!formato) return 200;
-  return MARKET_RATES[formato] ?? 200;
-}
-
-// GET /dashboard/summary
+// ── GET /dashboard/summary ────────────────────────────────────────────────────
+// Replaced 10 sequential count() queries with a single aggregation pass +
+// two grouped queries, all fired in parallel (3 round-trips total).
 router.get("/dashboard/summary", async (req, res) => {
   try {
     const unidade = resolveUnit(req, req.query.unidade as string | undefined);
-    const unitCond = unidade ? [eq(serviceOrdersTable.unidade, unidade)] : [];
 
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDay   = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const startOfYear  = new Date(now.getFullYear(), 0, 1);
 
-    const [open] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "aberta")));
-    const [inProg] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "em_andamento")));
-    const [done] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "concluida")));
-    const [cancelled] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, eq(serviceOrdersTable.status, "cancelada")));
-    const [today] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, gte(serviceOrdersTable.createdAt, startOfDay)));
-    const [month] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, gte(serviceOrdersTable.createdAt, startOfMonth)));
-    const [year] = await db.select({ count: count() }).from(serviceOrdersTable).where(and(...unitCond, gte(serviceOrdersTable.createdAt, startOfYear)));
+    // Optional WHERE fragment — empty when no unit filter
+    const whereClause = unidade ? sql`WHERE unidade = ${unidade}` : sql``;
 
-    const categories = await db
-      .select({ category: serviceOrdersTable.category, count: count() })
-      .from(serviceOrdersTable)
-      .where(unitCond.length ? and(...unitCond) : undefined)
-      .groupBy(serviceOrdersTable.category);
+    const [countsResult, categories, priorities] = await Promise.all([
+      // All counts + estimated value sum in a single table scan
+      db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'aberta')                        AS "open",
+          COUNT(*) FILTER (WHERE status = 'em_andamento')                  AS "inProg",
+          COUNT(*) FILTER (WHERE status = 'concluida')                     AS "done",
+          COUNT(*) FILTER (WHERE status = 'cancelada')                     AS "cancelled",
+          COUNT(*) FILTER (WHERE created_at >= ${startOfDay})              AS "today",
+          COUNT(*) FILTER (WHERE created_at >= ${startOfMonth})            AS "month",
+          COUNT(*) FILTER (WHERE created_at >= ${startOfYear})             AS "year",
+          COALESCE(SUM(CASE
+            WHEN estimated_value IS NOT NULL THEN estimated_value::numeric
+            WHEN formato_servico = 'civil'        THEN 280
+            WHEN formato_servico = 'refrigeracao' THEN 350
+            WHEN formato_servico = 'hidraulica'   THEN 250
+            WHEN formato_servico = 'mecanica'     THEN 320
+            WHEN formato_servico = 'eletrica'     THEN 290
+            ELSE 200
+          END), 0) AS "totalValue"
+        FROM service_orders
+        ${whereClause}
+      `),
+      db.select({ category: serviceOrdersTable.category, count: count() })
+        .from(serviceOrdersTable)
+        .where(unidade ? eq(serviceOrdersTable.unidade, unidade) : undefined)
+        .groupBy(serviceOrdersTable.category),
+      db.select({ priority: serviceOrdersTable.priority, count: count() })
+        .from(serviceOrdersTable)
+        .where(unidade ? eq(serviceOrdersTable.unidade, unidade) : undefined)
+        .groupBy(serviceOrdersTable.priority),
+    ]);
 
-    const priorities = await db
-      .select({ priority: serviceOrdersTable.priority, count: count() })
-      .from(serviceOrdersTable)
-      .where(unitCond.length ? and(...unitCond) : undefined)
-      .groupBy(serviceOrdersTable.priority);
-
-    // Sum of estimated values (stored or derived from formato)
-    const allOrders = await db.select({ estimatedValue: serviceOrdersTable.estimatedValue, formatoServico: serviceOrdersTable.formatoServico })
-      .from(serviceOrdersTable)
-      .where(unitCond.length ? and(...unitCond) : undefined);
-    const totalEstimatedValue = allOrders.reduce((acc, o) => {
-      if (o.estimatedValue !== null && o.estimatedValue !== undefined) return acc + Number(o.estimatedValue);
-      return acc + getFormatoAvg(o.formatoServico);
-    }, 0);
-
-    const totalCount = Number(open.count) + Number(inProg.count) + Number(done.count) + Number(cancelled.count);
-    const completionRate = totalCount > 0 ? Math.round((Number(done.count) / totalCount) * 100) : 0;
+    const c = (countsResult.rows[0] as any) ?? {};
+    const totalOpen       = Number(c.open ?? 0);
+    const totalInProgress = Number(c.inProg ?? 0);
+    const totalCompleted  = Number(c.done ?? 0);
+    const totalCancelled  = Number(c.cancelled ?? 0);
+    const totalCount = totalOpen + totalInProgress + totalCompleted + totalCancelled;
 
     res.json({
-      totalOpen: Number(open.count),
-      totalInProgress: Number(inProg.count),
-      totalCompleted: Number(done.count),
-      totalCancelled: Number(cancelled.count),
-      totalToday: Number(today.count),
-      totalThisMonth: Number(month.count),
-      totalThisYear: Number(year.count),
-      completionRate,
-      totalEstimatedValue: Math.round(totalEstimatedValue * 100) / 100,
-      byCategory: categories.map((c) => ({ category: c.category, count: Number(c.count) })),
-      byPriority: priorities.map((p) => ({ priority: p.priority, count: Number(p.count) })),
+      totalOpen,
+      totalInProgress,
+      totalCompleted,
+      totalCancelled,
+      totalToday:          Number(c.today ?? 0),
+      totalThisMonth:      Number(c.month ?? 0),
+      totalThisYear:       Number(c.year  ?? 0),
+      completionRate:      totalCount > 0 ? Math.round((totalCompleted / totalCount) * 100) : 0,
+      totalEstimatedValue: Math.round(Number(c.totalValue ?? 0) * 100) / 100,
+      byCategory: categories.map((r) => ({ category: r.category, count: Number(r.count) })),
+      byPriority: priorities.map((r) => ({ priority: r.priority, count: Number(r.count) })),
     });
   } catch (err) {
     req.log.error(err);
@@ -83,55 +80,88 @@ router.get("/dashboard/summary", async (req, res) => {
   }
 });
 
-// GET /dashboard/stats
+// ── GET /dashboard/stats ──────────────────────────────────────────────────────
+// Replaced the 4×N queries-in-a-loop (up to 48 round-trips) with a single
+// date_trunc GROUP BY query, then filled zero-count periods in memory.
 router.get("/dashboard/stats", async (req, res) => {
   try {
-    const period = (req.query.period as string) || "monthly";
+    const period  = (req.query.period as string) || "monthly";
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const now = new Date();
-    const points: { label: string; start: Date; end: Date }[] = [];
+
+    let truncUnit: string;
+    let overallStart: Date;
+    let expectedLabels: { label: string; key: string }[] = [];
 
     if (period === "daily") {
+      truncUnit = "day";
+      overallStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 13);
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now);
         d.setDate(d.getDate() - i);
         const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        const end = new Date(start);
-        end.setDate(end.getDate() + 1);
-        points.push({ label: start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), start, end });
+        expectedLabels.push({
+          label: start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          key: start.toISOString().slice(0, 10),
+        });
       }
     } else if (period === "monthly") {
+      truncUnit = "month";
+      overallStart = new Date(now.getFullYear(), now.getMonth() - 11, 1);
       for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
-        points.push({ label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }), start: d, end });
+        expectedLabels.push({
+          label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+          key: d.toISOString().slice(0, 7),
+        });
       }
     } else {
+      truncUnit = "year";
+      overallStart = new Date(now.getFullYear() - 4, 0, 1);
       for (let i = 4; i >= 0; i--) {
         const year = now.getFullYear() - i;
-        points.push({ label: String(year), start: new Date(year, 0, 1), end: new Date(year + 1, 0, 1) });
+        expectedLabels.push({ label: String(year), key: String(year) });
       }
     }
 
-    const stats = await Promise.all(
-      points.map(async ({ label, start, end }) => {
-        const [total] = await db.select({ count: count() }).from(serviceOrdersTable)
-          .where(and(gte(serviceOrdersTable.createdAt, start), sql`${serviceOrdersTable.createdAt} < ${end}`));
-        const [completed] = await db.select({ count: count() }).from(serviceOrdersTable)
-          .where(and(eq(serviceOrdersTable.status, "concluida"), gte(serviceOrdersTable.createdAt, start), sql`${serviceOrdersTable.createdAt} < ${end}`));
-        const [open] = await db.select({ count: count() }).from(serviceOrdersTable)
-          .where(and(eq(serviceOrdersTable.status, "aberta"), gte(serviceOrdersTable.createdAt, start), sql`${serviceOrdersTable.createdAt} < ${end}`));
-        const [inProgress] = await db.select({ count: count() }).from(serviceOrdersTable)
-          .where(and(eq(serviceOrdersTable.status, "em_andamento"), gte(serviceOrdersTable.createdAt, start), sql`${serviceOrdersTable.createdAt} < ${end}`));
+    // Optional unit filter — keeps stats consistent with summary cards
+    const unitFilter = unidade ? sql`AND unidade = ${unidade}` : sql``;
 
-        return {
-          label,
-          total: Number(total.count),
-          completed: Number(completed.count),
-          open: Number(open.count),
-          inProgress: Number(inProgress.count),
-        };
-      })
-    );
+    // Single grouped query — one round-trip for any period type
+    const rows = await db.execute(sql`
+      SELECT
+        date_trunc(${truncUnit}, created_at)                          AS period_start,
+        COUNT(*)                                                       AS total,
+        COUNT(*) FILTER (WHERE status = 'concluida')                  AS completed,
+        COUNT(*) FILTER (WHERE status = 'aberta')                     AS open,
+        COUNT(*) FILTER (WHERE status = 'em_andamento')               AS in_progress
+      FROM service_orders
+      WHERE created_at >= ${overallStart}
+      ${unitFilter}
+      GROUP BY period_start
+      ORDER BY period_start
+    `);
+
+    // Build lookup from truncated key → row
+    const rowMap = new Map<string, any>();
+    for (const row of rows.rows as any[]) {
+      const d = new Date(row.period_start);
+      const key = truncUnit === "day"   ? d.toISOString().slice(0, 10)
+                : truncUnit === "month" ? d.toISOString().slice(0, 7)
+                : String(d.getUTCFullYear());
+      rowMap.set(key, row);
+    }
+
+    const stats = expectedLabels.map(({ label, key }) => {
+      const row = rowMap.get(key);
+      return {
+        label,
+        total:      Number(row?.total       ?? 0),
+        completed:  Number(row?.completed   ?? 0),
+        open:       Number(row?.open        ?? 0),
+        inProgress: Number(row?.in_progress ?? 0),
+      };
+    });
 
     res.json(stats);
   } catch (err) {
@@ -140,12 +170,15 @@ router.get("/dashboard/stats", async (req, res) => {
   }
 });
 
-// GET /dashboard/indicators
+// ── GET /dashboard/indicators ─────────────────────────────────────────────────
+// Replaced separate full technicians table fetch with a LEFT JOIN,
+// eliminating one extra round-trip per request.
 router.get("/dashboard/indicators", async (req, res) => {
   try {
     const year = req.query.year ? Number(req.query.year) : new Date().getFullYear();
     const unidade = resolveUnit(req, req.query.unidade as string | undefined);
     const dateParam = req.query.date as string | undefined;
+
     let rangeStart: Date;
     let rangeEnd: Date;
     if (dateParam) {
@@ -163,110 +196,93 @@ router.get("/dashboard/indicators", async (req, res) => {
       rangeEnd = new Date(year + 1, 0, 1);
     }
 
-    const indicatorConditions: any[] = [
-      gte(serviceOrdersTable.createdAt, rangeStart),
+    const conditions: any[] = [
+      sql`${serviceOrdersTable.createdAt} >= ${rangeStart}`,
       sql`${serviceOrdersTable.createdAt} < ${rangeEnd}`,
     ];
-    if (unidade) indicatorConditions.push(eq(serviceOrdersTable.unidade, unidade));
+    if (unidade) conditions.push(eq(serviceOrdersTable.unidade, unidade));
 
+    // Single query with LEFT JOIN — no separate technicians fetch
     const allOrders = await db
       .select({
-        id: serviceOrdersTable.id,
-        location: serviceOrdersTable.location,
-        status: serviceOrdersTable.status,
-        technicianId: serviceOrdersTable.technicianId,
-        formatoServico: serviceOrdersTable.formatoServico,
-        estimatedValue: serviceOrdersTable.estimatedValue,
-        createdAt: serviceOrdersTable.createdAt,
+        location:          serviceOrdersTable.location,
+        status:            serviceOrdersTable.status,
+        technicianNameFree: (serviceOrdersTable as any).technicianNameFree,
+        technicianName:    techniciansTable.name,
+        formatoServico:    serviceOrdersTable.formatoServico,
+        estimatedValue:    serviceOrdersTable.estimatedValue,
+        createdAt:         serviceOrdersTable.createdAt,
       })
       .from(serviceOrdersTable)
-      .where(and(...indicatorConditions));
+      .leftJoin(techniciansTable, eq(serviceOrdersTable.technicianId, techniciansTable.id))
+      .where(and(...conditions));
 
-    // Fetch technicians for names
-    const techs = await db.select().from(techniciansTable);
-    const techMap = new Map(techs.map((t) => [t.id, t.name]));
-
-    // Helper to get effective value
+    // Market value fallback per formato
+    const MARKET_RATES: Record<string, number> = {
+      civil: 280, refrigeracao: 350, hidraulica: 250, mecanica: 320, eletrica: 290, outros: 180,
+    };
     const getValue = (o: typeof allOrders[0]) => {
       if (o.estimatedValue !== null && o.estimatedValue !== undefined) return Number(o.estimatedValue);
-      return getFormatoAvg(o.formatoServico);
+      return MARKET_RATES[o.formatoServico ?? ""] ?? 200;
     };
+    const getTechName = (o: typeof allOrders[0]) =>
+      (o as any).technicianNameFree || o.technicianName || "Não atribuído";
 
     // BY LOCATION
     const locationMap = new Map<string, { total: number; completed: number; value: number }>();
+    const techMapAgg  = new Map<string, { total: number; completed: number; value: number }>();
+    const monthMap    = new Map<string, { total: number; completed: number; value: number }>();
+    const formatoMap  = new Map<string, { total: number; value: number }>();
+
     for (const o of allOrders) {
-      const loc = o.location || "Não informado";
-      if (!locationMap.has(loc)) locationMap.set(loc, { total: 0, completed: 0, value: 0 });
-      const entry = locationMap.get(loc)!;
-      entry.total++;
-      if (o.status === "concluida") entry.completed++;
-      entry.value += getValue(o);
+      const loc  = o.location  || "Não informado";
+      const name = getTechName(o);
+      const fmt  = o.formatoServico || "outros";
+      const d    = new Date(o.createdAt);
+      const mKey = d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
+      const val  = getValue(o);
+      const done = o.status === "concluida";
+
+      const bump = (map: Map<string, any>, key: string) => {
+        if (!map.has(key)) map.set(key, { total: 0, completed: 0, value: 0 });
+        return map.get(key)!;
+      };
+
+      const le = bump(locationMap, loc); le.total++; if (done) le.completed++; le.value += val;
+      const te = bump(techMapAgg,  name); te.total++; if (done) te.completed++; te.value += val;
+      const me = bump(monthMap,    mKey); me.total++; if (done) me.completed++; me.value += val;
+      const fe = bump(formatoMap,  fmt);  fe.total++;                           fe.value += val;
     }
+
+    const round = (n: number) => Math.round(n * 100) / 100;
+
     const byLocation = Array.from(locationMap.entries())
-      .map(([location, d]) => ({ location, total: d.total, completed: d.completed, estimatedValue: Math.round(d.value * 100) / 100 }))
+      .map(([location, d]) => ({ location, total: d.total, completed: d.completed, estimatedValue: round(d.value) }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 15);
 
-    // BY MONTH
-    const monthMap = new Map<string, { total: number; completed: number; value: number }>();
-    for (const o of allOrders) {
-      const d = new Date(o.createdAt);
-      const key = d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" });
-      if (!monthMap.has(key)) monthMap.set(key, { total: 0, completed: 0, value: 0 });
-      const entry = monthMap.get(key)!;
-      entry.total++;
-      if (o.status === "concluida") entry.completed++;
-      entry.value += getValue(o);
-    }
-    // Ensure all 12 months present, in order
     const months: string[] = [];
-    for (let m = 0; m < 12; m++) {
+    for (let m = 0; m < 12; m++)
       months.push(new Date(year, m, 1).toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }));
-    }
     const byMonth = months.map((month) => {
       const d = monthMap.get(month) ?? { total: 0, completed: 0, value: 0 };
-      return { month, total: d.total, completed: d.completed, estimatedValue: Math.round(d.value * 100) / 100 };
+      return { month, total: d.total, completed: d.completed, estimatedValue: round(d.value) };
     });
 
-    // BY TECHNICIAN
-    const techMapAgg = new Map<string, { total: number; completed: number; value: number }>();
-    for (const o of allOrders) {
-      const name = o.technicianId ? (techMap.get(o.technicianId) ?? "Não atribuído") : "Não atribuído";
-      if (!techMapAgg.has(name)) techMapAgg.set(name, { total: 0, completed: 0, value: 0 });
-      const entry = techMapAgg.get(name)!;
-      entry.total++;
-      if (o.status === "concluida") entry.completed++;
-      entry.value += getValue(o);
-    }
     const byTechnician = Array.from(techMapAgg.entries())
-      .map(([technicianName, d]) => ({ technicianName, total: d.total, completed: d.completed, estimatedValue: Math.round(d.value * 100) / 100 }))
+      .map(([technicianName, d]) => ({ technicianName, total: d.total, completed: d.completed, estimatedValue: round(d.value) }))
       .sort((a, b) => b.total - a.total);
 
-    // BY FORMATO SERVICO
-    const formatoMap = new Map<string, { total: number; value: number }>();
-    for (const o of allOrders) {
-      const fmt = o.formatoServico || "outros";
-      if (!formatoMap.has(fmt)) formatoMap.set(fmt, { total: 0, value: 0 });
-      const entry = formatoMap.get(fmt)!;
-      entry.total++;
-      entry.value += getValue(o);
-    }
     const byFormatoServico = Array.from(formatoMap.entries()).map(([formato, d]) => ({
       formato,
       total: d.total,
-      estimatedValue: Math.round(d.value * 100) / 100,
-      avgValuePerService: d.total > 0 ? Math.round((d.value / d.total) * 100) / 100 : 0,
+      estimatedValue: round(d.value),
+      avgValuePerService: d.total > 0 ? round(d.value / d.total) : 0,
     }));
 
     const totalValue = allOrders.reduce((acc, o) => acc + getValue(o), 0);
 
-    res.json({
-      totalValue: Math.round(totalValue * 100) / 100,
-      byLocation,
-      byMonth,
-      byTechnician,
-      byFormatoServico,
-    });
+    res.json({ totalValue: round(totalValue), byLocation, byMonth, byTechnician, byFormatoServico });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Erro interno" });

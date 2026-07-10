@@ -52,10 +52,13 @@ export default function Calendario() {
   const [copiedShare, setCopiedShare] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
-  const queryKey = ["service-orders-calendar", unit, currentDate.getFullYear()];
+  // Key stabilised — period:"annual" always returns the current year so the year
+  // number does NOT need to be part of the key; including it caused a new fetch
+  // on every month-navigation click even though the server response was identical.
+  const queryKey = useMemo(() => ["service-orders-calendar", unit], [unit]);
 
   const { data: orders = [] } = useListServiceOrders(
-    { period: "annual" } as any,
+    { period: "annual", unidade: unit } as any,
     { query: { enabled: true, queryKey } }
   );
 
@@ -63,8 +66,7 @@ export default function Calendario() {
     setRefreshing(true);
     await queryClient.invalidateQueries({ queryKey });
     setRefreshing(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryClient, unit, currentDate.getFullYear()]);
+  }, [queryClient, queryKey]);
 
   const shareViewUrl = `${window.location.origin}${BASE_URL}/calendario?view=1`;
 

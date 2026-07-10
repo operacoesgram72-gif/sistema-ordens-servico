@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { Download, Plus, Search, FileSpreadsheet, Camera, FileText, RefreshCw } from "lucide-react";
@@ -57,7 +57,11 @@ export default function Ordens() {
   const [lightbox, setLightbox] = useState<LightboxState>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const queryKey = ["service-orders", search, status, period, tipo, formato, unit];
+  // Stable key — prevents handleRefresh from re-creating on every render
+  const queryKey = useMemo(
+    () => ["service-orders", search, status, period, tipo, formato, unit],
+    [search, status, period, tipo, formato, unit]
+  );
 
   const { data: ordens, isLoading } = useListServiceOrders(
     {

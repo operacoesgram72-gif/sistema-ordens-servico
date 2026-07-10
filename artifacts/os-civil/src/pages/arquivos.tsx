@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { salvarArquivo } from "@/lib/supabase";
 import {
   Folder, FolderPlus, File, Plus, Trash2, Upload,
@@ -88,9 +89,8 @@ export default function Arquivos() {
 
   const [tab, setTab] = useState<"arquivos" | "links">("arquivos");
 
-  /* ── File state ── */
-  const [entries, setEntries] = useState<FileEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  /* ── React Query ── */
+  const queryClient = useQueryClient();
   const [currentFolder, setCurrentFolder] = useState<number | null>(null);
   const [path, setPath] = useState<{ id: number | null; name: string }[]>([
     { id: null, name: "Raiz" },
@@ -99,31 +99,51 @@ export default function Arquivos() {
   const [showNewFolder, setShowNewFolder] = useState(false);
 
   /* ── Link state ── */
-  const [links, setLinks] = useState<LinkEntry[]>([]);
-  const [linksLoading, setLinksLoading] = useState(true);
   const [linkDialog, setLinkDialog] = useState(false);
   const [editingLinkId, setEditingLinkId] = useState<number | null>(null);
   const [linkForm, setLinkForm] = useState<LinkForm>(emptyLink);
   const [savingLink, setSavingLink] = useState(false);
   const [deletingLinkId, setDeletingLinkId] = useState<number | null>(null);
 
-  /* ────────────── File functions ────────────── */
+  /* ────────────── React Query hooks ────────────── */
 
-  const fetchEntries = async () => {
-    setLoading(true);
-    try {
+  const fileEntriesKey = useMemo(
+    () => ["file-entries", unit, currentFolder ?? "root"] as const,
+    [unit, currentFolder],
+  );
+  const linksKey = useMemo(() => ["links", unit] as const, [unit]);
+
+  const { data: entries = [], isLoading: loading, error: entriesError } = useQuery({
+    queryKey: fileEntriesKey,
+    queryFn: async (): Promise<FileEntry[]> => {
       const params = new URLSearchParams({ unidade: unit });
       params.set("parentId", currentFolder === null ? "root" : String(currentFolder));
       const res = await fetch(`${BASE_URL}/api/file-entries?${params}`);
-      if (res.ok) setEntries(await res.json());
-    } catch {
-      toast({ title: "Erro ao carregar arquivos", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!res.ok) throw new Error("Erro ao carregar arquivos");
+      return res.json();
+    },
+    staleTime: 30_000, // 30 s — folders are low-volatility data
+  });
 
-  useEffect(() => { fetchEntries(); }, [currentFolder, unit]);
+  const { data: links = [], isLoading: linksLoading, error: linksError } = useQuery({
+    queryKey: linksKey,
+    queryFn: async (): Promise<LinkEntry[]> => {
+      const res = await fetch(`${BASE_URL}/api/links?unidade=${unit}`);
+      if (!res.ok) throw new Error("Erro ao carregar links");
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  // Restore error feedback — show a toast whenever a query fails
+  useEffect(() => {
+    if (entriesError) toast({ title: "Erro ao carregar arquivos", variant: "destructive" });
+  }, [entriesError]);
+  useEffect(() => {
+    if (linksError) toast({ title: "Erro ao carregar links", variant: "destructive" });
+  }, [linksError]);
+
+  /* ────────────── File functions ────────────── */
 
   const navigateTo = (id: number | null, name: string) => {
     if (id === null) {
@@ -148,7 +168,7 @@ export default function Arquivos() {
       salvarArquivo({ unidade: unit, parentId: currentFolder ?? undefined, name: newFolderName.trim(), isFolder: 1 });
       setNewFolderName("");
       setShowNewFolder(false);
-      fetchEntries();
+      queryClient.invalidateQueries({ queryKey: fileEntriesKey });
       toast({ title: "Pasta criada!" });
     } catch {
       toast({ title: "Erro ao criar pasta", variant: "destructive" });
@@ -181,7 +201,7 @@ export default function Arquivos() {
             }),
           });
           salvarArquivo({ unidade: unit, parentId: currentFolder ?? undefined, name: file.name, isFolder: 0, fileType: file.type, fileSize: file.size });
-          fetchEntries();
+          queryClient.invalidateQueries({ queryKey: fileEntriesKey });
           toast({ title: `${file.name} enviado!` });
         } catch {
           toast({ title: `Erro ao enviar ${file.name}`, variant: "destructive" });
@@ -195,7 +215,7 @@ export default function Arquivos() {
     if (!confirm(`Excluir "${entry.name}"? Esta ação não pode ser desfeita.`)) return;
     try {
       await fetch(`${BASE_URL}/api/file-entries/${entry.id}`, { method: "DELETE" });
-      fetchEntries();
+      queryClient.invalidateQueries({ queryKey: fileEntriesKey });
       toast({ title: "Excluído com sucesso" });
     } catch {
       toast({ title: "Erro ao excluir", variant: "destructive" });
@@ -207,20 +227,6 @@ export default function Arquivos() {
   };
 
   /* ────────────── Link functions ────────────── */
-
-  const fetchLinks = async () => {
-    setLinksLoading(true);
-    try {
-      const res = await fetch(`${BASE_URL}/api/links?unidade=${unit}`);
-      if (res.ok) setLinks(await res.json());
-    } catch {
-      toast({ title: "Erro ao carregar links", variant: "destructive" });
-    } finally {
-      setLinksLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchLinks(); }, [unit]);
 
   const openNewLink = () => {
     setEditingLinkId(null);
@@ -258,7 +264,7 @@ export default function Arquivos() {
       if (!res.ok) throw new Error();
       toast({ title: editingLinkId ? "Link atualizado!" : "Link cadastrado!" });
       setLinkDialog(false);
-      fetchLinks();
+      queryClient.invalidateQueries({ queryKey: linksKey });
     } catch {
       toast({ title: "Erro ao salvar link", variant: "destructive" });
     } finally {
@@ -273,7 +279,7 @@ export default function Arquivos() {
       const res = await fetch(`${BASE_URL}/api/links/${id}?unidade=${unit}`, { method: "DELETE" });
       if (!res.ok && res.status !== 204) throw new Error();
       toast({ title: "Link excluído" });
-      fetchLinks();
+      queryClient.invalidateQueries({ queryKey: linksKey });
     } catch {
       toast({ title: "Erro ao excluir link", variant: "destructive" });
     } finally {

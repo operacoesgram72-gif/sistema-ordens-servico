@@ -10,7 +10,7 @@ import {
   SignServiceOrderBody,
   ListServiceOrdersQueryParams,
 } from "@workspace/api-zod";
-import { eq, and, gte, lte, like, or, sql } from "drizzle-orm";
+import { eq, and, gte, lte, like, or, sql, inArray } from "drizzle-orm";
 import { sendOsNotification } from "./settings";
 import { broadcast } from "../lib/sse-broadcast";
 
@@ -39,21 +39,33 @@ function parseDate(val: unknown): Date | undefined {
 
 async function enrichWithTechnician(orders: any[]) {
   if (!orders.length) return orders;
-  const techs = await db.select().from(techniciansTable);
-  const techMap = new Map(techs.map((t) => [t.id, t.name]));
+
+  // Only fetch the specific technician IDs referenced — avoids a full table scan
+  // on every request regardless of how many orders are in the list.
+  const techIds = [...new Set(
+    orders.map(o => o.technicianId).filter((id): id is number => id != null),
+  )];
+  const techMap = new Map<number, string>();
+  if (techIds.length > 0) {
+    const techs = await db
+      .select({ id: techniciansTable.id, name: techniciansTable.name })
+      .from(techniciansTable)
+      .where(inArray(techniciansTable.id, techIds));
+    techs.forEach(t => techMap.set(t.id, t.name));
+  }
+
   return orders.map((o) => ({
     ...o,
     technicianName: o.technicianNameFree
       ? o.technicianNameFree
-      : o.technicianId ? techMap.get(o.technicianId) ?? null : null,
-    scheduledAt: o.scheduledAt ? o.scheduledAt.toISOString() : null,
-    completedAt: o.completedAt ? o.completedAt.toISOString() : null,
-    signedAt: o.signedAt ? o.signedAt.toISOString() : null,
+      : o.technicianId != null ? (techMap.get(o.technicianId) ?? null) : null,
+    scheduledAt:    o.scheduledAt    ? o.scheduledAt.toISOString()    : null,
+    completedAt:    o.completedAt    ? o.completedAt.toISOString()    : null,
+    signedAt:       o.signedAt       ? o.signedAt.toISOString()       : null,
     estimatedValue: o.estimatedValue !== null && o.estimatedValue !== undefined
-      ? Number(o.estimatedValue)
-      : null,
-    createdAt: o.createdAt.toISOString(),
-    updatedAt: o.updatedAt.toISOString(),
+      ? Number(o.estimatedValue) : null,
+    createdAt:  o.createdAt.toISOString(),
+    updatedAt:  o.updatedAt.toISOString(),
   }));
 }
 

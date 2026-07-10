@@ -6,9 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
 import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays, MapPin, RefreshCw } from "lucide-react";
 import { PRIORITY_LABELS } from "@/lib/constants";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useUnit } from "@/contexts/unit-context";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -39,36 +39,35 @@ export default function Dashboard() {
   const [filterUnit, setFilterUnit] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
 
-  const [years, setYears] = useState<number[]>(
-    Array.from({ length: 5 }, (_, i) => currentYear - i)
-  );
-
   const isAM = unit === "AM";
   // Effective unit for API calls: AM can filter by sub-unit; other units always see themselves
   const effectiveUnit = isAM
     ? (filterUnit === "all" ? undefined : filterUnit)
     : unit;
 
-  const summaryQueryKey = ["dashboard-summary", effectiveUnit];
-  const statsQueryKey = ["dashboard-stats", period];
+  // Stable query key references — prevents handleRefresh from being recreated every render
+  const summaryQueryKey = useMemo(() => ["dashboard-summary", effectiveUnit],          [effectiveUnit]);
+  const statsQueryKey   = useMemo(() => ["dashboard-stats",   period, effectiveUnit],  [period, effectiveUnit]);
 
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary(
     { unidade: effectiveUnit },
     { query: { enabled: true, queryKey: summaryQueryKey } }
   );
+  // unidade passed so stats are always scoped to the same unit as summary cards
   const { data: stats, isLoading: loadingStats } = useGetDashboardStats(
-    { period },
+    { period, unidade: effectiveUnit } as any,
     { query: { enabled: true, queryKey: statsQueryKey } }
   );
 
-  useEffect(() => {
-    fetch(`${BASE_URL}/api/service-orders/available-years`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: number[] | null) => {
-        if (Array.isArray(data) && data.length > 0) setYears(data);
-      })
-      .catch(() => {});
-  }, []);
+  // Available years — replaced raw useEffect+fetch with useQuery for caching
+  const { data: years = Array.from({ length: 5 }, (_, i) => currentYear - i) } = useQuery({
+    queryKey: ["available-years"],
+    queryFn: (): Promise<number[]> =>
+      fetch(`${BASE_URL}/api/service-orders/available-years`)
+        .then(r => r.ok ? r.json() : [])
+        .then((d: number[]) => Array.isArray(d) && d.length > 0 ? d : [currentYear]),
+    staleTime: 5 * 60 * 1000, // years rarely change
+  });
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -77,7 +76,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: statsQueryKey }),
     ]);
     setRefreshing(false);
-  }, [queryClient, JSON.stringify(summaryQueryKey), JSON.stringify(statsQueryKey)]);
+  }, [queryClient, summaryQueryKey, statsQueryKey]);
 
   const daysInMonth = filterMonth !== "0"
     ? new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
@@ -125,7 +124,17 @@ export default function Dashboard() {
     );
   }
 
-  if (!summary) return null;
+  if (!summary) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center gap-4 min-h-[40vh]">
+        <p className="text-muted-foreground text-sm">Não foi possível carregar os dados do painel.</p>
+        <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-2">
+          <RefreshCw className="w-4 h-4" />
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
 
   const unitLabel = isAM && filterUnit !== "all" ? ` — ${filterUnit}` : isAM ? " — Todas as Unidades" : ` — ${unit}`;
 

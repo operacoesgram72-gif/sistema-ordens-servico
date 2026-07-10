@@ -138,6 +138,21 @@ const migrations = [
   `ALTER TABLE purchase_sheets DROP CONSTRAINT IF EXISTS purchase_sheets_unidade_unique`,
   `ALTER TABLE purchase_sheets ADD CONSTRAINT purchase_sheets_unidade_unique UNIQUE (unidade)`,
 
+  // ── performance indexes ────────────────────────────────────────────────────
+  // Composite indexes for the most common filtered queries
+  `CREATE INDEX IF NOT EXISTS idx_so_unidade_created ON service_orders (unidade, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_so_unidade_status  ON service_orders (unidade, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_so_status          ON service_orders (status)`,
+  `CREATE INDEX IF NOT EXISTS idx_so_created_at      ON service_orders (created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_so_technician_id   ON service_orders (technician_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_so_scheduled_at    ON service_orders (scheduled_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_fe_parent_id       ON file_entries   (parent_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_fe_unidade         ON file_entries   (unidade)`,
+  `CREATE INDEX IF NOT EXISTS idx_tech_manager_id    ON technicians    (manager_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_tech_unidade       ON technicians    (unidade)`,
+  `CREATE INDEX IF NOT EXISTS idx_mw_unidade         ON material_withdrawals (unidade)`,
+  `CREATE INDEX IF NOT EXISTS idx_mw_created_at      ON material_withdrawals (created_at DESC)`,
+
   // ── corporate org-chart roles (shared across all units) ───────────────────
   `INSERT INTO technicians (name, specialty, position, unidade, is_corporate, active)
    SELECT 'Eduardo Lopes', 'Diretoria', 'Diretor de Tecnologia', 'AM', true, true
