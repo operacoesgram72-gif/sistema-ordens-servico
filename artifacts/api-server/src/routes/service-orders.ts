@@ -37,6 +37,39 @@ function parseDate(val: unknown): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+// ── Columns to select for the list view ──────────────────────────────────────
+// Explicitly exclude `photos` and `signature` — those fields contain base64
+// image data that can be hundreds of KB per row. Returning them for every OS in
+// a list makes the response balloon to tens of MBs, causing the browser to hang
+// and the server to hit memory limits. The detail endpoint (/service-orders/:id)
+// still returns every column.
+const LIST_COLUMNS = {
+  id:               serviceOrdersTable.id,
+  number:           serviceOrdersTable.number,
+  title:            serviceOrdersTable.title,
+  description:      serviceOrdersTable.description,
+  category:         serviceOrdersTable.category,
+  priority:         serviceOrdersTable.priority,
+  status:           serviceOrdersTable.status,
+  location:         serviceOrdersTable.location,
+  department:       serviceOrdersTable.department,
+  technicianId:     serviceOrdersTable.technicianId,
+  technicianNameFree: serviceOrdersTable.technicianNameFree,
+  notes:            serviceOrdersTable.notes,
+  tipo:             serviceOrdersTable.tipo,
+  formatoServico:   serviceOrdersTable.formatoServico,
+  // photos and signature intentionally omitted from list — heavy base64 blobs
+  signedBy:         serviceOrdersTable.signedBy,
+  signedAt:         serviceOrdersTable.signedAt,
+  estimatedValue:   serviceOrdersTable.estimatedValue,
+  scheduledAt:      serviceOrdersTable.scheduledAt,
+  completedAt:      serviceOrdersTable.completedAt,
+  unidade:          serviceOrdersTable.unidade,
+  origem:           serviceOrdersTable.origem,
+  createdAt:        serviceOrdersTable.createdAt,
+  updatedAt:        serviceOrdersTable.updatedAt,
+} as const;
+
 async function enrichWithTechnician(orders: any[]) {
   if (!orders.length) return orders;
 
@@ -124,8 +157,9 @@ router.get("/service-orders", async (req, res) => {
       );
     }
 
+    // Select only lightweight columns — photos/signature are excluded (see LIST_COLUMNS above).
     const rows = await db
-      .select()
+      .select(LIST_COLUMNS)
       .from(serviceOrdersTable)
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(sql`${serviceOrdersTable.createdAt} DESC`);
