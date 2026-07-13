@@ -18,7 +18,11 @@ type Withdrawal = {
   tipoMaterial: string;
   quantidade: string;
   justificativa: string;
-  foto: string | null;
+  // `foto` is not returned by the list endpoint (kept light/fast) — only a
+  // boolean flag. The actual base64 payload is fetched on demand when the
+  // user opens the lightbox, via fetchPhotos().
+  foto?: string | null;
+  hasFoto?: boolean;
   tipo: string;
   createdAt: string;
 };
@@ -64,24 +68,68 @@ export default function RetiradaMateriais() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
+  const [loadingPhotosId, setLoadingPhotosId] = useState<number | null>(null);
+  // Pagination — the list endpoint returns a bounded page so opening this
+  // screen stays fast even as the table grows into the thousands. "Carregar
+  // mais" fetches the next page without re-fetching what's already loaded.
+  const PAGE_SIZE = 200;
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchPage = useCallback(async (offset: number) => {
+    const res = await fetch(`${BASE_URL}/api/material-withdrawals?unidade=${unit}&limit=${PAGE_SIZE}&offset=${offset}`);
+    if (!res.ok) throw new Error();
+    return res.json() as Promise<{ records: Withdrawal[]; hasMore: boolean }>;
+  }, [unit]);
 
   const fetchAll = useCallback(async () => {
     try {
-      const res = await fetch(`${BASE_URL}/api/material-withdrawals?unidade=${unit}`);
-      if (res.ok) setRecords(await res.json());
+      const { records: page, hasMore: more } = await fetchPage(0);
+      setRecords(page);
+      setHasMore(more);
     } catch {
       toast({ title: "Erro ao carregar registros", variant: "destructive" });
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [unit]);
+  }, [fetchPage]);
 
   useEffect(() => { setLoading(true); fetchAll(); }, [unit]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchAll();
+  };
+
+  const handleLoadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const { records: page, hasMore: more } = await fetchPage(records.length);
+      setRecords(prev => [...prev, ...page]);
+      setHasMore(more);
+    } catch {
+      toast({ title: "Erro ao carregar mais registros", variant: "destructive" });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  /** Lazily fetch the full record (including base64 photos) for the lightbox. */
+  const openPhotos = async (r: Withdrawal) => {
+    if (!r.hasFoto) return;
+    setLoadingPhotosId(r.id);
+    try {
+      const res = await fetch(`${BASE_URL}/api/material-withdrawals/${r.id}`);
+      if (!res.ok) throw new Error();
+      const full: Withdrawal = await res.json();
+      const photos = parsePhotos(full.foto ?? null);
+      if (photos.length > 0) setLightbox({ photos, index: 0 });
+    } catch {
+      toast({ title: "Erro ao carregar fotos", variant: "destructive" });
+    } finally {
+      setLoadingPhotosId(null);
+    }
   };
 
   const handleField = (field: keyof FormState, value: string) =>
@@ -119,16 +167,28 @@ export default function RetiradaMateriais() {
     setShowForm(true);
   };
 
-  const openEdit = (r: Withdrawal) => {
+  const openEdit = async (r: Withdrawal) => {
     setEditingId(r.id);
-    const photos = parsePhotos(r.foto);
+    // The list row doesn't carry `foto` (kept out of the list response for
+    // speed) — fetch the full record on demand so editing still has access
+    // to the existing photos.
+    let foto: string | null = r.foto ?? null;
+    if (r.hasFoto && foto == null) {
+      try {
+        const res = await fetch(`${BASE_URL}/api/material-withdrawals/${r.id}`);
+        if (res.ok) foto = ((await res.json()) as Withdrawal).foto ?? null;
+      } catch {
+        toast({ title: "Erro ao carregar fotos do registro", variant: "destructive" });
+      }
+    }
+    const photos = parsePhotos(foto);
     setForm({
       nome: r.nome || "",
       date: r.date,
       tipoMaterial: r.tipoMaterial,
       quantidade: r.quantidade,
       justificativa: r.justificativa,
-      foto: r.foto ?? null,
+      foto,
       tipo: r.tipo,
     });
     setPhotoPreviews(photos);
@@ -324,6 +384,7 @@ export default function RetiradaMateriais() {
                 <tr className="bg-muted/40 border-b border-border text-xs text-muted-foreground">
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Nome</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Data</th>
+                  <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Horário</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Tipo</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Material/Ferramenta</th>
                   <th className="text-left px-4 py-3 font-semibold border-r border-border/40">Quantidade</th>
@@ -334,12 +395,18 @@ export default function RetiradaMateriais() {
               </thead>
               <tbody className="divide-y divide-border/40">
                 {records.map(r => {
-                  const photos = parsePhotos(r.foto);
                   return (
                     <tr key={r.id} className="hover:bg-muted/10 transition-colors group">
                       <td className="px-4 py-3 border-r border-border/30 font-medium">{r.nome || <span className="text-muted-foreground italic">—</span>}</td>
                       <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm">
                         {r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
+                      </td>
+                      <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm text-muted-foreground">
+                        {/* Horário de registro — vem do momento em que o registro foi criado no
+                            sistema (createdAt), é estático e não é editável. */}
+                        {r.createdAt
+                          ? new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                          : "-"}
                       </td>
                       <td className="px-4 py-3 border-r border-border/30">
                         <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", tipoBadge(r.tipo))}>
@@ -352,16 +419,16 @@ export default function RetiradaMateriais() {
                         {r.justificativa}
                       </td>
                       <td className="px-4 py-3 border-r border-border/30 text-center">
-                        {photos.length > 0 ? (
+                        {r.hasFoto ? (
                           <button
-                            onClick={() => setLightbox({ photos, index: 0 })}
-                            className="relative mx-auto inline-flex items-center justify-center w-9 h-9 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors"
+                            onClick={() => openPhotos(r)}
+                            disabled={loadingPhotosId === r.id}
+                            className="relative mx-auto inline-flex items-center justify-center w-9 h-9 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors disabled:opacity-50"
                           >
-                            <ImageIcon className="w-4 h-4" />
-                            {photos.length > 1 && (
-                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[9px] rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                                {photos.length}
-                              </span>
+                            {loadingPhotosId === r.id ? (
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <ImageIcon className="w-4 h-4" />
                             )}
                           </button>
                         ) : (
@@ -385,6 +452,14 @@ export default function RetiradaMateriais() {
             </table>
           )}
         </CardContent>
+        {hasMore && !loading && (
+          <div className="flex justify-center border-t border-border/40 p-3">
+            <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={loadingMore} className="gap-2">
+              <RefreshCw className={`w-4 h-4 ${loadingMore ? "animate-spin" : ""}`} />
+              {loadingMore ? "Carregando..." : "Carregar mais registros"}
+            </Button>
+          </div>
+        )}
       </Card>
     </div>
   );

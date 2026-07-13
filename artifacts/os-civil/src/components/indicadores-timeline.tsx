@@ -32,6 +32,12 @@ const EVENT_META: Record<TimelineEventType, { icon: typeof ClipboardPlus; color:
 
 const EVENT_TYPES: TimelineEventType[] = ["os_criada", "os_concluida", "os_programada", "material"];
 
+/**
+ * Always includes the exact time of day the event happened, alongside a
+ * relative/absolute label for context — e.g. "há 2h · 14:35" or
+ * "12/07/26 · 09:10". The list (histórico) view is the only place this is
+ * used; the chart view is unaffected.
+ */
 function formatRelativeDate(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
@@ -44,14 +50,14 @@ function formatRelativeDate(iso: string): string {
   const dateStr = date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" });
 
   if (diffMs < 0) {
-    // Future event (e.g. scheduled OS) — show absolute date, no relative label.
-    return `${dateStr} às ${time}`;
+    // Future event (e.g. scheduled OS) — show absolute date + time.
+    return `${dateStr} · ${time}`;
   }
-  if (diffMin < 1) return "agora mesmo";
-  if (diffMin < 60) return `há ${diffMin} min`;
-  if (diffH < 24) return `há ${diffH}h`;
-  if (diffD < 7) return `há ${diffD}d`;
-  return `${dateStr} às ${time}`;
+  if (diffMin < 1) return `agora mesmo · ${time}`;
+  if (diffMin < 60) return `há ${diffMin} min · ${time}`;
+  if (diffH < 24) return `há ${diffH}h · ${time}`;
+  if (diffD < 7) return `há ${diffD}d · ${time}`;
+  return `${dateStr} · ${time}`;
 }
 
 /**
