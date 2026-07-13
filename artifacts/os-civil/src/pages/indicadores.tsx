@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import IndicadoresTimeline from "@/components/indicadores-timeline";
 
 const MONTHS = [
   "Todos", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -479,6 +480,10 @@ export default function Indicadores() {
           </CardContent>
         </Card>
       )}
+
+      {/* ── Timeline de Eventos ────────────────────────────────────────────── */}
+      {/* Purely additive — standalone card, does not alter any section above. */}
+      <IndicadoresTimeline />
     </div>
   );
 }

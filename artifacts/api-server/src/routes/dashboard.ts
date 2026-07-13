@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { serviceOrdersTable, techniciansTable } from "@workspace/db";
-import { eq, and, sql, count } from "drizzle-orm";
+import { serviceOrdersTable, techniciansTable, materialWithdrawalsTable } from "@workspace/db";
+import { eq, and, sql, count, isNotNull, desc } from "drizzle-orm";
 import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
@@ -290,6 +290,141 @@ router.get("/dashboard/indicators", async (req, res) => {
     const totalValue = allOrders.reduce((acc, o) => acc + getValue(o), 0);
 
     res.json({ totalValue: round(totalValue), byLocation, byMonth, byTechnician, byFormatoServico });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+// ── GET /dashboard/timeline ────────────────────────────────────────────────────
+// Aggregates recent events from existing tables into a single chronological feed
+// for the Indicadores timeline widget. Read-only — does not touch any other
+// endpoint's data or behavior. Sources (all real, existing timestamped data):
+//   - OS criadas       (service_orders.createdAt)
+//   - OS concluídas    (service_orders.completedAt, status = concluida)
+//   - OS programadas   (service_orders.scheduledAt) — calendar scheduling
+//   - Retiradas de material / compras (material_withdrawals.createdAt)
+// Each source is queried independently (LIMIT + ORDER BY, indexed columns),
+// merged in memory, sorted by date desc, and capped to `limit`.
+router.get("/dashboard/timeline", async (req, res) => {
+  try {
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
+    // Fetch a bit more than `limit` per source so merging+sorting still yields
+    // a full, correctly-ordered page even when one source dominates recency.
+    const perSourceLimit = limit;
+
+    const unitCond = (col: any) => (unidade ? eq(col, unidade) : undefined);
+
+    const [created, completed, scheduled, withdrawals] = await Promise.all([
+      db.select({
+          id: serviceOrdersTable.id,
+          number: serviceOrdersTable.number,
+          title: serviceOrdersTable.title,
+          location: serviceOrdersTable.location,
+          formatoServico: serviceOrdersTable.formatoServico,
+          date: serviceOrdersTable.createdAt,
+        })
+        .from(serviceOrdersTable)
+        .where(unitCond(serviceOrdersTable.unidade))
+        .orderBy(desc(serviceOrdersTable.createdAt))
+        .limit(perSourceLimit),
+      db.select({
+          id: serviceOrdersTable.id,
+          number: serviceOrdersTable.number,
+          title: serviceOrdersTable.title,
+          location: serviceOrdersTable.location,
+          formatoServico: serviceOrdersTable.formatoServico,
+          date: serviceOrdersTable.completedAt,
+        })
+        .from(serviceOrdersTable)
+        .where(and(
+          eq(serviceOrdersTable.status, "concluida"),
+          isNotNull(serviceOrdersTable.completedAt),
+          unitCond(serviceOrdersTable.unidade),
+        ))
+        .orderBy(desc(serviceOrdersTable.completedAt))
+        .limit(perSourceLimit),
+      db.select({
+          id: serviceOrdersTable.id,
+          number: serviceOrdersTable.number,
+          title: serviceOrdersTable.title,
+          location: serviceOrdersTable.location,
+          formatoServico: serviceOrdersTable.formatoServico,
+          date: serviceOrdersTable.scheduledAt,
+        })
+        .from(serviceOrdersTable)
+        .where(and(
+          isNotNull(serviceOrdersTable.scheduledAt),
+          unitCond(serviceOrdersTable.unidade),
+        ))
+        .orderBy(desc(serviceOrdersTable.scheduledAt))
+        .limit(perSourceLimit),
+      db.select({
+          id: materialWithdrawalsTable.id,
+          nome: materialWithdrawalsTable.nome,
+          tipoMaterial: materialWithdrawalsTable.tipoMaterial,
+          quantidade: materialWithdrawalsTable.quantidade,
+          date: materialWithdrawalsTable.createdAt,
+        })
+        .from(materialWithdrawalsTable)
+        .where(unitCond(materialWithdrawalsTable.unidade))
+        .orderBy(desc(materialWithdrawalsTable.createdAt))
+        .limit(perSourceLimit),
+    ]);
+
+    type TimelineEvent = {
+      id: string;
+      type: "os_criada" | "os_concluida" | "os_programada" | "material";
+      title: string;
+      subtitle: string | null;
+      date: string;
+    };
+
+    const events: TimelineEvent[] = [];
+
+    for (const o of created) {
+      events.push({
+        id: `criada-${o.id}`,
+        type: "os_criada",
+        title: `OS ${o.number} aberta`,
+        subtitle: o.title || o.location || null,
+        date: new Date(o.date as any).toISOString(),
+      });
+    }
+    for (const o of completed) {
+      if (!o.date) continue;
+      events.push({
+        id: `concluida-${o.id}`,
+        type: "os_concluida",
+        title: `OS ${o.number} concluída`,
+        subtitle: o.title || o.location || null,
+        date: new Date(o.date as any).toISOString(),
+      });
+    }
+    for (const o of scheduled) {
+      if (!o.date) continue;
+      events.push({
+        id: `programada-${o.id}`,
+        type: "os_programada",
+        title: `OS ${o.number} programada`,
+        subtitle: o.title || o.location || null,
+        date: new Date(o.date as any).toISOString(),
+      });
+    }
+    for (const w of withdrawals) {
+      events.push({
+        id: `material-${w.id}`,
+        type: "material",
+        title: `Retirada de material${w.tipoMaterial ? `: ${w.tipoMaterial}` : ""}`,
+        subtitle: [w.nome, w.quantidade].filter(Boolean).join(" — ") || null,
+        date: new Date(w.date as any).toISOString(),
+      });
+    }
+
+    events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    res.json(events.slice(0, limit));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Erro interno" });
