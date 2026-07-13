@@ -1,6 +1,11 @@
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ClipboardPlus, CheckCircle2, CalendarClock, Package, History } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ClipboardPlus, CheckCircle2, CalendarClock, Package, History, List, BarChart3 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 import { useUnit } from "@/contexts/unit-context";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -18,12 +23,14 @@ interface TimelineEvent {
 // Discreet, low-saturation colors per event type — matches the existing card
 // accent-color pattern used elsewhere in Indicadores (icon + colored value),
 // without introducing any new palette colors.
-const EVENT_META: Record<TimelineEventType, { icon: typeof ClipboardPlus; color: string; bg: string }> = {
-  os_criada:     { icon: ClipboardPlus,  color: "text-primary",       bg: "bg-primary/10" },
-  os_concluida:  { icon: CheckCircle2,   color: "text-emerald-500",   bg: "bg-emerald-500/10" },
-  os_programada: { icon: CalendarClock,  color: "text-blue-400",      bg: "bg-blue-400/10" },
-  material:      { icon: Package,        color: "text-amber-500",     bg: "bg-amber-500/10" },
+const EVENT_META: Record<TimelineEventType, { icon: typeof ClipboardPlus; color: string; bg: string; hex: string; label: string }> = {
+  os_criada:     { icon: ClipboardPlus,  color: "text-primary",       bg: "bg-primary/10",       hex: "hsl(var(--primary))", label: "OS Criadas" },
+  os_concluida:  { icon: CheckCircle2,   color: "text-emerald-500",   bg: "bg-emerald-500/10",   hex: "#10b981",             label: "OS Concluídas" },
+  os_programada: { icon: CalendarClock,  color: "text-blue-400",      bg: "bg-blue-400/10",      hex: "#60a5fa",             label: "OS Programadas" },
+  material:      { icon: Package,        color: "text-amber-500",     bg: "bg-amber-500/10",     hex: "#f59e0b",             label: "Materiais" },
 };
+
+const EVENT_TYPES: TimelineEventType[] = ["os_criada", "os_concluida", "os_programada", "material"];
 
 function formatRelativeDate(iso: string): string {
   const date = new Date(iso);
@@ -55,6 +62,7 @@ function formatRelativeDate(iso: string): string {
  */
 export default function IndicadoresTimeline() {
   const { unit } = useUnit();
+  const [viewMode, setViewMode] = useState<"lista" | "grafico">("lista");
 
   const { data: events, isLoading } = useQuery<TimelineEvent[]>({
     queryKey: ["dashboard-timeline", unit],
@@ -67,12 +75,70 @@ export default function IndicadoresTimeline() {
     refetchInterval: 60_000,
   });
 
+  // Aggregate the same events (list source of truth) into per-day counts by
+  // type, oldest → newest, for the chart view. Purely derived — no extra fetch.
+  const chartData = useMemo(() => {
+    if (!events || events.length === 0) return [];
+    const byDay = new Map<string, { day: string } & Record<TimelineEventType, number>>();
+    for (const ev of events) {
+      const d = new Date(ev.date);
+      const key = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      if (!byDay.has(key)) {
+        byDay.set(key, {
+          day: key,
+          os_criada: 0,
+          os_concluida: 0,
+          os_programada: 0,
+          material: 0,
+        });
+      }
+      byDay.get(key)![ev.type]++;
+    }
+    // Sort chronologically (ascending) using the earliest event date per day key
+    const dayOrder = new Map<string, number>();
+    for (const ev of events) {
+      const d = new Date(ev.date);
+      const key = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      const ts = d.getTime();
+      if (!dayOrder.has(key) || ts < dayOrder.get(key)!) dayOrder.set(key, ts);
+    }
+    return Array.from(byDay.values()).sort(
+      (a, b) => (dayOrder.get(a.day) ?? 0) - (dayOrder.get(b.day) ?? 0)
+    );
+  }, [events]);
+
   return (
     <Card className="bg-card border-border/50">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <History className="w-4 h-4 text-muted-foreground" />
-          <CardTitle className="text-base">Linha do Tempo de Eventos</CardTitle>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-base">Linha do Tempo de Eventos</CardTitle>
+          </div>
+          <div className="flex items-center gap-1 rounded-md border border-border/50 p-0.5">
+            <Button
+              type="button"
+              variant={viewMode === "lista" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setViewMode("lista")}
+              title="Ver histórico em lista"
+            >
+              <List className="w-3.5 h-3.5" />
+              Histórico
+            </Button>
+            <Button
+              type="button"
+              variant={viewMode === "grafico" ? "secondary" : "ghost"}
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setViewMode("grafico")}
+              title="Ver gráfico da linha do tempo"
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              Gráfico
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -84,7 +150,7 @@ export default function IndicadoresTimeline() {
           <p className="text-sm text-muted-foreground text-center py-8">
             Nenhum evento recente para exibir.
           </p>
-        ) : (
+        ) : viewMode === "lista" ? (
           <div className="relative max-h-[420px] overflow-y-auto pr-1">
             <div className="absolute left-[15px] top-1 bottom-1 w-px bg-border" aria-hidden="true" />
             <ul className="space-y-4">
@@ -112,6 +178,29 @@ export default function IndicadoresTimeline() {
               })}
             </ul>
           </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
+              <Tooltip
+                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
+                labelStyle={{ color: "hsl(var(--foreground))" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {EVENT_TYPES.map((type) => (
+                <Bar
+                  key={type}
+                  dataKey={type}
+                  name={EVENT_META[type].label}
+                  stackId="events"
+                  fill={EVENT_META[type].hex}
+                  radius={[2, 2, 0, 0]}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
         )}
       </CardContent>
     </Card>
