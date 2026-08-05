@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
 import { serviceOrdersTable, techniciansTable } from "@workspace/db";
 import { resolveUnit } from "../lib/share-tokens";
@@ -214,6 +215,10 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
         status: "aberta",
         unidade,
         origem,
+        // Pre-generate an opaque UUID share token at creation time.
+        // This means the public link is only obtainable from the portal
+        // (via the detail response), not mintable by arbitrary callers.
+        shareToken: randomUUID(),
       })
       .returning();
 
@@ -364,6 +369,79 @@ router.patch("/service-orders/:id/status", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(400).json({ error: "Dados inválidos" });
+  }
+});
+
+// GET /shared-os/:token — public, unauthenticated read-only view of a single OS.
+// Looks up by opaque UUID token only — no sequential ID is ever accepted.
+// Returns an EXPLICIT allowlist of public fields; any new DB column is excluded
+// by default unless deliberately added to PUBLIC_OS_FIELDS below.
+const PUBLIC_OS_FIELDS = {
+  number:           serviceOrdersTable.number,
+  title:            serviceOrdersTable.title,
+  description:      serviceOrdersTable.description,
+  category:         serviceOrdersTable.category,
+  priority:         serviceOrdersTable.priority,
+  status:           serviceOrdersTable.status,
+  location:         serviceOrdersTable.location,
+  department:       serviceOrdersTable.department,
+  technicianId:     serviceOrdersTable.technicianId,
+  technicianNameFree: serviceOrdersTable.technicianNameFree,
+  notes:            serviceOrdersTable.notes,
+  tipo:             serviceOrdersTable.tipo,
+  formatoServico:   serviceOrdersTable.formatoServico,
+  photos:           serviceOrdersTable.photos,
+  signature:        serviceOrdersTable.signature,
+  signedBy:         serviceOrdersTable.signedBy,
+  signedAt:         serviceOrdersTable.signedAt,
+  estimatedValue:   serviceOrdersTable.estimatedValue,
+  scheduledAt:      serviceOrdersTable.scheduledAt,
+  completedAt:      serviceOrdersTable.completedAt,
+  createdAt:        serviceOrdersTable.createdAt,
+} as const;
+
+router.get("/shared-os/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    // UUIDs are 36 chars (8-4-4-4-12 with hyphens). Reject obviously malformed tokens early.
+    if (!token || !/^[0-9a-f-]{36}$/.test(token)) {
+      res.status(400).json({ error: "Token inválido" }); return;
+    }
+
+    const [row] = await db
+      .select(PUBLIC_OS_FIELDS)
+      .from(serviceOrdersTable)
+      .where(eq(serviceOrdersTable.shareToken, token));
+    if (!row) { res.status(404).json({ error: "Não encontrada" }); return; }
+
+    // Resolve technician name independently — we cannot use enrichWithTechnician
+    // here because that helper expects all date columns (including updatedAt) which
+    // are intentionally excluded from the public projection.
+    let technicianName: string | null = row.technicianNameFree ?? null;
+    if (!technicianName && row.technicianId != null) {
+      const [tech] = await db
+        .select({ name: techniciansTable.name })
+        .from(techniciansTable)
+        .where(eq(techniciansTable.id, row.technicianId));
+      technicianName = tech?.name ?? null;
+    }
+
+    // Strip the internal technicianId from the response — callers only need the name.
+    const { technicianId: _tid, ...rest } = row;
+    const safe = {
+      ...rest,
+      technicianName,
+      scheduledAt:    row.scheduledAt?.toISOString()    ?? null,
+      completedAt:    row.completedAt?.toISOString()    ?? null,
+      signedAt:       row.signedAt?.toISOString()       ?? null,
+      estimatedValue: row.estimatedValue !== null && row.estimatedValue !== undefined
+        ? Number(row.estimatedValue) : null,
+      createdAt:      row.createdAt.toISOString(),
+    };
+    res.json(safe);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro interno" });
   }
 });
 

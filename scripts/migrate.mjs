@@ -50,6 +50,11 @@ const migrations = [
   `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS department text`,
   `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS notes text`,
   `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+  `ALTER TABLE service_orders ADD COLUMN IF NOT EXISTS share_token text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_so_share_token ON service_orders (share_token) WHERE share_token IS NOT NULL`,
+  // Back-fill share tokens for any OS rows created before this column existed.
+  // gen_random_uuid() is available in all Postgres ≥ 13 / Supabase instances.
+  `UPDATE service_orders SET share_token = gen_random_uuid()::text WHERE share_token IS NULL`,
 
   // ── technicians ────────────────────────────────────────────────────────────
   `CREATE TABLE IF NOT EXISTS technicians (

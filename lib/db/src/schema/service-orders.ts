@@ -26,6 +26,7 @@ export const serviceOrdersTable = pgTable("service_orders", {
   completedAt: timestamp("completed_at"),
   unidade: text("unidade").notNull().default("AM"),
   origem: text("origem").notNull().default("manual"),
+  shareToken: text("share_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

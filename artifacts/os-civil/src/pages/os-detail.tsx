@@ -380,13 +380,21 @@ export default function OSDetail() {
     );
   };
 
-  const copyShareLink = () => {
-    const url = `${window.location.origin}${window.location.pathname}?view=1`;
-    navigator.clipboard.writeText(url).then(() => {
+  const copyShareLink = async () => {
+    try {
+      // The share token is pre-generated at OS creation time and included in
+      // the detail response — no server round-trip needed to mint a token.
+      const token = (os as any)?.shareToken as string | undefined;
+      if (!token) throw new Error("token missing");
+      const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+      const url = `${window.location.origin}${BASE}/os-publica/${token}`;
+      await navigator.clipboard.writeText(url);
       setCopiedShare(true);
       setTimeout(() => setCopiedShare(false), 2500);
-      toast({ title: "Link de somente leitura copiado!", description: "Compartilhe para que terceiros possam visualizar esta OS sem editar." });
-    });
+      toast({ title: "Link copiado!", description: "Terceiros poderão visualizar esta OS sem acesso ao portal." });
+    } catch {
+      toast({ title: "Erro ao gerar link", description: "Tente novamente.", variant: "destructive" });
+    }
   };
 
   const handleDelete = () => {

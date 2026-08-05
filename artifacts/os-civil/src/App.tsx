@@ -32,6 +32,7 @@ const Arquivos          = lazy(() => import("@/pages/arquivos"));
 const Processos         = lazy(() => import("@/pages/processos"));
 const RegistrarPmoc     = lazy(() => import("@/pages/registrar-pmoc"));
 const FecharOS          = lazy(() => import("@/pages/fechar-os"));
+const OsPublica         = lazy(() => import("@/pages/os-publica"));
 const NotFound          = lazy(() => import("@/pages/not-found"));
 
 const queryClient = new QueryClient({
@@ -174,6 +175,7 @@ function App() {
                 <Route path="/fornecedores/publico/:id" component={FornecedorPublico} />
                 <Route path="/fornecedores/publico" component={FornecedoresPublico} />
                 <Route path="/compras/publico/:unidade" component={ComprasServicosPublico} />
+                <Route path="/os-publica/:token" component={OsPublica} />
                 <Route component={StandaloneGuard} />
               </Switch>
             </Suspense>
