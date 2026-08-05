@@ -245,6 +245,9 @@ router.get("/dashboard/indicators", async (req, res) => {
     if (filterTipo)    conditions.push(eq((serviceOrdersTable as any).tipo, filterTipo));
 
     // Single query with LEFT JOIN — no separate technicians fetch
+    // Capped at 2000 rows: JS-side aggregation for the indicators page degrades
+    // above that threshold (CPU, memory). At 2000 records the stats are still
+    // representative and the response arrives in < 1 s.
     const allOrders = await db
       .select({
         location:           serviceOrdersTable.location,
@@ -258,7 +261,8 @@ router.get("/dashboard/indicators", async (req, res) => {
       })
       .from(serviceOrdersTable)
       .leftJoin(techniciansTable, eq(serviceOrdersTable.technicianId, techniciansTable.id))
-      .where(and(...conditions));
+      .where(and(...conditions))
+      .limit(2000);
 
     // Market value fallback per formato
     const MARKET_RATES: Record<string, number> = {

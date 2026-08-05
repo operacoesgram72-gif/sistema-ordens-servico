@@ -43,7 +43,8 @@ function getCacheKey(unit: string) {
 
 function readCache(unit: string): OS[] {
   try {
-    return JSON.parse(localStorage.getItem(getCacheKey(unit)) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(getCacheKey(unit)) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -154,7 +155,11 @@ export default function FecharOS() {
       let existing: string[] = [];
       try {
         const r = await fetch(`${BASE_URL}/api/service-orders/${osId}/photos`);
-        if (r.ok) { const d = await r.json(); existing = JSON.parse(d.photos || "[]") || []; }
+        if (r.ok) {
+          const d = await r.json();
+          const parsed = JSON.parse(d.photos || "[]");
+          existing = Array.isArray(parsed) ? parsed : [];
+        }
       } catch {}
 
       const merged = [...existing, ...allNew];
@@ -229,7 +234,7 @@ export default function FecharOS() {
       const r = await fetch(`${BASE_URL}/api/service-orders/${osId}/photos`);
       if (r.ok) {
         const d = await r.json() as { photos: string | null };
-        const list: string[] = (() => { try { return JSON.parse(d.photos || "[]") ?? []; } catch { return []; } })();
+        const list: string[] = (() => { try { const p = JSON.parse(d.photos || "[]"); return Array.isArray(p) ? p : []; } catch { return []; } })();
         setOsPhotos(prev => ({ ...prev, [osId]: list }));
       }
     } catch {
@@ -267,7 +272,9 @@ export default function FecharOS() {
     setLoading(true);
     setFromCache(false);
     try {
-      const res = await fetch(`${BASE_URL}/api/service-orders?unidade=${unitFromUrl}`);
+      // Limit to 200 most-recent OS — keeps the response small and the card list
+      // manageable. Employees working on a specific unit will never need >200 open calls.
+      const res = await fetch(`${BASE_URL}/api/service-orders?unidade=${unitFromUrl}&limit=200`);
       if (res.ok) {
         const data = await res.json();
         setOrdens(data);

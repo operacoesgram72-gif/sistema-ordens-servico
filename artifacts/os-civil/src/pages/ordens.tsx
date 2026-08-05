@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import { format } from "date-fns";
 import { Download, Plus, Search, FileSpreadsheet, Camera, FileText, RefreshCw } from "lucide-react";
@@ -29,8 +29,9 @@ const MAX_DISPLAY_CHARS = 2 * 1024 * 1024;
 function parsePhotos(photosStr: string | null | undefined): string[] {
   if (!photosStr) return [];
   try {
-    const arr: unknown[] = JSON.parse(photosStr);
-    return arr.filter(
+    const parsed: unknown = JSON.parse(photosStr);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
       (s): s is string =>
         typeof s === "string" &&
         !s.startsWith("data:video/") &&
@@ -49,6 +50,9 @@ export default function Ordens() {
   const { unit } = useUnit();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  // Debounced version of search — API query only fires 400 ms after typing stops,
+  // preventing a round-trip on every keystroke for large datasets.
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<string>("all");
   const [period, setPeriod] = useState<string>("monthly");
   const [tipo, setTipo] = useState<string>("all");
@@ -57,47 +61,59 @@ export default function Ordens() {
   const [lightbox, setLightbox] = useState<LightboxState>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
   // Lazy-load first photo per OS for the list thumbnail.
   // Photos are excluded from the list payload for performance; when the user
   // hovers over a row with photos, we fetch from the lightweight /photos endpoint
   // and cache the result so subsequent hovers are instant.
   const [loadedPhotos, setLoadedPhotos] = useState<Record<number, string>>({});
+  // Track both in-flight and already-loaded IDs in refs so the callback stays
+  // stable (no loadedPhotos closure) — avoids recreating it on every thumbnail load.
   const loadingPhotosRef = useRef(new Set<number>());
+  const loadedPhotosRef  = useRef(new Set<number>());
   const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 
   const loadFirstPhoto = useCallback(async (id: number) => {
-    if (loadedPhotos[id] || loadingPhotosRef.current.has(id)) return;
+    if (loadedPhotosRef.current.has(id) || loadingPhotosRef.current.has(id)) return;
     loadingPhotosRef.current.add(id);
     try {
       const res = await fetch(`${BASE_URL}/api/service-orders/${id}/photos`);
       if (!res.ok) return;
       const { photos: raw } = await res.json() as { photos: string | null };
       if (!raw) return;
-      const arr: unknown[] = JSON.parse(raw);
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
       const MAX_THUMB = 500 * 1024; // 500 KB — enough for a clear thumbnail
-      const first = arr.find(
+      const first = parsed.find(
         (s): s is string =>
           typeof s === "string" &&
           s.startsWith("data:image/") &&
           s.length <= MAX_THUMB
       );
-      if (first) setLoadedPhotos(prev => ({ ...prev, [id]: first }));
+      if (first) {
+        loadedPhotosRef.current.add(id);
+        setLoadedPhotos(prev => ({ ...prev, [id]: first }));
+      }
     } catch {
       // silently ignore — camera icon stays, user can open detail page
     } finally {
       loadingPhotosRef.current.delete(id);
     }
-  }, [loadedPhotos, BASE_URL]);
+  }, [BASE_URL]); // stable — no loadedPhotos in closure
 
   // Stable key — prevents handleRefresh from re-creating on every render
   const queryKey = useMemo(
-    () => ["service-orders", search, status, period, tipo, formato, unit],
-    [search, status, period, tipo, formato, unit]
+    () => ["service-orders", debouncedSearch, status, period, tipo, formato, unit],
+    [debouncedSearch, status, period, tipo, formato, unit]
   );
 
   const { data: ordens, isLoading } = useListServiceOrders(
     {
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       status: status !== "all" ? status : undefined,
       period: period !== "all" ? (period as any) : undefined,
       tipo: tipo !== "all" ? (tipo as any) : undefined,

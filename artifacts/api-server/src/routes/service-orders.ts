@@ -162,14 +162,25 @@ router.get("/service-orders", async (req, res) => {
       );
     }
 
+    // Default to 300 most-recent records; callers may request up to 500 via ?limit=N.
+    // Returning every OS without a cap causes 10+ MB responses and multi-second hangs
+    // on large datasets — the list UI only ever displays a manageable subset anyway.
+    const limit  = Math.min(Math.max(Number(q.limit) || 300, 1), 500);
+    const offset = Math.max(Number(q.offset) || 0, 0);
+
     // Select only lightweight columns — photos/signature are excluded (see LIST_COLUMNS above).
     const rows = await db
       .select(LIST_COLUMNS)
       .from(serviceOrdersTable)
       .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(sql`${serviceOrdersTable.createdAt} DESC`);
+      .orderBy(sql`${serviceOrdersTable.createdAt} DESC`)
+      .limit(limit)
+      .offset(offset);
 
     const enriched = await enrichWithTechnician(rows);
+    // Short cache: 30 s browser cache + ETag so repeated navigations are instant
+    // but new records appear within half a minute without a manual refresh.
+    res.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
     res.json(enriched);
   } catch (err) {
     req.log.error(err);
