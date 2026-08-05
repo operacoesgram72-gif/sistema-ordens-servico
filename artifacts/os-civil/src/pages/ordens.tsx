@@ -338,7 +338,7 @@ export default function Ordens() {
                 const loadedPhoto = loadedPhotos[os.id];
                 return (
                   <TableRow key={os.id} className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setLocation(`/ordens/${os.id}`)}>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(new Date(os.createdAt), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{format(new Date(os.createdAt), "dd/MM/yyyy HH:mm")}</TableCell>
                     <TableCell>
                       <span className="text-xs font-mono font-semibold text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded">
                         {(os as any).unidade || "—"}

@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { STATUS_LABELS } from "@/lib/constants";
+import { STATUS_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { CalendarSummaryCards, type CalendarSummary } from "@/components/calendario/summary-cards";
@@ -65,6 +65,7 @@ export default function Calendario() {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("todos");
+  const [formatoFilter, setFormatoFilter] = useState<string>("todos");
   const [myTechId, setMyTechId] = useState<string>(() => localStorage.getItem(MY_TECH_STORAGE_KEY) || "");
 
   // Key stabilised — period:"annual" always returns the current year so the year
@@ -107,25 +108,33 @@ export default function Calendario() {
     [orders, unit]
   );
 
-  // Quick-filter applied on top of the unit-scoped orders — affects only what
-  // is shown in the grid (dots/chips/day counts), never the underlying data.
+  // Quick-filter + formato filter applied on top of the unit-scoped orders —
+  // affects only what is shown in the grid, never the underlying data.
   const filteredOrders = useMemo(() => {
+    let base: any[];
     switch (quickFilter) {
       case "minhas":
-        return myTechId
+        base = myTechId
           ? unitOrders.filter((os: any) => String(os.technicianId ?? "") === myTechId)
           : [];
+        break;
       case "urgente":
-        return unitOrders.filter((os: any) => os.priority === "urgente");
+        base = unitOrders.filter((os: any) => os.priority === "urgente");
+        break;
       case "aberta":
       case "em_andamento":
       case "concluida":
       case "cancelada":
-        return unitOrders.filter((os: any) => os.status === quickFilter);
+        base = unitOrders.filter((os: any) => os.status === quickFilter);
+        break;
       default:
-        return unitOrders;
+        base = unitOrders;
     }
-  }, [unitOrders, quickFilter, myTechId]);
+    if (formatoFilter !== "todos") {
+      base = base.filter((os: any) => os.formatoServico === formatoFilter);
+    }
+    return base;
+  }, [unitOrders, quickFilter, myTechId, formatoFilter]);
 
   const ordersByDate = useMemo(() => {
     const map = new Map<string, typeof filteredOrders>();
@@ -273,7 +282,7 @@ export default function Calendario() {
       {/* Summary cards */}
       <CalendarSummaryCards summary={monthSummary} />
 
-      {/* Quick filters */}
+      {/* Quick filters + formato filter */}
       <div className="flex flex-wrap items-center gap-2">
         {QUICK_FILTERS.map(f => (
           <button
@@ -289,6 +298,19 @@ export default function Calendario() {
             {f.label}
           </button>
         ))}
+
+        {/* Formato de serviço filter — combinável com os demais chips */}
+        <Select value={formatoFilter} onValueChange={setFormatoFilter}>
+          <SelectTrigger className="h-7 text-xs w-[150px]">
+            <SelectValue placeholder="Formato" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os Formatos</SelectItem>
+            {Object.entries(FORMATO_SERVICO_LABELS).map(([val, label]) => (
+              <SelectItem key={val} value={val}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         {quickFilter === "minhas" && !isReadOnly && (
           <div className="flex items-center gap-1.5 ml-1">

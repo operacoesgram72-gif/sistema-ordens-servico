@@ -196,14 +196,6 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
     setRows(prev => prev.map(row => {
       if (row.id !== rowId) return row;
       const qdata = row[quarter];
-      if (!qdata.ok && qdata.fotos.length === 0) {
-        toast({
-          title: "Foto obrigatória",
-          description: "Adicione pelo menos uma foto antes de marcar como OK.",
-          variant: "destructive",
-        });
-        return row;
-      }
       const q = { ...qdata, ok: !qdata.ok };
       return { ...row, [quarter]: q };
     }));
