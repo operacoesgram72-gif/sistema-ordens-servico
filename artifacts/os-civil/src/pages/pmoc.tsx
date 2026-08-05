@@ -613,7 +613,7 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
       <Card className="bg-card border-border/50">
         <CardContent className="p-0 overflow-auto max-h-[calc(100vh-260px)]">
           <table className="w-full text-xs border-collapse" style={{ minWidth: "1600px" }}>
-            <thead className="sticky top-0 z-10">
+            <thead className="sticky top-0 z-10 bg-background">
               <tr className="bg-muted/40 border-b border-border">
                 {colHeader("empresa",  "Empresa",      "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[120px]")}
                 {colHeader("cod",      "Cod.",          "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20")}
