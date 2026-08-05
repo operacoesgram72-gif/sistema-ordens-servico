@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useGetDashboardIndicators } from "@workspace/api-client-react";
 import { useUnit } from "@/contexts/unit-context";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -49,7 +49,6 @@ export default function Indicadores() {
   const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [selectedMonth, setSelectedMonth] = useState<number>(0);
   const [selectedDate, setSelectedDate] = useState<string>(todayISO());
-  const [years, setYears] = useState<number[]>([currentYear]);
 
   // Desempenho filters — formato/tipo are server-side; técnico is client-side
   const [filterFormato, setFilterFormato] = useState<string>("all");
@@ -59,18 +58,23 @@ export default function Indicadores() {
   const { unit } = useUnit();
   const queryClient = useQueryClient();
 
+  // Replace raw useEffect+fetch with React Query — cached for 5 min, no re-fetch on every render
+  const { data: yearsData } = useQuery({
+    queryKey: ["available-years"],
+    queryFn: (): Promise<number[]> =>
+      fetch(`${BASE_URL}/api/service-orders/available-years`)
+        .then(r => r.ok ? r.json() : [])
+        .then((d: number[]) => Array.isArray(d) && d.length > 0 ? d : [currentYear]),
+    staleTime: 5 * 60 * 1000,
+  });
+  const years = yearsData ?? [currentYear];
+
+  // Sync selectedYear when available years load (keep valid selection)
   useEffect(() => {
-    fetch(`${BASE_URL}/api/service-orders/available-years`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: number[] | null) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setYears(data);
-          if (!data.includes(selectedYear)) setSelectedYear(data[0]);
-        }
-      })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unit]);
+    if (yearsData && yearsData.length > 0 && !yearsData.includes(selectedYear)) {
+      setSelectedYear(yearsData[0]);
+    }
+  }, [yearsData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset client-side technician filter whenever any server-side filter or period changes
   // so a previously selected technician doesn't silently remain when the dataset changes.
@@ -147,20 +151,31 @@ export default function Indicadores() {
     <div className="flex flex-col flex-1 min-h-0">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="bg-background border-b border-border/30 shrink-0">
-        <div className="px-6 md:px-8 pt-6 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Indicadores de Desempenho</h1>
-          <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do período selecionado.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+        {/* Title row */}
+        <div className="px-6 md:px-8 pt-6 pb-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Indicadores de Desempenho</h1>
+            <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do período selecionado.</p>
+          </div>
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={() => queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] })}
             title="Atualizar indicadores"
+            className="gap-2 shrink-0"
           >
             <RefreshCw className="w-4 h-4" />
+            Atualizar
           </Button>
+        </div>
+
+        {/* Unified filter bar — Período + Desempenho in one scrollable row */}
+        <div className="px-6 md:px-8 pb-3 flex flex-wrap items-center gap-2">
+          {/* Período */}
+          <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground shrink-0">
+            <Calendar className="w-4 h-4 text-primary" />
+            Período:
+          </div>
           <Select
             value={periodMode}
             onValueChange={(val) => {
@@ -169,7 +184,7 @@ export default function Indicadores() {
               if (mode !== "mes") setSelectedMonth(0);
             }}
           >
-            <SelectTrigger className="w-28">
+            <SelectTrigger className="w-24 h-8 text-sm">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
@@ -183,7 +198,7 @@ export default function Indicadores() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              className="h-8 rounded-md border border-input bg-background px-3 text-sm"
             />
           ) : (
             <>
@@ -191,7 +206,7 @@ export default function Indicadores() {
                 value={selectedYear.toString()}
                 onValueChange={(val) => setSelectedYear(parseInt(val))}
               >
-                <SelectTrigger className="w-28">
+                <SelectTrigger className="w-24 h-8 text-sm">
                   <SelectValue placeholder="Ano" />
                 </SelectTrigger>
                 <SelectContent>
@@ -205,7 +220,7 @@ export default function Indicadores() {
                   value={selectedMonth.toString()}
                   onValueChange={(val) => setSelectedMonth(parseInt(val))}
                 >
-                  <SelectTrigger className="w-36">
+                  <SelectTrigger className="w-34 h-8 text-sm">
                     <SelectValue placeholder="Mês" />
                   </SelectTrigger>
                   <SelectContent>
@@ -217,15 +232,14 @@ export default function Indicadores() {
               )}
             </>
           )}
-        </div>
-        {/* ── Filtros de Desempenho — parte do cabeçalho fixo ─────────────── */}
-        <div className="px-6 md:px-8 py-2 border-t border-border/20 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-muted-foreground font-medium">Filtros de Desempenho:</span>
-          <Select
-            value={filterFormato}
-            onValueChange={(v) => setFilterFormato(v)}
-          >
-            <SelectTrigger className="w-44 h-9 text-sm">
+
+          {/* Divider */}
+          <div className="h-5 w-px bg-border/50 mx-1 hidden sm:block" />
+
+          {/* Filtros de Desempenho */}
+          <span className="text-sm text-muted-foreground font-medium hidden sm:inline shrink-0">Filtros:</span>
+          <Select value={filterFormato} onValueChange={(v) => setFilterFormato(v)}>
+            <SelectTrigger className="w-44 h-8 text-sm">
               <SelectValue placeholder="Formato de Serviço" />
             </SelectTrigger>
             <SelectContent>
@@ -235,11 +249,8 @@ export default function Indicadores() {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={filterTipo}
-            onValueChange={(v) => setFilterTipo(v)}
-          >
-            <SelectTrigger className="w-40 h-9 text-sm">
+          <Select value={filterTipo} onValueChange={(v) => setFilterTipo(v)}>
+            <SelectTrigger className="w-38 h-8 text-sm">
               <SelectValue placeholder="Tipo" />
             </SelectTrigger>
             <SelectContent>
@@ -249,11 +260,8 @@ export default function Indicadores() {
               ))}
             </SelectContent>
           </Select>
-          <Select
-            value={filterTecnico}
-            onValueChange={(v) => setFilterTecnico(v)}
-          >
-            <SelectTrigger className="w-48 h-9 text-sm">
+          <Select value={filterTecnico} onValueChange={(v) => setFilterTecnico(v)}>
+            <SelectTrigger className="w-44 h-8 text-sm">
               <SelectValue placeholder="Técnico" />
             </SelectTrigger>
             <SelectContent>
@@ -267,15 +275,14 @@ export default function Indicadores() {
             <Button
               variant="ghost"
               size="sm"
-              className="h-9 px-2 text-xs text-muted-foreground"
+              className="h-8 px-2 text-xs text-muted-foreground"
               onClick={() => { setFilterFormato("all"); setFilterTipo("all"); setFilterTecnico("all"); }}
             >
               <X className="w-3 h-3 mr-1" />
-              Limpar filtros
+              Limpar
             </Button>
           )}
         </div>
-      </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-6">

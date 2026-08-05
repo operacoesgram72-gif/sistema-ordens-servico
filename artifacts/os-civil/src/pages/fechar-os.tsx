@@ -37,22 +37,30 @@ type OS = {
 
 type EditDraft = Pick<OS, "location" | "department" | "description" | "notes" | "priority" | "technicianName">;
 
+const CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 minutes
+
 function getCacheKey(unit: string) {
   return `gram-fechar-os-cache-${unit}`;
 }
+function getCacheTsKey(unit: string) {
+  return `gram-fechar-os-cache-ts-${unit}`;
+}
 
-function readCache(unit: string): OS[] {
+function readCache(unit: string): { orders: OS[]; stale: boolean } {
   try {
     const parsed = JSON.parse(localStorage.getItem(getCacheKey(unit)) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    const ts = Number(localStorage.getItem(getCacheTsKey(unit)) || "0");
+    const stale = Date.now() - ts > CACHE_MAX_AGE_MS;
+    return { orders: Array.isArray(parsed) ? parsed : [], stale };
   } catch {
-    return [];
+    return { orders: [], stale: true };
   }
 }
 
 function writeCache(unit: string, orders: OS[]): void {
   try {
     localStorage.setItem(getCacheKey(unit), JSON.stringify(orders));
+    localStorage.setItem(getCacheTsKey(unit), String(Date.now()));
   } catch {}
 }
 
@@ -68,6 +76,8 @@ export default function FecharOS() {
   const [ordens, setOrdens] = useState<OS[]>([]);
   const [loading, setLoading] = useState(true);
   const [fromCache, setFromCache] = useState(false);
+  // Pagination: render 30 cards at a time to keep mobile smooth even with 200 orders
+  const [visibleCount, setVisibleCount] = useState(30);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successId, setSuccessId] = useState<number | null>(null);
   const [addingMediaToId, setAddingMediaToId] = useState<number | null>(null);
@@ -268,8 +278,8 @@ export default function FecharOS() {
     }
   };
 
-  const loadOrdens = useCallback(async () => {
-    setLoading(true);
+  const loadOrdens = useCallback(async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
     setFromCache(false);
     try {
       // Limit to 200 most-recent OS — keeps the response small and the card list
@@ -284,7 +294,7 @@ export default function FecharOS() {
       }
     } catch {
       // Fallback to cache (works offline or on transient network errors)
-      const cached = readCache(unitFromUrl);
+      const { orders: cached } = readCache(unitFromUrl);
       if (cached.length > 0) {
         setOrdens(cached);
         setFromCache(true);
@@ -322,8 +332,17 @@ export default function FecharOS() {
   );
 
   useEffect(() => {
-    void loadOrdens();
-  }, [loadOrdens]);
+    // If we have fresh cache, show it immediately and refresh silently in background.
+    // This makes the portal feel instant on re-visits without a visible loading spinner.
+    const { orders: cached, stale } = readCache(unitFromUrl);
+    if (cached.length > 0 && !stale) {
+      setOrdens(cached);
+      setLoading(false);
+      void loadOrdens(false); // background refresh
+    } else {
+      void loadOrdens(true); // show spinner
+    }
+  }, [unitFromUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStatusChange = async (id: number, newStatus: string) => {
     // Capture previous status BEFORE any state change for safe rollback
@@ -502,7 +521,7 @@ export default function FecharOS() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {ordens.map(os => (
+            {ordens.slice(0, visibleCount).map(os => (
               <Card key={os.id} className={`bg-card border-border/50 transition-all ${successId === os.id ? "border-emerald-500/50 bg-emerald-500/5" : ""}`}>
                 <CardContent className="p-4 space-y-3">
                   {/* OS header */}
@@ -742,6 +761,23 @@ export default function FecharOS() {
                 </CardContent>
               </Card>
             ))}
+            {/* Load-more pagination — prevents rendering 200 cards at once on mobile */}
+            {visibleCount < ordens.length && (
+              <div className="flex flex-col items-center gap-2 pt-2">
+                <p className="text-xs text-muted-foreground">
+                  Exibindo {Math.min(visibleCount, ordens.length)} de {ordens.length} ordens
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount(v => Math.min(v + 30, ordens.length))}
+                  className="gap-2"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Carregar mais
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
