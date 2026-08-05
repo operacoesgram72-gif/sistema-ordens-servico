@@ -604,6 +604,9 @@ export default function NovaOS() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="aberta">Aberta</SelectItem>
+                          <SelectItem value="em_andamento">Em Andamento</SelectItem>
+                          <SelectItem value="concluida">Concluída</SelectItem>
+                          <SelectItem value="cancelada">Cancelada</SelectItem>
                           <SelectItem value="impedimento">
                             <span className="flex items-center gap-2">
                               <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />

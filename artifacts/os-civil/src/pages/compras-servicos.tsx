@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShoppingCart, Share2, Loader2, Save, CheckCircle2, Printer } from "lucide-react";
+import { ShoppingCart, Share2, Loader2, Save, CheckCircle2, Printer, BarChart2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useUnit } from "@/contexts/unit-context";
 import { SheetGrid } from "@/components/compras/sheet-grid";
+import { ComprasDashboard } from "@/components/compras/compras-dashboard";
 import type { Workbook } from "@/types/purchase-sheet";
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -28,6 +29,7 @@ export default function ComprasServicos() {
 
   const [workbook, setWorkbook] = useState<Workbook | null>(null);
   const [activeTabId, setActiveTabId] = useState<string>("");
+  const [showDashboard, setShowDashboard] = useState(false);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyRef = useRef(false);
@@ -160,6 +162,10 @@ export default function ComprasServicos() {
               {saveState === "saving" && <><Loader2 className="w-3.5 h-3.5 animate-spin" />Salvando…</>}
               {saveState === "saved" && <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />Salvo</>}
             </div>
+            <Button variant="outline" onClick={() => setShowDashboard(true)} disabled={!workbook} title="Ver indicadores e gráficos">
+              <BarChart2 className="w-4 h-4 mr-2" />
+              Indicadores
+            </Button>
             <Button variant="outline" onClick={() => window.print()} title="Exportar como PDF">
               <Printer className="w-4 h-4 mr-2" />
               Exportar PDF
@@ -178,6 +184,10 @@ export default function ComprasServicos() {
         <div className="hidden print:block text-xl font-bold mb-2">
           Compras e Serviços — Unidade {unit}
         </div>
+
+        {showDashboard && workbook && (
+          <ComprasDashboard workbook={workbook} unit={unit} onClose={() => setShowDashboard(false)} />
+        )}
 
         <Card id="compras-print-card" className="p-4 bg-card border-border/50">
           {isLoading || !workbook ? (

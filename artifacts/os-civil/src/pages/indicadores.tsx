@@ -354,7 +354,7 @@ export default function Indicadores() {
           <CardHeader><CardTitle className="text-base">Volume Mensal de OS</CardTitle></CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={indicators.byMonth} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <ComposedChart data={filteredMonths} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
                 <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />

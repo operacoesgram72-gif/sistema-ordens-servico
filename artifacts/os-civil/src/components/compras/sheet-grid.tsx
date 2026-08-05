@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Plus, Trash2, Pencil, Check, X, ExternalLink, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,11 +39,45 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
   const [renameValue, setRenameValue] = useState("");
   // columnFilters: keyed by column index within the active tab
   const [columnFilters, setColumnFilters] = useState<Record<number, string>>({});
+  // colWidths: per-column pixel width overrides (drag-to-resize)
+  const [colWidths, setColWidths] = useState<Record<number, number>>({});
+  const resizingRef = useRef<{ colIdx: number; startX: number; startWidth: number } | null>(null);
+
+  const onResizeMove = useCallback((e: MouseEvent) => {
+    if (!resizingRef.current) return;
+    const { colIdx, startX, startWidth } = resizingRef.current;
+    const newWidth = Math.max(60, startWidth + e.clientX - startX);
+    setColWidths(prev => ({ ...prev, [colIdx]: newWidth }));
+  }, []);
+
+  const onResizeEnd = useCallback(() => {
+    resizingRef.current = null;
+    document.removeEventListener("mousemove", onResizeMove);
+    document.removeEventListener("mouseup", onResizeEnd);
+  }, [onResizeMove]);
+
+  const onResizeStart = useCallback((e: React.MouseEvent, colIdx: number) => {
+    const th = (e.currentTarget as HTMLElement).closest("th") as HTMLElement;
+    resizingRef.current = { colIdx, startX: e.clientX, startWidth: th.offsetWidth };
+    document.addEventListener("mousemove", onResizeMove);
+    document.addEventListener("mouseup", onResizeEnd);
+    e.preventDefault();
+    e.stopPropagation();
+  }, [onResizeMove, onResizeEnd]);
 
   const activeTab = workbook.tabs.find((t) => t.id === activeTabId) ?? workbook.tabs[0];
 
-  // Reset column filters when the active tab changes
-  useEffect(() => { setColumnFilters({}); }, [activeTabId]);
+  // Reset column filters and widths when the active tab changes
+  useEffect(() => { setColumnFilters({}); setColWidths({}); }, [activeTabId]);
+
+  // Unique values per column for filter datalist suggestions
+  const uniqueValsByColumn = useMemo(() => {
+    if (!activeTab) return {} as Record<number, string[]>;
+    return activeTab.columns.reduce((acc, _, ci) => {
+      acc[ci] = [...new Set(activeTab.rows.map(r => r[ci] ?? "").filter(Boolean))].sort();
+      return acc;
+    }, {} as Record<number, string[]>);
+  }, [activeTab]);
 
   // Client-side filtered rows — does not affect persisted data
   const filteredRows = useMemo(() => {
@@ -195,8 +229,12 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
             <tr>
               <th className="w-10 border-b border-r border-border/50 bg-muted/30 no-print-controls" />
               {activeTab.columns.map((col, colIdx) => (
-                <th key={colIdx} className="border-b border-r border-border/50 bg-muted/30 p-0 min-w-[140px]">
-                  <div className="flex items-center gap-1 px-1.5 py-1">
+                <th
+                  key={colIdx}
+                  className="border-b border-r border-border/50 bg-muted/30 p-0 relative"
+                  style={{ width: colWidths[colIdx] ?? undefined, minWidth: colWidths[colIdx] ?? 140 }}
+                >
+                  <div className="flex items-center gap-1 px-1.5 py-1 pr-2">
                     {readOnly ? (
                       <span className="font-semibold text-xs flex-1 truncate">{col}</span>
                     ) : (
@@ -212,6 +250,12 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                       </button>
                     )}
                   </div>
+                  {/* Drag-to-resize handle — right edge of header */}
+                  <div
+                    className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-primary/30 active:bg-primary/50 no-print-controls select-none"
+                    onMouseDown={(e) => onResizeStart(e, colIdx)}
+                    title="Arrastar para redimensionar"
+                  />
                 </th>
               ))}
               {!readOnly && (
@@ -222,21 +266,25 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                 </th>
               )}
             </tr>
-            {/* Column filter inputs row — hidden in print */}
+            {/* Column filter inputs row — hidden in print; datalist provides Excel-style unique-value suggestions */}
             <tr className="no-print">
               <th className="w-10 border-b border-r border-border/50 bg-background/50">
                 <Search className="w-3 h-3 text-muted-foreground/40 mx-auto" />
               </th>
               {activeTab.columns.map((_, colIdx) => (
-                <th key={colIdx} className="border-b border-r border-border/50 bg-background/50 p-1 min-w-[140px]">
+                <th key={colIdx} className="border-b border-r border-border/50 bg-background/50 p-1" style={{ minWidth: colWidths[colIdx] ?? 140 }}>
                   <input
+                    list={`sg-filter-${activeTabId}-${colIdx}`}
                     value={columnFilters[colIdx] ?? ""}
                     onChange={(e) =>
                       setColumnFilters((prev) => ({ ...prev, [colIdx]: e.target.value }))
                     }
-                    placeholder="Filtrar…"
+                    placeholder="▾ Filtrar…"
                     className="w-full bg-transparent text-xs px-1.5 py-0.5 outline-none border border-border/40 rounded focus:border-primary/50 placeholder:text-muted-foreground/30"
                   />
+                  <datalist id={`sg-filter-${activeTabId}-${colIdx}`}>
+                    {(uniqueValsByColumn[colIdx] ?? []).map(v => <option key={v} value={v} />)}
+                  </datalist>
                 </th>
               ))}
               {!readOnly && <th className="border-b border-border/50 bg-background/50" />}

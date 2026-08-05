@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Camera, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ type QuarterData = {
 
 type PmocRow = {
   id: string;
+  empresa: string;
   cod: string;
   modelo: string;
   tensao: string;
@@ -45,7 +46,7 @@ type PmocRow = {
 };
 
 type EditingCell =
-  | { rowId: string; field: "cod" | "modelo" | "tensao" | "btu" | "local" | "tipoArea" | "linkFicha" | "observacao" }
+  | { rowId: string; field: "empresa" | "cod" | "modelo" | "tensao" | "btu" | "local" | "tipoArea" | "linkFicha" | "observacao" }
   | { rowId: string; field: "execucao"; quarter: QuarterKey }
   | null;
 
@@ -72,7 +73,7 @@ function emptyQuarter(): QuarterData {
 
 const defaultRows: PmocRow[] = [
   {
-    id: genId(), cod: "AR001", modelo: "SPLIT DUTO DAIKIN", tensao: "220", btu: "48.000",
+    id: genId(), empresa: "", cod: "AR001", modelo: "SPLIT DUTO DAIKIN", tensao: "220", btu: "48.000",
     local: "TRANSMISSORES 01", tipoArea: "ESTRATÉGICO", linkFicha: "",
     q1: { execucao: "Fevereiro", ok: true, fotos: [] },
     q2: { execucao: "Maio", ok: true, fotos: [] },
@@ -81,7 +82,7 @@ const defaultRows: PmocRow[] = [
     observacao: "",
   },
   {
-    id: genId(), cod: "AR002", modelo: "CASSETE DAIKIN", tensao: "220", btu: "36.000",
+    id: genId(), empresa: "", cod: "AR002", modelo: "CASSETE DAIKIN", tensao: "220", btu: "36.000",
     local: "REFEITÓRIO", tipoArea: "ADMINISTRATIVO", linkFicha: "",
     q1: { execucao: "Fevereiro", ok: true, fotos: [] },
     q2: { execucao: "Maio", ok: true, fotos: [] },
@@ -122,6 +123,29 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const { toast } = useToast();
   const [rows, setRowsRaw] = useState<PmocRow[]>(() => loadRows(storageKey, initialRows));
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
+  // Column filters for the 8 fixed text columns (empresa, cod, modelo, tensao, btu, local, tipoArea, observacao)
+  const [colFilters, setColFilters] = useState<Record<string, string>>({});
+
+  // Derive unique values per fixed column for datalist suggestions
+  const filterFields = ["empresa", "cod", "modelo", "tensao", "btu", "local", "tipoArea", "observacao"] as const;
+  const uniqueVals = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    for (const f of filterFields) {
+      result[f] = [...new Set(rows.map(r => (r[f] as string) || "").filter(Boolean))].sort();
+    }
+    return result;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const active = Object.entries(colFilters).filter(([, v]) => v.trim());
+    if (!active.length) return rows;
+    return rows.filter(row =>
+      active.every(([field, val]) =>
+        ((row[field as keyof PmocRow] as string) ?? "").toLowerCase().includes(val.toLowerCase())
+      )
+    );
+  }, [rows, colFilters]);
 
   // On mount: fetch server data and update state + localStorage cache.
   // The server is the source of truth.
@@ -165,7 +189,7 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const addRow = () => {
     const nextCod = `AR${String(rows.length + 1).padStart(3, "0")}`;
     setRows(prev => [...prev, {
-      id: genId(), cod: nextCod, modelo: "", tensao: "220", btu: "",
+      id: genId(), empresa: "", cod: nextCod, modelo: "", tensao: "220", btu: "",
       local: "", tipoArea: "ESTRATÉGICO", linkFicha: "",
       q1: emptyQuarter(), q2: emptyQuarter(), q3: emptyQuarter(), q4: emptyQuarter(),
       observacao: "",
@@ -441,6 +465,7 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
           <table className="w-full text-xs border-collapse" style={{ minWidth: "1600px" }}>
             <thead>
               <tr className="bg-muted/40 border-b border-border">
+                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[120px]">Empresa</th>
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 whitespace-nowrap w-20">Cod.</th>
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[160px]">Modelo</th>
                 <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20">Tensão (V)</th>
@@ -456,8 +481,44 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground min-w-[140px]">Observação</th>
                 <th className="w-10" />
               </tr>
+              {/* Filter row — Excel-style text search with unique-value suggestions */}
+              <tr className="bg-muted/10 border-b border-border/60">
+                {(["empresa","cod","modelo","tensao","btu","local","tipoArea"] as const).map(field => (
+                  <td key={field} className="px-1 py-1 border-r border-border/30">
+                    <input
+                      list={`pmoc-filter-${storageKey}-${field}`}
+                      value={colFilters[field] ?? ""}
+                      onChange={e => setColFilters(prev => ({ ...prev, [field]: e.target.value }))}
+                      placeholder="▾ Filtrar…"
+                      className="w-full bg-background text-[10px] px-1.5 py-0.5 outline-none border border-border/40 rounded focus:border-primary/50 placeholder:text-muted-foreground/30"
+                    />
+                    <datalist id={`pmoc-filter-${storageKey}-${field}`}>
+                      {uniqueVals[field]?.map(v => <option key={v} value={v} />)}
+                    </datalist>
+                  </td>
+                ))}
+                {/* span through all quarter sub-columns + observacao column */}
+                <td colSpan={12} className="border-r border-border/30" />
+                <td className="px-1 py-1">
+                  <input
+                    list={`pmoc-filter-${storageKey}-observacao`}
+                    value={colFilters["observacao"] ?? ""}
+                    onChange={e => setColFilters(prev => ({ ...prev, observacao: e.target.value }))}
+                    placeholder="▾ Filtrar…"
+                    className="w-full bg-background text-[10px] px-1.5 py-0.5 outline-none border border-border/40 rounded focus:border-primary/50 placeholder:text-muted-foreground/30"
+                  />
+                  <datalist id={`pmoc-filter-${storageKey}-observacao`}>
+                    {uniqueVals["observacao"]?.map(v => <option key={v} value={v} />)}
+                  </datalist>
+                </td>
+                <td className="px-1 py-1 text-center">
+                  {Object.values(colFilters).some(v => v.trim()) && (
+                    <button onClick={() => setColFilters({})} className="text-[9px] text-muted-foreground hover:text-destructive" title="Limpar filtros">✕</button>
+                  )}
+                </td>
+              </tr>
               <tr className="bg-muted/20 border-b border-border text-[10px] text-muted-foreground">
-                <th colSpan={7} />
+                <th colSpan={8} />
                 {QUARTERS.map(q => (
                   <React.Fragment key={q.key}>
                     <th className="text-center px-2 py-1.5 border-r border-border/30 font-normal min-w-[100px]">Execução</th>
@@ -470,8 +531,11 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
-              {rows.map((row) => (
+              {filteredRows.map((row) => (
                 <tr key={row.id} className="group hover:bg-muted/10 transition-colors">
+                  <td className="px-3 py-2 border-r border-border/30">
+                    <EditableCell rowId={row.id} field="empresa" value={row.empresa ?? ""} />
+                  </td>
                   <td className="px-3 py-2 border-r border-border/30 font-mono font-bold text-primary">
                     <EditableCell rowId={row.id} field="cod" value={row.cod} />
                   </td>
@@ -556,10 +620,12 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {filteredRows.length === 0 && (
                 <tr>
-                  <td colSpan={24} className="text-center py-10 text-muted-foreground">
-                    Nenhum equipamento cadastrado. Clique em "Adicionar Equipamento" para começar.
+                  <td colSpan={22} className="text-center py-10 text-muted-foreground">
+                    {rows.length === 0
+                      ? "Nenhum equipamento cadastrado. Clique em \"Adicionar Equipamento\" para começar."
+                      : "Nenhum equipamento corresponde aos filtros."}
                   </td>
                 </tr>
               )}
