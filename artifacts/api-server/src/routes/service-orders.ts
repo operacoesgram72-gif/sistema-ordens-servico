@@ -223,8 +223,20 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
       })
       .returning();
 
-    const [enriched] = await enrichWithTechnician([created]);
-    res.status(201).json(enriched);
+    // Fast path: new orders always have technicianNameFree (free text) and
+    // no technicianId, so enrichWithTechnician would do zero DB work.
+    // Inline the field transforms to skip the async overhead entirely.
+    const isoOrNull = (d: Date | null | undefined) => (d ? d.toISOString() : null);
+    res.status(201).json({
+      ...created,
+      technicianName:  (created as any).technicianNameFree ?? null,
+      scheduledAt:     isoOrNull(created.scheduledAt),
+      completedAt:     null,
+      signedAt:        null,
+      estimatedValue:  created.estimatedValue != null ? Number(created.estimatedValue) : null,
+      createdAt:       created.createdAt.toISOString(),
+      updatedAt:       created.updatedAt.toISOString(),
+    });
 
     // Fire email notification asynchronously (non-blocking)
     sendOsNotification({
@@ -233,7 +245,7 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
       location: created.location,
       priority: created.priority,
       description: created.description ?? null,
-      technicianName: (enriched as any).technicianName ?? null,
+      technicianName: (created as any).technicianNameFree ?? null,
       formatoServico: created.formatoServico ?? null,
       estimatedValue: created.estimatedValue ? Number(created.estimatedValue) : null,
       photos: created.photos ?? null,

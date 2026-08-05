@@ -218,68 +218,67 @@ export default function Indicadores() {
             </>
           )}
         </div>
+        {/* ── Filtros de Desempenho — parte do cabeçalho fixo ─────────────── */}
+        <div className="px-6 md:px-8 py-2 border-t border-border/20 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground font-medium">Filtros de Desempenho:</span>
+          <Select
+            value={filterFormato}
+            onValueChange={(v) => setFilterFormato(v)}
+          >
+            <SelectTrigger className="w-44 h-9 text-sm">
+              <SelectValue placeholder="Formato de Serviço" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os formatos</SelectItem>
+              {Object.entries(FORMATO_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filterTipo}
+            onValueChange={(v) => setFilterTipo(v)}
+          >
+            <SelectTrigger className="w-40 h-9 text-sm">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              {Object.entries(TIPO_LABELS).map(([k, v]) => (
+                <SelectItem key={k} value={k}>{v}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filterTecnico}
+            onValueChange={(v) => setFilterTecnico(v)}
+          >
+            <SelectTrigger className="w-48 h-9 text-sm">
+              <SelectValue placeholder="Técnico" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os técnicos</SelectItem>
+              {allTechnicians.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {hasActiveFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2 text-xs text-muted-foreground"
+              onClick={() => { setFilterFormato("all"); setFilterTipo("all"); setFilterTecnico("all"); }}
+            >
+              <X className="w-3 h-3 mr-1" />
+              Limpar filtros
+            </Button>
+          )}
+        </div>
       </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-6">
-
-      {/* ── Desempenho Filters ─────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-muted-foreground font-medium">Filtros de Desempenho:</span>
-        <Select
-          value={filterFormato}
-          onValueChange={(v) => setFilterFormato(v)}
-        >
-          <SelectTrigger className="w-44 h-9 text-sm">
-            <SelectValue placeholder="Formato de Serviço" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os formatos</SelectItem>
-            {Object.entries(FORMATO_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filterTipo}
-          onValueChange={(v) => setFilterTipo(v)}
-        >
-          <SelectTrigger className="w-40 h-9 text-sm">
-            <SelectValue placeholder="Tipo" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os tipos</SelectItem>
-            {Object.entries(TIPO_LABELS).map(([k, v]) => (
-              <SelectItem key={k} value={k}>{v}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filterTecnico}
-          onValueChange={(v) => setFilterTecnico(v)}
-        >
-          <SelectTrigger className="w-48 h-9 text-sm">
-            <SelectValue placeholder="Técnico" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os técnicos</SelectItem>
-            {allTechnicians.map((name) => (
-              <SelectItem key={name} value={name}>{name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {hasActiveFilter && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-9 px-2 text-xs text-muted-foreground"
-            onClick={() => { setFilterFormato("all"); setFilterTipo("all"); setFilterTecnico("all"); }}
-          >
-            <X className="w-3 h-3 mr-1" />
-            Limpar filtros
-          </Button>
-        )}
-      </div>
 
       {/* ── Summary cards ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

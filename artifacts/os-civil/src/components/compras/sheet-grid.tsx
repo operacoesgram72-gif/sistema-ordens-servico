@@ -362,7 +362,19 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                       </td>
                     );
                   })}
-                  {!readOnly && <td className="border-b border-border/50 no-print-controls" />}
+                  {!readOnly && (
+                    <td className="border-b border-border/50 no-print-controls w-8">
+                      <button
+                        onClick={() => {
+                          if (window.confirm("Remover esta linha?")) deleteRow(rowIdx);
+                        }}
+                        className="w-full flex items-center justify-center py-1.5 text-muted-foreground/30 hover:text-destructive transition-colors"
+                        title="Remover linha"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))
             )}

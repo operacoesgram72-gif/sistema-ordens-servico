@@ -143,7 +143,7 @@ function ManagementRouter() {
               <Route path="/fornecedores" component={Fornecedores} />
               <Route path="/compras" component={ComprasServicos} />
               <Route path="/configuracoes" component={Configuracoes} />
-              <Route path="/pmoc" component={Pmoc} />
+              <Route path="/pmoc" component={() => <Pmoc />} />
               <Route path="/retirada-materiais" component={RetiradaMateriais} />
               <Route path="/calendario" component={Calendario} />
               <Route path="/arquivos" component={Arquivos} />

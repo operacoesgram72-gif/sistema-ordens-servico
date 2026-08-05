@@ -75,7 +75,7 @@ const formSchema = z.object({
   photos: z.string().optional(),
   origem: z.string().optional(),
   temPte: z.enum(["sim", "nao"]).optional(),
-  statusInicial: z.enum(["aberta", "impedimento"]).optional(),
+  statusInicial: z.enum(["aberta", "em_andamento", "concluida", "cancelada", "impedimento"]).optional(),
   motivoImpedimento: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.statusInicial === "impedimento" && !data.motivoImpedimento?.trim()) {
@@ -365,7 +365,7 @@ export default function NovaOS() {
           location: values.location,
           description,
           notes: notesField,
-          status: values.statusInicial === "impedimento" ? "impedimento" : "aberta",
+          status: values.statusInicial ?? "aberta",
           category: values.category,
           priority: values.priority,
           scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,

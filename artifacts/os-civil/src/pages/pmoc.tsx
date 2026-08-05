@@ -765,8 +765,21 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   );
 }
 
-export default function Pmoc() {
-  const [activeStateTab, setActiveStateTab] = useState<StateTabKey>("amazonas");
+// Maps management unit keys to PMOC state tab keys so the employee portal
+// defaults to the correct state tab for the employee's unit.
+const UNIT_TO_STATE_TAB: Record<string, StateTabKey> = {
+  AM: "amazonas",
+  AC: "acre",
+  AP: "amapa",
+  RO: "rondonia",
+  RR: "roraima",
+  PA: "interiores",
+};
+
+export default function Pmoc({ unit }: { unit?: string } = {}) {
+  const defaultTab: StateTabKey =
+    (unit && UNIT_TO_STATE_TAB[unit]) ? UNIT_TO_STATE_TAB[unit] : "amazonas";
+  const [activeStateTab, setActiveStateTab] = useState<StateTabKey>(defaultTab);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
