@@ -183,6 +183,26 @@ export default function Configuracoes() {
   const [connForm, setConnForm] = useState({ label: "", apiKey: "", endpointUrl: "" });
   const [showKey, setShowKey] = useState<Record<string, boolean>>({});
 
+  // ── PostgreSQL connection config (stored locally for security) ───────────
+  const PG_LS_KEY = "gram-pg-connection";
+  const [pgForm, setPgForm] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(PG_LS_KEY) || "null") ?? { host: "", port: "5432", database: "", user: "", password: "" }; }
+    catch { return { host: "", port: "5432", database: "", user: "", password: "" }; }
+  });
+  const [pgSaved, setPgSaved] = useState(false);
+  const [showPgPass, setShowPgPass] = useState(false);
+
+  const savePgConn = () => {
+    try { localStorage.setItem(PG_LS_KEY, JSON.stringify(pgForm)); } catch {}
+    setPgSaved(true);
+    setTimeout(() => setPgSaved(false), 2500);
+    toast({ title: "Conexão PostgreSQL salva localmente." });
+  };
+
+  const pgConnectionString = pgForm.host && pgForm.database && pgForm.user
+    ? `postgresql://${pgForm.user}:***@${pgForm.host}:${pgForm.port || 5432}/${pgForm.database}`
+    : "";
+
   // ── Misc UI state ───────────────────────────────────────────────────────
   const [copied, setCopied] = useState(false);
   const [copiedCal, setCopiedCal] = useState(false);
@@ -959,6 +979,103 @@ export default function Configuracoes() {
         </CardHeader>
         {sectOpen.integrations && (
           <CardContent className="space-y-6 sect-content">
+
+            {/* ── PostgreSQL connection ──────────────────────────────────── */}
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/70">Banco de Dados</p>
+              <div className="rounded-md border border-border/70 bg-muted/20 p-4 space-y-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl shrink-0">🐘</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Conexão PostgreSQL</span>
+                      {pgForm.host && pgForm.database && pgForm.user && (
+                        <Badge variant="outline" className="text-[10px] py-0 text-emerald-400 border-emerald-700/50">Configurado</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                      Parâmetros de conexão com um banco de dados PostgreSQL externo. Armazenados localmente neste dispositivo.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Host *</Label>
+                    <Input
+                      placeholder="db.exemplo.com ou 192.168.1.100"
+                      value={pgForm.host}
+                      onChange={e => setPgForm((f: typeof pgForm) => ({ ...f, host: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Porta</Label>
+                    <Input
+                      placeholder="5432"
+                      value={pgForm.port}
+                      onChange={e => setPgForm((f: typeof pgForm) => ({ ...f, port: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Banco de Dados *</Label>
+                    <Input
+                      placeholder="nome_do_banco"
+                      value={pgForm.database}
+                      onChange={e => setPgForm((f: typeof pgForm) => ({ ...f, database: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Usuário *</Label>
+                    <Input
+                      placeholder="postgres"
+                      value={pgForm.user}
+                      onChange={e => setPgForm((f: typeof pgForm) => ({ ...f, user: e.target.value }))}
+                    />
+                  </div>
+                  <div className="md:col-span-2 space-y-1.5">
+                    <Label className="text-xs">Senha</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type={showPgPass ? "text" : "password"}
+                        placeholder="Senha de acesso ao banco"
+                        value={pgForm.password}
+                        onChange={e => setPgForm((f: typeof pgForm) => ({ ...f, password: e.target.value }))}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => setShowPgPass(v => !v)}
+                      >
+                        {showPgPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {pgConnectionString && (
+                  <div className="bg-muted/40 rounded px-3 py-2 font-mono text-xs text-muted-foreground break-all">
+                    {pgConnectionString}
+                  </div>
+                )}
+
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={savePgConn}
+                    disabled={!pgForm.host || !pgForm.database || !pgForm.user}
+                  >
+                    {pgSaved
+                      ? <><CheckCircle2 className="w-3.5 h-3.5" />Salvo!</>
+                      : <><Save className="w-3.5 h-3.5" />Salvar Conexão</>}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {connections.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Conexões Ativas</p>

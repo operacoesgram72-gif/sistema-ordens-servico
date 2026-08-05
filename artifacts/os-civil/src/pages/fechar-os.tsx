@@ -185,6 +185,10 @@ export default function FecharOS() {
       technicianName: os.technicianName ?? "",
     });
     setEditingId(os.id);
+    // Auto-show existing photos when entering edit mode so the technician can
+    // see what's already attached before deciding to add or remove photos.
+    setShowPhotosId(os.id);
+    void loadPhotos(os.id);
   };
 
   const handleSaveEdit = async (id: number) => {

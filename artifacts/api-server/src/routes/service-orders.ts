@@ -262,14 +262,22 @@ router.get("/service-orders/available-years", async (req, res) => {
 
 // GET /service-orders/:id/photos — lightweight: returns only the photos field
 // Used by the list page to lazy-load thumbnails without fetching the full OS payload.
+// Photos blobs are large (base64); cache aggressively to avoid repeated 20s+ round-trips.
 router.get("/service-orders/:id/photos", async (req, res) => {
   try {
     const id = Number(req.params.id);
     const [row] = await db
-      .select({ photos: serviceOrdersTable.photos })
+      .select({ photos: serviceOrdersTable.photos, updatedAt: serviceOrdersTable.updatedAt })
       .from(serviceOrdersTable)
       .where(eq(serviceOrdersTable.id, id));
     if (!row) { res.status(404).json({ error: "Não encontrada" }); return; }
+
+    // ETag based on last update time — avoids re-transferring blobs when unchanged.
+    const etag = `"photos-${id}-${row.updatedAt?.getTime() ?? 0}"`;
+    res.set("ETag", etag);
+    res.set("Cache-Control", "private, max-age=120"); // 2-minute browser cache
+    if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
+
     res.json({ photos: row.photos ?? null });
   } catch (err) {
     req.log.error(err);

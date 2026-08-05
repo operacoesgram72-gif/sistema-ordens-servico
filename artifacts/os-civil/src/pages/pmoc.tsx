@@ -123,11 +123,27 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const { toast } = useToast();
   const [rows, setRowsRaw] = useState<PmocRow[]>(() => loadRows(storageKey, initialRows));
   const [editingCell, setEditingCell] = useState<EditingCell>(null);
-  // Column filters for the 8 fixed text columns (empresa, cod, modelo, tensao, btu, local, tipoArea, observacao)
-  const [colFilters, setColFilters] = useState<Record<string, string>>({});
+  // Excel-style column filters — Record<field, selected values[]>. Empty = show all.
+  const [colFilters, setColFilters] = useState<Record<string, string[]>>({});
+  // Which column's dropdown is open
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+  // Search text inside each column's dropdown
+  const [filterSearch, setFilterSearch] = useState<Record<string, string>>({});
 
-  // Derive unique values per fixed column for datalist suggestions
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!openFilter) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (!target.closest("[data-pmoc-filter]")) setOpenFilter(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openFilter]);
+
   const filterFields = ["empresa", "cod", "modelo", "tensao", "btu", "local", "tipoArea", "observacao"] as const;
+
+  // Derive unique values per fixed column
   const uniqueVals = useMemo(() => {
     const result: Record<string, string[]> = {};
     for (const f of filterFields) {
@@ -138,14 +154,115 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   }, [rows]);
 
   const filteredRows = useMemo(() => {
-    const active = Object.entries(colFilters).filter(([, v]) => v.trim());
+    const active = Object.entries(colFilters).filter(([, vals]) => vals.length > 0);
     if (!active.length) return rows;
     return rows.filter(row =>
-      active.every(([field, val]) =>
-        ((row[field as keyof PmocRow] as string) ?? "").toLowerCase().includes(val.toLowerCase())
-      )
+      active.every(([field, selectedVals]) => {
+        const val = (row[field as keyof PmocRow] as string) ?? "";
+        return selectedVals.includes(val);
+      })
     );
   }, [rows, colFilters]);
+
+  const toggleFilterVal = (field: string, val: string) => {
+    setColFilters(prev => {
+      const cur = prev[field] ?? [];
+      const next = cur.includes(val) ? cur.filter(v => v !== val) : [...cur, val];
+      return { ...prev, [field]: next };
+    });
+  };
+  const clearFilter = (field: string) => setColFilters(prev => ({ ...prev, [field]: [] }));
+  const hasActiveFilters = Object.values(colFilters).some(v => v.length > 0);
+
+  // ── Excel-style column filter header cell ──────────────────────────────
+  // Regular function (not a React component) — called directly in JSX below.
+  function colHeader(field: string, label: string, thClass: string) {
+    const active = (colFilters[field] ?? []).length > 0;
+    const search = filterSearch[field] ?? "";
+    const isOpen = openFilter === field;
+    const vals = (uniqueVals[field] ?? [])
+      .filter(v => !search || v.toLowerCase().includes(search.toLowerCase()));
+    const selectedVals = colFilters[field] ?? [];
+    return (
+      <th key={field} className={`relative ${thClass}`} data-pmoc-filter="">
+        <div className="flex items-center gap-1 whitespace-nowrap">
+          <span>{label}</span>
+          <button
+            data-pmoc-filter=""
+            onMouseDown={e => e.stopPropagation()}
+            onClick={() => {
+              setOpenFilter(isOpen ? null : field);
+              if (!isOpen) setFilterSearch(p => ({ ...p, [field]: "" }));
+            }}
+            className={`ml-auto shrink-0 p-0.5 rounded hover:bg-muted/60 transition-colors ${active ? "text-primary" : "text-muted-foreground/30 hover:text-muted-foreground"}`}
+            title="Filtrar coluna"
+          >
+            {/* Material Icons filter glyph */}
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z"/></svg>
+          </button>
+        </div>
+        {isOpen && (
+          <div
+            data-pmoc-filter=""
+            onMouseDown={e => e.stopPropagation()}
+            className="absolute top-full left-0 z-[200] bg-card border border-border rounded-lg shadow-2xl min-w-[200px] max-w-[260px] p-2 space-y-1.5 mt-0.5"
+          >
+            <input
+              data-pmoc-filter=""
+              autoFocus
+              placeholder="Pesquisar valores…"
+              value={search}
+              onChange={e => setFilterSearch(p => ({ ...p, [field]: e.target.value }))}
+              className="w-full text-xs px-2 py-1.5 border border-border/60 rounded outline-none bg-background focus:border-primary/50"
+            />
+            <div className="max-h-48 overflow-y-auto space-y-0.5">
+              <label className="flex items-center gap-2 text-xs px-1.5 py-0.5 rounded hover:bg-muted/40 cursor-pointer select-none" data-pmoc-filter="">
+                <input
+                  data-pmoc-filter=""
+                  type="checkbox"
+                  className="w-3 h-3 accent-primary"
+                  checked={selectedVals.length === 0}
+                  onChange={() => clearFilter(field)}
+                />
+                <span className="text-muted-foreground italic">(Todos)</span>
+              </label>
+              {vals.length === 0 && (
+                <p className="text-[10px] text-muted-foreground/60 px-2 py-1 italic">Nenhum resultado</p>
+              )}
+              {vals.map(val => (
+                <label key={val} className="flex items-center gap-2 text-xs px-1.5 py-0.5 rounded hover:bg-muted/40 cursor-pointer select-none" data-pmoc-filter="">
+                  <input
+                    data-pmoc-filter=""
+                    type="checkbox"
+                    className="w-3 h-3 accent-primary"
+                    checked={selectedVals.includes(val)}
+                    onChange={() => toggleFilterVal(field, val)}
+                  />
+                  <span className="truncate flex-1">{val}</span>
+                </label>
+              ))}
+            </div>
+            <div className="border-t border-border/50 pt-1 flex gap-1" data-pmoc-filter="">
+              <button
+                data-pmoc-filter=""
+                onClick={() => { clearFilter(field); setOpenFilter(null); }}
+                className="flex-1 text-[10px] py-1 rounded bg-muted/40 hover:bg-muted text-muted-foreground transition-colors"
+              >
+                Limpar
+              </button>
+              <button
+                data-pmoc-filter=""
+                onClick={() => setOpenFilter(null)}
+                className="flex-1 text-[10px] py-1 rounded bg-primary/20 hover:bg-primary/30 text-primary transition-colors font-medium"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+      </th>
+    );
+  }
 
   // On mount: fetch server data and update state + localStorage cache.
   // The server is the source of truth.
@@ -465,57 +582,31 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
           <table className="w-full text-xs border-collapse" style={{ minWidth: "1600px" }}>
             <thead>
               <tr className="bg-muted/40 border-b border-border">
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[120px]">Empresa</th>
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 whitespace-nowrap w-20">Cod.</th>
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[160px]">Modelo</th>
-                <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20">Tensão (V)</th>
-                <th className="text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20">BTU (s)</th>
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[150px]">Local</th>
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-28">Tipo de Área</th>
+                {colHeader("empresa",  "Empresa",      "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[120px]")}
+                {colHeader("cod",      "Cod.",          "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20")}
+                {colHeader("modelo",   "Modelo",        "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[160px]")}
+                {colHeader("tensao",   "Tensão (V)",    "text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20")}
+                {colHeader("btu",      "BTU (s)",       "text-center px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20")}
+                {colHeader("local",    "Local",         "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[150px]")}
+                {colHeader("tipoArea", "Tipo de Área",  "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-28")}
                 <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-24">Link da Ficha</th>
                 {QUARTERS.map(q => (
                   <th key={q.key} colSpan={3} className="text-center px-3 py-2.5 font-semibold text-primary border-r border-border/40 bg-primary/5 whitespace-nowrap">
                     {q.label}
                   </th>
                 ))}
-                <th className="text-left px-3 py-2.5 font-semibold text-muted-foreground min-w-[140px]">Observação</th>
-                <th className="w-10" />
-              </tr>
-              {/* Filter row — Excel-style text search with unique-value suggestions */}
-              <tr className="bg-muted/10 border-b border-border/60">
-                {(["empresa","cod","modelo","tensao","btu","local","tipoArea"] as const).map(field => (
-                  <td key={field} className="px-1 py-1 border-r border-border/30">
-                    <input
-                      list={`pmoc-filter-${storageKey}-${field}`}
-                      value={colFilters[field] ?? ""}
-                      onChange={e => setColFilters(prev => ({ ...prev, [field]: e.target.value }))}
-                      placeholder="▾ Filtrar…"
-                      className="w-full bg-background text-[10px] px-1.5 py-0.5 outline-none border border-border/40 rounded focus:border-primary/50 placeholder:text-muted-foreground/30"
-                    />
-                    <datalist id={`pmoc-filter-${storageKey}-${field}`}>
-                      {uniqueVals[field]?.map(v => <option key={v} value={v} />)}
-                    </datalist>
-                  </td>
-                ))}
-                {/* span through all quarter sub-columns + observacao column */}
-                <td colSpan={12} className="border-r border-border/30" />
-                <td className="px-1 py-1">
-                  <input
-                    list={`pmoc-filter-${storageKey}-observacao`}
-                    value={colFilters["observacao"] ?? ""}
-                    onChange={e => setColFilters(prev => ({ ...prev, observacao: e.target.value }))}
-                    placeholder="▾ Filtrar…"
-                    className="w-full bg-background text-[10px] px-1.5 py-0.5 outline-none border border-border/40 rounded focus:border-primary/50 placeholder:text-muted-foreground/30"
-                  />
-                  <datalist id={`pmoc-filter-${storageKey}-observacao`}>
-                    {uniqueVals["observacao"]?.map(v => <option key={v} value={v} />)}
-                  </datalist>
-                </td>
-                <td className="px-1 py-1 text-center">
-                  {Object.values(colFilters).some(v => v.trim()) && (
-                    <button onClick={() => setColFilters({})} className="text-[9px] text-muted-foreground hover:text-destructive" title="Limpar filtros">✕</button>
+                {colHeader("observacao", "Observação", "text-left px-3 py-2.5 font-semibold text-muted-foreground min-w-[140px]")}
+                <th className="w-10 px-2 text-center">
+                  {hasActiveFilters && (
+                    <button
+                      onClick={() => setColFilters({})}
+                      title="Limpar todos os filtros"
+                      className="text-[9px] text-destructive hover:text-destructive/80"
+                    >
+                      ✕
+                    </button>
                   )}
-                </td>
+                </th>
               </tr>
               <tr className="bg-muted/20 border-b border-border text-[10px] text-muted-foreground">
                 <th colSpan={8} />

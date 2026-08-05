@@ -1,0 +1,26 @@
+Faça somente as alterações abaixo, reutilizando o máximo possível da estrutura e componentes existentes para minimizar o consumo de créditos do Agent. Não altere regras de negócio, não faça refatorações desnecessárias e não modifique funcionalidades que já estejam funcionando corretamente.
+
+Alterações:
+
+Desempenho: Identifique e corrija todos os gargalos de performance para tornar o sistema mais rápido e fluido, principalmente com grande volume de dados. Otimize carregamentos, consultas, renderizações e abertura das telas sem alterar o comportamento atual.
+Fotos da OS: Permitir que, no Portal do Funcionário, durante a edição ou fechamento de uma Ordem de Serviço, seja possível visualizar todas as fotos já anexadas à OS.
+Indicadores de Compras e Serviços: Reestruture o dashboard utilizando o mesmo padrão dos indicadores de Ordens de Serviço, mantendo uma interface limpa (UI/UX). Exibir indicadores relevantes como:
+Valor total de Compras;
+Valor total de Serviços;
+Valor total de GV;
+Gráficos por Fornecedor;
+Gráficos por Solicitante;
+Filtros por Fornecedor, Solicitante, Tipo e demais campos relevantes.
+Mantenha apenas os cards essenciais e evite poluição visual.
+Integrações: Criar, dentro de Configurações → Integrações e Conexões, uma área para configuração da conexão com PostgreSQL, permitindo informar os parâmetros de conexão sem interferir nas conexões já existentes.
+PMOC: Substituir os filtros atuais das colunas por filtros no padrão Microsoft Excel, permitindo pesquisar e selecionar os valores existentes em cada coluna.
+Estabilidade: Corrigir qualquer erro que possa causar lentidão, travamentos, falhas de carregamento ou impedir o funcionamento normal do sistema, garantindo estabilidade mesmo com grande quantidade de registros.
+
+Importante:
+
+Faça apenas essas alterações.
+Preserve todas as funcionalidades existentes.
+Não introduza novos bugs.
+Reutilize componentes e códigos já existentes sempre que possível.
+Caso os créditos do Agent estejam próximos do limite, implemente e valide uma funcionalidade por vez, concluindo completamente cada etapa antes de iniciar a próxima.
+Não deixe nenhuma funcionalidade iniciada pela metade e priorize sempre a estabilidade da aplicação.
