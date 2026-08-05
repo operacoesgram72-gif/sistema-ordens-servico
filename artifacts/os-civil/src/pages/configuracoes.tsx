@@ -566,13 +566,15 @@ export default function Configuracoes() {
   // ══════════════════════════════════════════════════════════════════════════
   if (unit !== "AM") {
     return (
-      <div className="p-6 md:p-8 max-w-2xl mx-auto space-y-6">
-        <div>
+      <div className="flex flex-col flex-1 min-h-0">
+        <div className="bg-background border-b border-border/30 shrink-0 px-6 md:px-8 pt-6 pb-4">
           <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Configurações de e-mail para a unidade <span className="font-semibold text-foreground">{unit}</span>.
           </p>
         </div>
+        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="p-6 md:p-8 max-w-2xl space-y-5">
 
         {/* Info banner */}
         <div className="rounded-lg border border-border/60 bg-muted/30 p-4 flex gap-3 items-start">
@@ -693,6 +695,8 @@ export default function Configuracoes() {
           <p className="text-xs text-muted-foreground/50">Desenvolvido por <strong>Aristoteles Melo</strong> — GRAM Operações.</p>
         </div>
       </div>
+      </div>
+      </div>
     );
   }
 
@@ -700,11 +704,13 @@ export default function Configuracoes() {
   // ── AM FULL VIEW ─────────────────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="p-6 md:p-8 max-w-3xl mx-auto space-y-5">
-      <div>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="bg-background border-b border-border/30 shrink-0 px-6 md:px-8 pt-6 pb-4">
         <h1 className="text-2xl font-bold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground mt-1 text-sm">Ajustes do sistema, notificações e integrações.</p>
       </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="px-6 md:px-8 pb-8 pt-4 max-w-3xl space-y-5">
 
       {/* ── Notificações por E-mail ─────────────────────────────────────── */}
       <Card className="bg-card border-border/50 card-interactive">
@@ -1535,6 +1541,8 @@ export default function Configuracoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+    </div>
     </div>
   );
 }

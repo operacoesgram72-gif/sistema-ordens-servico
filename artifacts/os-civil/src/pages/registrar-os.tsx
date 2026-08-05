@@ -4,7 +4,7 @@ import * as z from "zod";
 import { format } from "date-fns";
 import {
   CalendarIcon, Save, X, Image as ImageIcon, CheckCircle2, TrendingUp,
-  CalendarDays, ArrowLeft, Camera, Video, WifiOff, Clock,
+  CalendarDays, ArrowLeft, Camera, Video, WifiOff, Clock, UserPlus, Plus,
 } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -45,7 +45,6 @@ const formSchema = z.object({
   scheduledAt: z.date().optional(),
   tipo: z.enum(["reforma", "revitalizacao", "preventiva", "corretiva", "outros"]).optional(),
   formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "outros"]).optional(),
-  technicianName: z.string().optional(),
   photos: z.string().optional(),
   temPte: z.enum(["sim", "nao"]).optional(),
 });
@@ -56,6 +55,7 @@ export default function RegistrarOS() {
   const createOrder = useCreateServiceOrder();
   const [, setLocation] = useLocation();
   const [photosBase64, setPhotosBase64] = useState<string[]>([]);
+  const [technicians, setTechnicians] = useState<string[]>([""]);
 
   type VideoEntry = {
     id: string; name: string; localUrl: string;
@@ -86,7 +86,6 @@ export default function RegistrarOS() {
       description: "",
       category: "manutencao",
       priority: "media",
-      technicianName: "",
       photos: "",
       temPte: undefined,
     },
@@ -312,7 +311,7 @@ export default function RegistrarOS() {
       scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
       tipo: values.tipo,
       formatoServico: values.formatoServico,
-      technicianName: values.technicianName || undefined,
+      technicianName: technicians.filter(t => t.trim()).join(" / ") || undefined,
       photos: photosField,
       unidade: unitFromUrl,
       origem: "manual",
@@ -431,7 +430,7 @@ export default function RegistrarOS() {
         </div>
       </header>
 
-      <div className="flex-1 flex items-start justify-center px-4 py-8">
+      <div className="flex-1 overflow-y-auto min-h-0 flex items-start justify-center px-4 py-8">
         <div className="w-full max-w-2xl space-y-6">
 
           {submitted ? (
@@ -630,20 +629,38 @@ export default function RegistrarOS() {
                           )}
                         />
 
-                        {/* Técnico */}
-                        <FormField
-                          control={form.control}
-                          name="technicianName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Técnico Responsável</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Nome do técnico (opcional)" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
+                        {/* Técnicos Responsáveis — lista dinâmica */}
+                        <div className="md:col-span-2 space-y-2">
+                          <Label>Técnicos Responsáveis</Label>
+                          <div className="space-y-2">
+                            {technicians.map((name, idx) => (
+                              <div key={idx} className="flex gap-2 items-center">
+                                <Input
+                                  placeholder={idx === 0 ? "Nome do técnico responsável (opcional)" : `Técnico ${idx + 1}`}
+                                  value={name}
+                                  onChange={e => setTechnicians(prev => prev.map((t, i) => i === idx ? e.target.value : t))}
+                                />
+                                {technicians.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setTechnicians(prev => prev.filter((_, i) => i !== idx))}
+                                    className="shrink-0 text-muted-foreground hover:text-destructive transition-colors p-1"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setTechnicians(prev => [...prev, ""])}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" />
+                            Adicionar Técnico
+                          </button>
+                        </div>
 
                         {/* Tem PTE */}
                         <FormField
@@ -728,7 +745,7 @@ export default function RegistrarOS() {
                                   <button
                                     type="button"
                                     onClick={() => removePhoto(idx)}
-                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-100 transition-opacity"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -743,7 +760,7 @@ export default function RegistrarOS() {
                                   <button
                                     type="button"
                                     onClick={() => removeVideo(v.id)}
-                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-0.5 opacity-100 transition-opacity"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>

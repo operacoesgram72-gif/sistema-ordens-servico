@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { serviceOrdersTable, techniciansTable, materialWithdrawalsTable } from "@workspace/db";
-import { eq, and, sql, count, isNotNull, desc } from "drizzle-orm";
+import { eq, and, sql, count, isNotNull, desc, gte, lt } from "drizzle-orm";
 import { resolveUnit } from "../lib/share-tokens";
 
 const router = Router();
@@ -18,8 +18,44 @@ router.get("/dashboard/summary", async (req, res) => {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfYear  = new Date(now.getFullYear(), 0, 1);
 
-    // Optional WHERE fragment — empty when no unit filter
-    const whereClause = unidade ? sql`WHERE unidade = ${unidade}` : sql``;
+    // Optional date-range filter from query params (year / month / day)
+    const filterYear  = req.query.year  ? Number(req.query.year)  : undefined;
+    const filterMonth = req.query.month ? Number(req.query.month) : undefined;
+    const filterDay   = req.query.day   ? Number(req.query.day)   : undefined;
+
+    let periodStart: Date | undefined;
+    let periodEnd:   Date | undefined;
+    if (filterYear !== undefined) {
+      if (filterMonth && filterDay) {
+        periodStart = new Date(filterYear, filterMonth - 1, filterDay);
+        periodEnd   = new Date(filterYear, filterMonth - 1, filterDay + 1);
+      } else if (filterMonth) {
+        periodStart = new Date(filterYear, filterMonth - 1, 1);
+        periodEnd   = new Date(filterYear, filterMonth, 1);
+      } else {
+        periodStart = new Date(filterYear, 0, 1);
+        periodEnd   = new Date(filterYear + 1, 0, 1);
+      }
+    }
+
+    // Combined WHERE clause: unit + optional date range
+    const whereClause = (() => {
+      if (unidade && periodStart && periodEnd)
+        return sql`WHERE unidade = ${unidade} AND created_at >= ${periodStart} AND created_at < ${periodEnd}`;
+      if (unidade)
+        return sql`WHERE unidade = ${unidade}`;
+      if (periodStart && periodEnd)
+        return sql`WHERE created_at >= ${periodStart} AND created_at < ${periodEnd}`;
+      return sql``;
+    })();
+
+    // Drizzle filter for byCategory / byPriority queries
+    const unitFilter  = unidade ? eq(serviceOrdersTable.unidade, unidade) : undefined;
+    const dateFilter  = periodStart && periodEnd
+      ? and(gte(serviceOrdersTable.createdAt, periodStart), lt(serviceOrdersTable.createdAt, periodEnd))
+      : undefined;
+    const drizzleWhere = unitFilter && dateFilter ? and(unitFilter, dateFilter)
+      : unitFilter ?? dateFilter;
 
     const [countsResult, categories, priorities] = await Promise.all([
       // All counts + estimated value sum in a single table scan
@@ -46,11 +82,11 @@ router.get("/dashboard/summary", async (req, res) => {
       `),
       db.select({ category: serviceOrdersTable.category, count: count() })
         .from(serviceOrdersTable)
-        .where(unidade ? eq(serviceOrdersTable.unidade, unidade) : undefined)
+        .where(drizzleWhere)
         .groupBy(serviceOrdersTable.category),
       db.select({ priority: serviceOrdersTable.priority, count: count() })
         .from(serviceOrdersTable)
-        .where(unidade ? eq(serviceOrdersTable.unidade, unidade) : undefined)
+        .where(drizzleWhere)
         .groupBy(serviceOrdersTable.priority),
     ]);
 

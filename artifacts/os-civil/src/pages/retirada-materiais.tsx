@@ -305,7 +305,8 @@ export default function RetiradaMateriais() {
   , []);
 
   return (
-    <div className="p-4 md:p-6 max-w-full mx-auto space-y-6">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="bg-background border-b border-border/30 shrink-0 px-4 md:px-6 pt-4 pb-4">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
@@ -327,6 +328,9 @@ export default function RetiradaMateriais() {
           </Button>
         </div>
       </div>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="px-4 md:px-6 pb-6 pt-4 max-w-full space-y-6">
 
       {/* Modal de formulário */}
       {showForm && (
@@ -484,6 +488,8 @@ export default function RetiradaMateriais() {
           </div>
         )}
       </Card>
+      </div>
+      </div>
     </div>
   );
 }

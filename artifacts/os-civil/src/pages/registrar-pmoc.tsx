@@ -45,7 +45,7 @@ export default function RegistrarPmoc() {
       </header>
 
       <div className="flex-1 overflow-auto flex flex-col min-h-0">
-        <Pmoc unit={unitFromUrl} />
+        <Pmoc />
       </div>
     </div>
   );

@@ -46,11 +46,19 @@ export default function Dashboard() {
     : unit;
 
   // Stable query key references — prevents handleRefresh from being recreated every render
-  const summaryQueryKey = useMemo(() => ["dashboard-summary", effectiveUnit],          [effectiveUnit]);
+  const summaryQueryKey = useMemo(
+    () => ["dashboard-summary", effectiveUnit, filterYear, filterMonth, filterDay],
+    [effectiveUnit, filterYear, filterMonth, filterDay]
+  );
   const statsQueryKey   = useMemo(() => ["dashboard-stats",   period, effectiveUnit],  [period, effectiveUnit]);
 
   const { data: summary, isLoading: loadingSummary } = useGetDashboardSummary(
-    { unidade: effectiveUnit },
+    {
+      unidade: effectiveUnit,
+      year: parseInt(filterYear),
+      ...(filterMonth !== "0" ? { month: parseInt(filterMonth) } : {}),
+      ...(filterMonth !== "0" && filterDay !== "0" ? { day: parseInt(filterDay) } : {}),
+    } as any,
     { query: { enabled: true, queryKey: summaryQueryKey } }
   );
   // unidade passed so stats are always scoped to the same unit as summary cards

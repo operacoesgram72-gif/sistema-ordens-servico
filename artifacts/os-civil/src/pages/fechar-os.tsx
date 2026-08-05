@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
 import { format } from "date-fns";
-import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw, Camera, Image as ImageIcon, X, Edit3, Save, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw, Camera, Image as ImageIcon, X, Edit3, Save, ChevronDown, ChevronUp, Trash2, UserPlus } from "lucide-react";
 import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,6 +74,7 @@ export default function FecharOS() {
   // Feature: full OS edit
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraft>({ location: "", department: "", description: "", notes: "", priority: "media", technicianName: "" });
+  const [editTechnicians, setEditTechnicians] = useState<string[]>([""]);
   const [savingId, setSavingId] = useState<number | null>(null);
 
   // Feature: per-OS photo management (lazy-loaded on demand)
@@ -176,6 +177,10 @@ export default function FecharOS() {
 
   // ── Feature: full OS edit ──────────────────────────────────────────────
   const startEdit = (os: OS) => {
+    const techList = os.technicianName
+      ? os.technicianName.split(" / ").map(s => s.trim()).filter(Boolean)
+      : [""];
+    setEditTechnicians(techList);
     setEditDraft({
       location: os.location ?? "",
       department: os.department ?? "",
@@ -194,10 +199,11 @@ export default function FecharOS() {
   const handleSaveEdit = async (id: number) => {
     setSavingId(id);
     try {
+      const technicianName = editTechnicians.filter(t => t.trim()).join(" / ") || "";
       const res = await fetch(`${BASE_URL}/api/service-orders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editDraft),
+        body: JSON.stringify({ ...editDraft, technicianName }),
       });
       if (!res.ok) throw new Error();
       const updated: OS = await res.json();
@@ -545,9 +551,45 @@ export default function FecharOS() {
                           <label className="text-xs font-medium text-muted-foreground">Departamento</label>
                           <Input value={editDraft.department ?? ""} onChange={e => setEditDraft(d => ({ ...d, department: e.target.value }))} placeholder="Departamento / setor" className="h-8 text-sm" />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-muted-foreground">Técnico Responsável</label>
-                          <Input value={editDraft.technicianName ?? ""} onChange={e => setEditDraft(d => ({ ...d, technicianName: e.target.value }))} placeholder="Nome do técnico" className="h-8 text-sm" />
+                        <div className="space-y-1 sm:col-span-2">
+                          <label className="text-xs font-medium text-muted-foreground">Técnicos Responsáveis</label>
+                          <div className="space-y-1.5">
+                            {editTechnicians.map((name, idx) => (
+                              <div key={idx} className="flex gap-1.5 items-center">
+                                <Input
+                                  value={name}
+                                  onChange={e => {
+                                    const next = editTechnicians.map((t, i) => i === idx ? e.target.value : t);
+                                    setEditTechnicians(next);
+                                    setEditDraft(d => ({ ...d, technicianName: next.filter(t => t.trim()).join(" / ") }));
+                                  }}
+                                  placeholder={idx === 0 ? "Nome do técnico" : `Técnico ${idx + 1}`}
+                                  className="h-8 text-sm"
+                                />
+                                {editTechnicians.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = editTechnicians.filter((_, i) => i !== idx);
+                                      setEditTechnicians(next);
+                                      setEditDraft(d => ({ ...d, technicianName: next.filter(t => t.trim()).join(" / ") }));
+                                    }}
+                                    className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setEditTechnicians(prev => [...prev, ""])}
+                            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors mt-1"
+                          >
+                            <UserPlus className="w-3 h-3" />
+                            Adicionar Técnico
+                          </button>
                         </div>
                         <div className="space-y-1">
                           <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
@@ -647,7 +689,7 @@ export default function FecharOS() {
                                     type="button"
                                     onClick={() => void handleDeleteOsPhoto(os.id, idx)}
                                     title="Remover foto"
-                                    className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                    className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors opacity-100"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>

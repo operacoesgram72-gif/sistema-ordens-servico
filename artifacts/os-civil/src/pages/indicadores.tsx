@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  ComposedChart, Line, Legend,
+  ComposedChart, Line, Legend, LabelList,
 } from "recharts";
 import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -377,20 +377,42 @@ export default function Indicadores() {
         <Card className="bg-card border-border/50">
           <CardHeader><CardTitle className="text-base">Top 10 Locais</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={320}>
               <BarChart
                 layout="vertical"
                 data={indicators.byLocation.slice(0, 10)}
-                margin={{ top: 5, right: 20, left: 20, bottom: 5 }}
+                margin={{ top: 5, right: 48, left: 0, bottom: 5 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis dataKey="location" type="category" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} width={100} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+                <YAxis
+                  dataKey="location"
+                  type="category"
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  width={130}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v: string) => v.length > 20 ? v.slice(0, 18) + "…" : v}
+                />
                 <Tooltip
                   contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
-                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  labelStyle={{ color: "hsl(var(--foreground))", fontWeight: 600 }}
+                  cursor={{ fill: "hsl(var(--muted)/0.4)" }}
+                  formatter={(v: number) => [v, "Ordens de Serviço"]}
                 />
-                <Bar dataKey="count" name="OS" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="count" name="OS" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
+                  <LabelList
+                    dataKey="count"
+                    position="right"
+                    style={{ fontSize: 11, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
+                  />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
