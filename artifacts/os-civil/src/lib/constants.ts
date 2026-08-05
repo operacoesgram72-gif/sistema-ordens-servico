@@ -22,6 +22,7 @@ export const FORMATO_SERVICO_LABELS: Record<string, string> = {
   hidraulica: "Hidráulica",
   mecanica: "Mecânica",
   eletrica: "Elétrica",
+  ronda: "Ronda",
   outros: "Outros",
 };
 
@@ -44,6 +45,7 @@ export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   em_andamento: "Em Andamento",
   concluida: "Concluída",
   cancelada: "Cancelada",
+  impedimento: "Impedimento",
 };
 
 export const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
@@ -51,4 +53,5 @@ export const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
   em_andamento: "bg-amber-500/10 text-amber-500 border-amber-500/20",
   concluida: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
   cancelada: "bg-red-500/10 text-red-500 border-red-500/20",
+  impedimento: "bg-orange-500/10 text-orange-500 border-orange-500/20",
 };

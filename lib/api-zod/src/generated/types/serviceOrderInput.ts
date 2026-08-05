@@ -8,6 +8,7 @@
 import type { ServiceOrderInputCategory } from './serviceOrderInputCategory';
 import type { ServiceOrderInputFormatoServico } from './serviceOrderInputFormatoServico';
 import type { ServiceOrderInputPriority } from './serviceOrderInputPriority';
+import type { ServiceOrderInputStatus } from './serviceOrderInputStatus';
 import type { ServiceOrderInputTipo } from './serviceOrderInputTipo';
 
 export interface ServiceOrderInput {
@@ -23,6 +24,8 @@ export interface ServiceOrderInput {
   notes?: string;
   tipo?: ServiceOrderInputTipo;
   formatoServico?: ServiceOrderInputFormatoServico;
+  /** Status inicial — padrão aberta */
+  status?: ServiceOrderInputStatus;
   photos?: string;
   scheduledAt?: string;
 }

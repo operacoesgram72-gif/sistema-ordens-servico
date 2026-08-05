@@ -24,6 +24,7 @@ const MARKET_RATES: Record<string, number> = {
   hidraulica: 250,
   mecanica: 320,
   eletrica: 290,
+  ronda: 120,
   outros: 180,
 };
 
@@ -212,7 +213,7 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
         photos: body.photos ?? null,
         estimatedValue: estimatedValue !== null ? String(estimatedValue) : null,
         scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
-        status: "aberta",
+        status: (body as any).status ?? "aberta",
         unidade,
         origem,
         // Pre-generate an opaque UUID share token at creation time.

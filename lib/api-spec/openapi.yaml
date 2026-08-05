@@ -703,7 +703,7 @@ components:
           enum: [baixa, media, alta, urgente]
         status:
           type: string
-          enum: [aberta, em_andamento, concluida, cancelada]
+          enum: [aberta, em_andamento, concluida, cancelada, impedimento]
         location:
           type: string
         department:
@@ -719,7 +719,7 @@ components:
           enum: [reforma, revitalizacao, preventiva, corretiva, outros, "null"]
         formatoServico:
           type: ["string", "null"]
-          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros, "null"]
+          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, ronda, outros, "null"]
         photos:
           type: ["string", "null"]
           description: JSON array of base64 image strings
@@ -773,7 +773,11 @@ components:
           enum: [reforma, revitalizacao, preventiva, corretiva, outros]
         formatoServico:
           type: string
-          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros]
+          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, ronda, outros]
+        status:
+          type: string
+          enum: [aberta, impedimento]
+          description: Status inicial — padrão aberta
         photos:
           type: string
         scheduledAt:
@@ -794,7 +798,7 @@ components:
           enum: [baixa, media, alta, urgente]
         status:
           type: string
-          enum: [aberta, em_andamento, concluida, cancelada]
+          enum: [aberta, em_andamento, concluida, cancelada, impedimento]
         location:
           type: string
         department:
@@ -809,7 +813,7 @@ components:
           enum: [reforma, revitalizacao, preventiva, corretiva, outros]
         formatoServico:
           type: string
-          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, outros]
+          enum: [civil, refrigeracao, hidraulica, mecanica, eletrica, ronda, outros]
         photos:
           type: string
         scheduledAt:
@@ -824,7 +828,7 @@ components:
       properties:
         status:
           type: string
-          enum: [aberta, em_andamento, concluida, cancelada]
+          enum: [aberta, em_andamento, concluida, cancelada, impedimento]
         notes:
           type: string
 

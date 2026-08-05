@@ -31,6 +31,7 @@ export * from './serviceOrderInput';
 export * from './serviceOrderInputCategory';
 export * from './serviceOrderInputFormatoServico';
 export * from './serviceOrderInputPriority';
+export * from './serviceOrderInputStatus';
 export * from './serviceOrderInputTipo';
 export * from './serviceOrderPriority';
 export * from './serviceOrderStatus';

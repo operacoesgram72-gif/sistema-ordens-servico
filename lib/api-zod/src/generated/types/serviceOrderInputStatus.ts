@@ -6,13 +6,13 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export type ServiceOrderStatus = typeof ServiceOrderStatus[keyof typeof ServiceOrderStatus];
+/**
+ * Status inicial — padrão aberta
+ */
+export type ServiceOrderInputStatus = typeof ServiceOrderInputStatus[keyof typeof ServiceOrderInputStatus];
 
 
-export const ServiceOrderStatus = {
+export const ServiceOrderInputStatus = {
   aberta: 'aberta',
-  em_andamento: 'em_andamento',
-  concluida: 'concluida',
-  cancelada: 'cancelada',
   impedimento: 'impedimento',
 } as const;

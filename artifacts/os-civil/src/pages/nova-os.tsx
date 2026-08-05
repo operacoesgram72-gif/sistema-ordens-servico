@@ -5,7 +5,7 @@ import * as z from "zod";
 import { format } from "date-fns";
 import {
   CalendarIcon, ArrowLeft, Save, X, Paperclip, TrendingUp, Film,
-  MapPin, Camera, LocateFixed, Loader2,
+  MapPin, Camera, LocateFixed, Loader2, Plus, UserPlus, AlertTriangle,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef, useMemo } from "react";
@@ -37,6 +37,7 @@ const MARKET_RATES: Record<string, number> = {
   hidraulica: 250,
   mecanica: 320,
   eletrica: 290,
+  ronda: 120,
   outros: 180,
 };
 
@@ -69,11 +70,21 @@ const formSchema = z.object({
   priority: z.enum(["baixa", "media", "alta", "urgente"]),
   scheduledAt: z.date().optional(),
   tipo: z.enum(["reforma", "revitalizacao", "preventiva", "corretiva", "outros"]).optional(),
-  formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "outros"]).optional(),
+  formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "ronda", "outros"]).optional(),
   technicianName: z.string().optional(),
   photos: z.string().optional(),
   origem: z.string().optional(),
   temPte: z.enum(["sim", "nao"]).optional(),
+  statusInicial: z.enum(["aberta", "impedimento"]).optional(),
+  motivoImpedimento: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.statusInicial === "impedimento" && !data.motivoImpedimento?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Motivo do Impedimento é obrigatório",
+      path: ["motivoImpedimento"],
+    });
+  }
 });
 
 type MediaFile = { src: string; type: "image" | "video"; name: string };
@@ -85,6 +96,8 @@ export default function NovaOS() {
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([]);
+  // Dynamic technician list — at least one entry; joined with " / " on submit
+  const [technicians, setTechnicians] = useState<string[]>([""]);
 
   type VideoEntry = {
     id: string; name: string; localUrl: string;
@@ -123,6 +136,8 @@ export default function NovaOS() {
       photos: "",
       origem: "manual",
       scheduledAt: prefilledDate,
+      statusInicial: "aberta",
+      motivoImpedimento: "",
     },
   });
 
@@ -176,6 +191,7 @@ export default function NovaOS() {
 
   const formatoServico = form.watch("formatoServico");
   const tipoOS = form.watch("tipo");
+  const statusInicial = form.watch("statusInicial");
   const estimativaAuto = formatoServico
     ? Math.round(
         MARKET_RATES[formatoServico] *
@@ -322,6 +338,15 @@ export default function NovaOS() {
     const pteNote = values.temPte ? `[PTE: ${values.temPte === "sim" ? "Sim" : "Não"}]` : "";
     const description = [pteNote, values.description].filter(Boolean).join(" — ") || undefined;
 
+    // Build notes: prepend impedimento block when status inicial is impedimento
+    const impedimentoNote = values.statusInicial === "impedimento" && values.motivoImpedimento?.trim()
+      ? `[IMPEDIMENTO] ${values.motivoImpedimento.trim()}`
+      : undefined;
+    const notesField = impedimentoNote || undefined;
+
+    // Join the dynamic technician list (skip empty entries)
+    const technicianName = technicians.filter(t => t.trim()).join(" / ") || undefined;
+
     // Merge base64 photos (from mediaFiles state) and successfully uploaded video
     // paths (from videoEntries state) into one array — videoEntries was previously
     // ignored here, causing all video uploads to be silently discarded.
@@ -339,12 +364,14 @@ export default function NovaOS() {
           title: autoTitle,
           location: values.location,
           description,
+          notes: notesField,
+          status: values.statusInicial === "impedimento" ? "impedimento" : "aberta",
           category: values.category,
           priority: values.priority,
           scheduledAt: values.scheduledAt ? values.scheduledAt.toISOString() : undefined,
           tipo: values.tipo,
           formatoServico: values.formatoServico,
-          technicianName: values.technicianName || undefined,
+          technicianName,
           photos: photosField,
           unidade: unit,
           origem: values.origem || "manual",
@@ -564,20 +591,92 @@ export default function NovaOS() {
                   )}
                 />
 
-                {/* Técnico Responsável */}
+                {/* Status Inicial — inclui opção Impedimento */}
                 <FormField
                   control={form.control}
-                  name="technicianName"
+                  name="statusInicial"
                   render={({ field }) => (
-                    <FormItem className="md:col-span-2">
-                      <FormLabel>Técnico Responsável</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Nome do técnico responsável" {...field} />
-                      </FormControl>
+                    <FormItem>
+                      <FormLabel>Status Inicial</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? "aberta"}>
+                        <FormControl>
+                          <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="aberta">Aberta</SelectItem>
+                          <SelectItem value="impedimento">
+                            <span className="flex items-center gap-2">
+                              <AlertTriangle className="w-3.5 h-3.5 text-orange-500" />
+                              Impedimento
+                            </span>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
+
+                {/* Motivo do Impedimento — só aparece quando status = impedimento */}
+                {statusInicial === "impedimento" && (
+                  <FormField
+                    control={form.control}
+                    name="motivoImpedimento"
+                    render={({ field }) => (
+                      <FormItem className="md:col-span-2">
+                        <FormLabel className="text-orange-500 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          Motivo do Impedimento <span className="text-destructive ml-0.5">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Descreva o impedimento externo que bloqueia a execução..."
+                            className="min-h-[90px] border-orange-500/40 focus-visible:ring-orange-500/30"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {/* Técnicos Responsáveis — lista dinâmica (mínimo 1) */}
+                <div className="md:col-span-2 space-y-2">
+                  <Label>Técnicos Responsáveis</Label>
+                  <div className="space-y-2">
+                    {technicians.map((name, idx) => (
+                      <div key={idx} className="flex gap-2 items-center">
+                        <Input
+                          placeholder={idx === 0 ? "Nome do técnico responsável" : `Técnico ${idx + 1}`}
+                          value={name}
+                          onChange={e => setTechnicians(prev => prev.map((t, i) => i === idx ? e.target.value : t))}
+                        />
+                        {technicians.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setTechnicians(prev => prev.filter((_, i) => i !== idx))}
+                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 mt-1"
+                    onClick={() => setTechnicians(prev => [...prev, ""])}
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Adicionar Técnico
+                  </Button>
+                </div>
 
                 {/* Tem PTE */}
                 <FormField

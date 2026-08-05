@@ -14,4 +14,5 @@ export const StatusUpdateStatus = {
   em_andamento: 'em_andamento',
   concluida: 'concluida',
   cancelada: 'cancelada',
+  impedimento: 'impedimento',
 } as const;

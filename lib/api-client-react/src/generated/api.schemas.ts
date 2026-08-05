@@ -57,6 +57,7 @@ export const ServiceOrderStatus = {
   em_andamento: 'em_andamento',
   concluida: 'concluida',
   cancelada: 'cancelada',
+  impedimento: 'impedimento',
 } as const;
 
 /**
@@ -86,6 +87,7 @@ export const ServiceOrderFormatoServico = {
   hidraulica: 'hidraulica',
   mecanica: 'mecanica',
   eletrica: 'eletrica',
+  ronda: 'ronda',
   outros: 'outros',
   null: 'null',
 } as const;
@@ -177,7 +179,19 @@ export const ServiceOrderInputFormatoServico = {
   hidraulica: 'hidraulica',
   mecanica: 'mecanica',
   eletrica: 'eletrica',
+  ronda: 'ronda',
   outros: 'outros',
+} as const;
+
+/**
+ * Status inicial — padrão aberta
+ */
+export type ServiceOrderInputStatus = typeof ServiceOrderInputStatus[keyof typeof ServiceOrderInputStatus];
+
+
+export const ServiceOrderInputStatus = {
+  aberta: 'aberta',
+  impedimento: 'impedimento',
 } as const;
 
 export interface ServiceOrderInput {
@@ -193,6 +207,8 @@ export interface ServiceOrderInput {
   notes?: string;
   tipo?: ServiceOrderInputTipo;
   formatoServico?: ServiceOrderInputFormatoServico;
+  /** Status inicial — padrão aberta */
+  status?: ServiceOrderInputStatus;
   photos?: string;
   scheduledAt?: string;
 }
@@ -226,6 +242,7 @@ export const ServiceOrderUpdateStatus = {
   em_andamento: 'em_andamento',
   concluida: 'concluida',
   cancelada: 'cancelada',
+  impedimento: 'impedimento',
 } as const;
 
 export type ServiceOrderUpdateTipo = typeof ServiceOrderUpdateTipo[keyof typeof ServiceOrderUpdateTipo];
@@ -248,6 +265,7 @@ export const ServiceOrderUpdateFormatoServico = {
   hidraulica: 'hidraulica',
   mecanica: 'mecanica',
   eletrica: 'eletrica',
+  ronda: 'ronda',
   outros: 'outros',
 } as const;
 
@@ -277,6 +295,7 @@ export const StatusUpdateStatus = {
   em_andamento: 'em_andamento',
   concluida: 'concluida',
   cancelada: 'cancelada',
+  impedimento: 'impedimento',
 } as const;
 
 export interface StatusUpdate {

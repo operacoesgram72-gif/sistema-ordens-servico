@@ -15,5 +15,6 @@ export const ServiceOrderInputFormatoServico = {
   hidraulica: 'hidraulica',
   mecanica: 'mecanica',
   eletrica: 'eletrica',
+  ronda: 'ronda',
   outros: 'outros',
 } as const;
