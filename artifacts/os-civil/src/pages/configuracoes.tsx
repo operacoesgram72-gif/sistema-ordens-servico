@@ -102,6 +102,30 @@ const AVAILABLE_INTEGRATIONS: Integration[] = [
     category: "Comunicação",
     docsUrl: "https://api.slack.com/messaging/webhooks",
   },
+  {
+    id: "aws-s3",
+    name: "AWS S3 — Armazenamento",
+    description: "Armazene fotos, documentos e arquivos no Amazon S3 com URLs públicas ou privadas.",
+    logo: "🪣",
+    category: "Cloud",
+    docsUrl: "https://docs.aws.amazon.com/s3/",
+  },
+  {
+    id: "aws-lambda",
+    name: "AWS Lambda — Funções",
+    description: "Dispare funções serverless da AWS ao registrar ou atualizar ordens de serviço.",
+    logo: "λ",
+    category: "Cloud",
+    docsUrl: "https://docs.aws.amazon.com/lambda/",
+  },
+  {
+    id: "aws-ses",
+    name: "AWS SES — E-mail",
+    description: "Envie notificações de OS via Amazon Simple Email Service (SES) em escala.",
+    logo: "✉️",
+    category: "Cloud",
+    docsUrl: "https://docs.aws.amazon.com/ses/",
+  },
 ];
 
 function genId() {

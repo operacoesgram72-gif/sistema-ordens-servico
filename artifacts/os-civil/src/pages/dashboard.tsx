@@ -141,7 +141,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Painel de Controle</h1>

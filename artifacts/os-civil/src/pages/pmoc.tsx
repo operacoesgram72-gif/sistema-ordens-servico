@@ -174,6 +174,26 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
   const clearFilter = (field: string) => setColFilters(prev => ({ ...prev, [field]: [] }));
   const hasActiveFilters = Object.values(colFilters).some(v => v.length > 0);
 
+  // ── Column resizing ────────────────────────────────────────────────────
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ field: string; startX: number; startW: number } | null>(null);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const r = resizingRef.current;
+      if (!r) return;
+      const delta = e.clientX - r.startX;
+      setColWidths(prev => ({ ...prev, [r.field]: Math.max(48, r.startW + delta) }));
+    };
+    const onUp = () => { resizingRef.current = null; };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
   // ── Excel-style column filter header cell ──────────────────────────────
   // Regular function (not a React component) — called directly in JSX below.
   function colHeader(field: string, label: string, thClass: string) {
@@ -183,8 +203,11 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
     const vals = (uniqueVals[field] ?? [])
       .filter(v => !search || v.toLowerCase().includes(search.toLowerCase()));
     const selectedVals = colFilters[field] ?? [];
+    const dynStyle = colWidths[field] !== undefined
+      ? { width: colWidths[field], minWidth: colWidths[field] } as React.CSSProperties
+      : undefined;
     return (
-      <th key={field} className={`relative ${thClass}`} data-pmoc-filter="">
+      <th key={field} className={`relative ${thClass}`} data-pmoc-filter="" style={dynStyle}>
         <div className="flex items-center gap-1 whitespace-nowrap">
           <span>{label}</span>
           <button
@@ -260,6 +283,16 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
             </div>
           </div>
         )}
+        {/* Drag-to-resize handle */}
+        <div
+          className="absolute right-0 top-0 h-full w-1 cursor-col-resize hover:bg-primary/50 select-none"
+          onMouseDown={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const th = (e.currentTarget as HTMLElement).closest("th") as HTMLElement | null;
+            resizingRef.current = { field, startX: e.clientX, startW: th ? th.offsetWidth : 80 };
+          }}
+        />
       </th>
     );
   }
@@ -492,8 +525,8 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
 
       {/* Photo dialog */}
       {photoDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setPhotoDialog(null)}>
-          <div className="bg-card border border-border rounded-lg w-full max-w-md p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={() => setPhotoDialog(null)}>
+          <div className="bg-card border border-border rounded-lg w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-base">
                 Fotos — {dialogRow?.cod} / {QUARTERS.find(q => q.key === photoDialog.quarter)?.label}
@@ -578,9 +611,9 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
       )}
 
       <Card className="bg-card border-border/50">
-        <CardContent className="p-0 overflow-x-auto">
+        <CardContent className="p-0 overflow-auto max-h-[calc(100vh-260px)]">
           <table className="w-full text-xs border-collapse" style={{ minWidth: "1600px" }}>
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-muted/40 border-b border-border">
                 {colHeader("empresa",  "Empresa",      "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 min-w-[120px]")}
                 {colHeader("cod",      "Cod.",          "text-left px-3 py-2.5 font-semibold text-muted-foreground border-r border-border/40 w-20")}
@@ -608,7 +641,7 @@ function PmocTable({ storageKey, initialRows = [] }: PmocTableProps) {
                   )}
                 </th>
               </tr>
-              <tr className="bg-muted/20 border-b border-border text-[10px] text-muted-foreground">
+              <tr className="bg-muted/20 border-b border-border text-[10px] text-muted-foreground sticky-sub-header">
                 <th colSpan={8} />
                 {QUARTERS.map(q => (
                   <React.Fragment key={q.key}>
@@ -737,7 +770,7 @@ export default function Pmoc() {
 
   return (
     <div className="p-4 md:p-6 w-full max-w-full space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between sticky top-0 z-20 bg-background -mx-4 px-4 md:-mx-6 md:px-6 -mt-4 md:-mt-6 pt-4 md:pt-6 pb-3 border-b border-border/30">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <Wind className="w-7 h-7 text-primary" />
@@ -780,11 +813,7 @@ export default function Pmoc() {
           </div>
         </div>
 
-        {STATE_TABS.map(tab => (
-          <div key={tab.key} className={cn(activeStateTab === tab.key ? "block" : "hidden")}>
-            <PmocTable storageKey={`pmoc_state_${tab.key}`} initialRows={[]} />
-          </div>
-        ))}
+        <PmocTable key={activeStateTab} storageKey={`pmoc_state_${activeStateTab}`} initialRows={[]} />
       </div>
     </div>
   );

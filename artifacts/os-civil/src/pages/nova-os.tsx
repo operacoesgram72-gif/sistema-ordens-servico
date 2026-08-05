@@ -395,7 +395,7 @@ export default function NovaOS() {
 
   return (
     <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/ordens")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>

@@ -175,7 +175,7 @@ export default function Ordens() {
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print-hide">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 print-hide sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Ordens de Serviço</h1>
           <p className="text-muted-foreground mt-1">Unidade: <strong>{unit}</strong> — chamados e atividades.</p>

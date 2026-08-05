@@ -133,11 +133,24 @@ export function ComprasDashboard({ workbook, unit, onClose }: Props) {
 
   const activeFilters = [filterFornecedor, filterSolicitante, filterTipo, filterTab].filter(f => f !== "__ALL__").length;
 
-  /* KPI cards */
-  const totalValue = useMemo(() => filtered.reduce((s, r) => s + r.value, 0), [filtered]);
-  const comprasValue = useMemo(() => filtered.filter(r => r.tabCategory === "compras").reduce((s, r) => s + r.value, 0), [filtered]);
-  const servicosValue = useMemo(() => filtered.filter(r => r.tabCategory === "servicos").reduce((s, r) => s + r.value, 0), [filtered]);
-  const gvValue = useMemo(() => filtered.filter(r => r.tabCategory === "gv").reduce((s, r) => s + r.value, 0), [filtered]);
+  /* KPI cards — classified by "Tipo" cell value first, tab-name detection as fallback */
+  function rowTipo(r: RowRecord): "compras" | "servicos" | "gv" | "other" {
+    const t = r.tipo.toLowerCase().trim();
+    if (t) {
+      if (t.includes("compra")) return "compras";
+      if (t.includes("servi")) return "servicos";
+      if (t.includes("gv") || t.includes("gestão") || t.includes("gestao")) return "gv";
+      return "other";
+    }
+    return r.tabCategory;
+  }
+  const totalValue   = useMemo(() => filtered.reduce((s, r) => s + r.value, 0), [filtered]);
+  const comprasRows  = useMemo(() => filtered.filter(r => rowTipo(r) === "compras"),  [filtered]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const servicosRows = useMemo(() => filtered.filter(r => rowTipo(r) === "servicos"), [filtered]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const gvRows       = useMemo(() => filtered.filter(r => rowTipo(r) === "gv"),       [filtered]);  // eslint-disable-line react-hooks/exhaustive-deps
+  const comprasValue  = useMemo(() => comprasRows.reduce((s, r) => s + r.value, 0),  [comprasRows]);
+  const servicosValue = useMemo(() => servicosRows.reduce((s, r) => s + r.value, 0), [servicosRows]);
+  const gvValue       = useMemo(() => gvRows.reduce((s, r) => s + r.value, 0),       [gvRows]);
   const hasValues = totalValue > 0;
 
   /* Aggregation helpers */
@@ -286,7 +299,7 @@ export function ComprasDashboard({ workbook, unit, onClose }: Props) {
                 <span className="text-xs text-muted-foreground">Compras</span>
               </div>
               <div className="text-lg font-bold font-mono text-blue-400">
-                {comprasValue > 0 ? formatCurrencyShort(comprasValue) : <span className="text-sm text-muted-foreground">{filtered.filter(r => r.tabCategory === "compras").length} itens</span>}
+                {comprasValue > 0 ? formatCurrencyShort(comprasValue) : <span className="text-sm text-muted-foreground">{comprasRows.length} itens</span>}
               </div>
             </CardContent>
           </Card>
@@ -297,7 +310,7 @@ export function ComprasDashboard({ workbook, unit, onClose }: Props) {
                 <span className="text-xs text-muted-foreground">Serviços</span>
               </div>
               <div className="text-lg font-bold font-mono text-emerald-500">
-                {servicosValue > 0 ? formatCurrencyShort(servicosValue) : <span className="text-sm text-muted-foreground">{filtered.filter(r => r.tabCategory === "servicos").length} itens</span>}
+                {servicosValue > 0 ? formatCurrencyShort(servicosValue) : <span className="text-sm text-muted-foreground">{servicosRows.length} itens</span>}
               </div>
             </CardContent>
           </Card>
@@ -308,7 +321,7 @@ export function ComprasDashboard({ workbook, unit, onClose }: Props) {
                 <span className="text-xs text-muted-foreground">GV</span>
               </div>
               <div className="text-lg font-bold font-mono text-amber-500">
-                {gvValue > 0 ? formatCurrencyShort(gvValue) : <span className="text-sm text-muted-foreground">{filtered.filter(r => r.tabCategory === "gv").length} itens</span>}
+                {gvValue > 0 ? formatCurrencyShort(gvValue) : <span className="text-sm text-muted-foreground">{gvRows.length} itens</span>}
               </div>
             </CardContent>
           </Card>
