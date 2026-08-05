@@ -144,9 +144,10 @@ export default function Indicadores() {
   const avgValue = totalOs > 0 ? totalValue / totalOs : 0;
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
+      <div className="bg-background border-b border-border/30 shrink-0">
+        <div className="px-6 md:px-8 pt-6 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Indicadores de Desempenho</h1>
           <p className="text-muted-foreground mt-1">Métricas e acompanhamento financeiro do período selecionado.</p>
@@ -218,6 +219,9 @@ export default function Indicadores() {
           )}
         </div>
       </div>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-6">
 
       {/* ── Desempenho Filters ─────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
@@ -226,7 +230,7 @@ export default function Indicadores() {
           value={filterFormato}
           onValueChange={(v) => setFilterFormato(v)}
         >
-          <SelectTrigger className="w-44 h-8 text-sm">
+          <SelectTrigger className="w-44 h-9 text-sm">
             <SelectValue placeholder="Formato de Serviço" />
           </SelectTrigger>
           <SelectContent>
@@ -240,7 +244,7 @@ export default function Indicadores() {
           value={filterTipo}
           onValueChange={(v) => setFilterTipo(v)}
         >
-          <SelectTrigger className="w-40 h-8 text-sm">
+          <SelectTrigger className="w-40 h-9 text-sm">
             <SelectValue placeholder="Tipo" />
           </SelectTrigger>
           <SelectContent>
@@ -254,7 +258,7 @@ export default function Indicadores() {
           value={filterTecnico}
           onValueChange={(v) => setFilterTecnico(v)}
         >
-          <SelectTrigger className="w-48 h-8 text-sm">
+          <SelectTrigger className="w-48 h-9 text-sm">
             <SelectValue placeholder="Técnico" />
           </SelectTrigger>
           <SelectContent>
@@ -268,7 +272,7 @@ export default function Indicadores() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 px-2 text-xs text-muted-foreground"
+            className="h-9 px-2 text-xs text-muted-foreground"
             onClick={() => { setFilterFormato("all"); setFilterTipo("all"); setFilterTecnico("all"); }}
           >
             <X className="w-3 h-3 mr-1" />
@@ -484,6 +488,9 @@ export default function Indicadores() {
       {/* ── Timeline de Eventos ────────────────────────────────────────────── */}
       {/* Purely additive — standalone card, does not alter any section above. */}
       <IndicadoresTimeline />
+    
+        </div>
+      </div>
     </div>
   );
 }

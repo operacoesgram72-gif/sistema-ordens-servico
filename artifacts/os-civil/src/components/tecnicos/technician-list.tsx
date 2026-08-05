@@ -20,7 +20,7 @@ export function TechnicianList({ technicians, isLoading, managerNameById, canMan
   const colSpan = canManage ? 7 : 6;
 
   return (
-    <div className="border border-border/50 rounded-md bg-card overflow-hidden">
+    <div className="border border-border/50 rounded-md bg-card overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>

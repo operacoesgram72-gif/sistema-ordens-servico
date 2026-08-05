@@ -394,8 +394,9 @@ export default function NovaOS() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4 sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="bg-background border-b border-border/30 shrink-0">
+        <div className="px-6 md:px-8 pt-6 pb-4 flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/ordens")}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -406,6 +407,9 @@ export default function NovaOS() {
           </p>
         </div>
       </div>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="px-6 md:px-8 pb-8 pt-4 max-w-4xl mx-auto space-y-6">
 
       <Card className="bg-card border-border/50">
         <CardContent className="pt-6">
@@ -831,6 +835,9 @@ export default function NovaOS() {
           </Form>
         </CardContent>
       </Card>
+    
+        </div>
+      </div>
     </div>
   );
 }

@@ -181,8 +181,10 @@
 }
 
 /* ── Page transition ── */
+/* fill-mode:backwards = stacking context only during 0.28s animation,
+   never after — this allows flex-1 children to size correctly */
 .page-enter {
-  animation: pageEnter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: pageEnter 0.28s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 @keyframes pageEnter {
   from { opacity: 0; }

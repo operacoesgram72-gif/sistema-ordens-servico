@@ -91,7 +91,7 @@ export default function Dashboard() {
 
   if (loadingSummary || loadingStats) {
     return (
-      <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex flex-col flex-1 min-h-0">
         <div className="space-y-2">
           <Skeleton className="h-9 w-64" />
           <Skeleton className="h-4 w-80" />
@@ -139,9 +139,10 @@ export default function Dashboard() {
   const unitLabel = isAM && filterUnit !== "all" ? ` — ${filterUnit}` : isAM ? " — Todas as Unidades" : ` — ${unit}`;
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="flex flex-col gap-4 sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
+      <div className="bg-background border-b border-border/30 shrink-0">
+        <div className="px-6 md:px-8 pt-6 pb-4 flex flex-col gap-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Painel de Controle</h1>
@@ -235,6 +236,9 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-8">
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -357,6 +361,9 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      </div>
+    
+        </div>
       </div>
     </div>
   );

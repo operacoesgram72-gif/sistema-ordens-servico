@@ -136,8 +136,9 @@ export default function Cadastros() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sticky top-0 z-20 bg-background -mx-6 px-6 md:-mx-8 md:px-8 -mt-6 md:-mt-8 pt-6 md:pt-8 pb-3 border-b border-border/30">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="bg-background border-b border-border/30 shrink-0">
+        <div className="px-6 md:px-8 pt-6 pb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dados Cadastrais</h1>
           <p className="text-muted-foreground mt-1">Funcionários e contatos — unidade <strong>{unit}</strong>.</p>
@@ -156,6 +157,9 @@ export default function Cadastros() {
           </Button>
         </div>
       </div>
+      </div>
+      <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-6">
 
       <Card className="p-4 bg-card border-border/50">
         <div className="relative max-w-sm">
@@ -273,6 +277,9 @@ export default function Cadastros() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    
+        </div>
+      </div>
     </div>
   );
 }

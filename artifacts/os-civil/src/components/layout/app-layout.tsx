@@ -301,8 +301,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           when navigating back. Inner div uses key={location} to trigger the
           page-enter CSS animation without resetting the scroll container.
         */}
-        <div className="flex-1 overflow-y-auto">
-          <div key={location} className="page-enter min-h-full">
+        <div className="flex-1 min-h-0 flex flex-col">
+          <div key={location} className="page-enter flex-1 min-h-0 flex flex-col overflow-y-auto">
             {children}
           </div>
         </div>
