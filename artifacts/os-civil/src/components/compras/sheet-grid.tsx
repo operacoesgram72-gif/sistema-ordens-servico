@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Trash2, Pencil, Check, X, ExternalLink } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Plus, Trash2, Pencil, Check, X, ExternalLink, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Workbook, SheetTab } from "@/types/purchase-sheet";
@@ -37,8 +37,29 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
   const readOnly = !onChange;
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  // columnFilters: keyed by column index within the active tab
+  const [columnFilters, setColumnFilters] = useState<Record<number, string>>({});
 
   const activeTab = workbook.tabs.find((t) => t.id === activeTabId) ?? workbook.tabs[0];
+
+  // Reset column filters when the active tab changes
+  useEffect(() => { setColumnFilters({}); }, [activeTabId]);
+
+  // Client-side filtered rows — does not affect persisted data
+  const filteredRows = useMemo(() => {
+    if (!activeTab) return [];
+    const hasFilter = Object.values(columnFilters).some((v) => v.trim() !== "");
+    if (!hasFilter) return activeTab.rows.map((row, idx) => ({ row, idx }));
+    return activeTab.rows
+      .map((row, idx) => ({ row, idx }))
+      .filter(({ row }) =>
+        Object.entries(columnFilters).every(([colIdxStr, filterVal]) => {
+          if (!filterVal.trim()) return true;
+          const colIdx = Number(colIdxStr);
+          return (row[colIdx] ?? "").toLowerCase().includes(filterVal.toLowerCase());
+        })
+      );
+  }, [activeTab, columnFilters]);
 
   const updateTab = (tabId: string, updater: (tab: SheetTab) => SheetTab) => {
     if (!onChange) return;
@@ -170,8 +191,9 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
       <div className="border border-border/50 rounded-md overflow-auto bg-card">
         <table className="border-collapse w-full text-sm">
           <thead>
+            {/* Column names row */}
             <tr>
-              <th className="w-10 border-b border-r border-border/50 bg-muted/30" />
+              <th className="w-10 border-b border-r border-border/50 bg-muted/30 no-print-controls" />
               {activeTab.columns.map((col, colIdx) => (
                 <th key={colIdx} className="border-b border-r border-border/50 bg-muted/30 p-0 min-w-[140px]">
                   <div className="flex items-center gap-1 px-1.5 py-1">
@@ -185,7 +207,7 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                       />
                     )}
                     {!readOnly && activeTab.columns.length > 1 && (
-                      <button onClick={() => deleteColumn(colIdx)} className="text-muted-foreground/50 hover:text-destructive shrink-0" title="Remover coluna">
+                      <button onClick={() => deleteColumn(colIdx)} className="text-muted-foreground/50 hover:text-destructive shrink-0 no-print-controls" title="Remover coluna">
                         <X className="w-3 h-3" />
                       </button>
                     )}
@@ -193,12 +215,31 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                 </th>
               ))}
               {!readOnly && (
-                <th className="border-b border-border/50 bg-muted/30 w-10">
+                <th className="border-b border-border/50 bg-muted/30 w-10 no-print-controls">
                   <button onClick={addColumn} className="flex items-center justify-center w-full h-full text-muted-foreground hover:text-primary py-1.5" title="Adicionar coluna">
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </th>
               )}
+            </tr>
+            {/* Column filter inputs row — hidden in print */}
+            <tr className="no-print">
+              <th className="w-10 border-b border-r border-border/50 bg-background/50">
+                <Search className="w-3 h-3 text-muted-foreground/40 mx-auto" />
+              </th>
+              {activeTab.columns.map((_, colIdx) => (
+                <th key={colIdx} className="border-b border-r border-border/50 bg-background/50 p-1 min-w-[140px]">
+                  <input
+                    value={columnFilters[colIdx] ?? ""}
+                    onChange={(e) =>
+                      setColumnFilters((prev) => ({ ...prev, [colIdx]: e.target.value }))
+                    }
+                    placeholder="Filtrar…"
+                    className="w-full bg-transparent text-xs px-1.5 py-0.5 outline-none border border-border/40 rounded focus:border-primary/50 placeholder:text-muted-foreground/30"
+                  />
+                </th>
+              ))}
+              {!readOnly && <th className="border-b border-border/50 bg-background/50" />}
             </tr>
           </thead>
           <tbody>
@@ -208,10 +249,16 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                   Nenhuma linha. {!readOnly && "Clique em \"+ Linha\" para começar."}
                 </td>
               </tr>
+            ) : filteredRows.length === 0 ? (
+              <tr>
+                <td colSpan={activeTab.columns.length + 2} className="text-center text-muted-foreground text-xs py-8">
+                  Nenhuma linha corresponde aos filtros.
+                </td>
+              </tr>
             ) : (
-              activeTab.rows.map((row, rowIdx) => (
+              filteredRows.map(({ row, idx: rowIdx }) => (
                 <tr key={rowIdx} className="hover:bg-muted/20">
-                  <td className="border-r border-b border-border/50 text-center text-[11px] text-muted-foreground/70">
+                  <td className="border-r border-b border-border/50 text-center text-[11px] text-muted-foreground/70 no-print-controls">
                     {!readOnly ? (
                       <button onClick={() => deleteRow(rowIdx)} className="w-full py-1 hover:text-destructive" title="Remover linha">
                         {rowIdx + 1}
@@ -227,27 +274,39 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                     return (
                       <td key={colIdx} className="border-r border-b border-border/50 p-0">
                         {readOnly ? (
-                          <div className="px-2 py-1.5 text-xs min-h-[30px]">
+                          <div className="px-2 py-1.5 text-xs min-h-[30px] break-words whitespace-pre-wrap">
                             {cellIsUrl ? (
                               <a
                                 href={cell}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-primary hover:underline max-w-full truncate"
+                                className="inline-flex items-center gap-1 text-primary hover:underline break-all"
                                 onClick={e => e.stopPropagation()}
                               >
                                 <ExternalLink className="w-3 h-3 shrink-0" />
-                                <span className="truncate">{cell}</span>
+                                <span className="break-all">{cell}</span>
                               </a>
                             ) : (
                               cell || <span className="text-muted-foreground/40">—</span>
                             )}
                           </div>
                         ) : (
-                          <input
+                          <textarea
                             value={cell}
+                            rows={1}
                             onChange={(e) => setCell(rowIdx, colIdx, e.target.value)}
-                            className={`w-full bg-transparent px-2 py-1.5 text-xs outline-none focus:bg-primary/5 ${linkCol && cell && !isAbsoluteUrl(cell) ? "text-amber-500/80" : linkCol && cellIsUrl ? "text-primary" : ""}`}
+                            onInput={(e) => {
+                              const el = e.currentTarget;
+                              el.style.height = "auto";
+                              el.style.height = `${el.scrollHeight}px`;
+                            }}
+                            ref={(el) => {
+                              if (el) {
+                                el.style.height = "auto";
+                                el.style.height = `${el.scrollHeight}px`;
+                              }
+                            }}
+                            className={`w-full bg-transparent px-2 py-1.5 text-xs outline-none focus:bg-primary/5 resize-none overflow-hidden break-words whitespace-pre-wrap min-h-[30px] ${linkCol && cell && !isAbsoluteUrl(cell) ? "text-amber-500/80" : linkCol && cellIsUrl ? "text-primary" : ""}`}
                             placeholder={linkCol ? "https://..." : undefined}
                             title={linkCol && cell && !isAbsoluteUrl(cell) ? "URL inválida — use https://..." : undefined}
                           />
@@ -255,7 +314,7 @@ export function SheetGrid({ workbook, onChange, activeTabId, onActiveTabChange }
                       </td>
                     );
                   })}
-                  {!readOnly && <td className="border-b border-border/50" />}
+                  {!readOnly && <td className="border-b border-border/50 no-print-controls" />}
                 </tr>
               ))
             )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShoppingCart, Share2, Loader2, Save, CheckCircle2 } from "lucide-react";
+import { ShoppingCart, Share2, Loader2, Save, CheckCircle2, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
@@ -91,43 +91,108 @@ export default function ComprasServicos() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ShoppingCart className="w-7 h-7 text-primary" />
-            Compras e Serviços
-          </h1>
-          <p className="text-muted-foreground mt-1">Planilha da unidade <strong>{unit}</strong> — todas as células são editáveis.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-xs text-muted-foreground flex items-center gap-1.5 min-w-[110px] justify-end">
-            {saveState === "saving" && <><Loader2 className="w-3.5 h-3.5 animate-spin" />Salvando…</>}
-            {saveState === "saved" && <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />Salvo</>}
-          </div>
-          <Button variant="outline" onClick={handleShare}>
-            <Share2 className="w-4 h-4 mr-2" />
-            Compartilhar
-          </Button>
-          <Button onClick={handleManualSave} disabled={!workbook || saveState === "saving"}>
-            <Save className="w-4 h-4 mr-2" />
-            Salvar
-          </Button>
-        </div>
-      </div>
+    <>
+      {/* Print-only styles — active on Ctrl+P / window.print() */}
+      <style>{`
+        @media print {
+          /* Hide sidebar (aside) and elements marked no-print */
+          aside,
+          .no-print,
+          .no-print-controls {
+            display: none !important;
+          }
+          /* Expand the main content to full page width */
+          #compras-print-root {
+            max-width: 100% !important;
+            padding: 8px !important;
+            margin: 0 !important;
+          }
+          /* Remove card chrome */
+          #compras-print-card {
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+          }
+          /* Table fills the page */
+          table {
+            width: 100% !important;
+            font-size: 10px !important;
+            border-collapse: collapse !important;
+          }
+          th, td {
+            border: 1px solid #ccc !important;
+            padding: 4px 6px !important;
+            word-break: break-word !important;
+            white-space: pre-wrap !important;
+          }
+          /* Render editable column-name inputs as plain bold text */
+          thead input {
+            font-weight: 600 !important;
+            border: none !important;
+            outline: none !important;
+            background: transparent !important;
+            width: 100% !important;
+            pointer-events: none !important;
+          }
+          /* Render cell textareas as plain text */
+          textarea {
+            border: none !important;
+            outline: none !important;
+            resize: none !important;
+            background: transparent !important;
+            width: 100% !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
 
-      <Card className="p-4 bg-card border-border/50">
-        {isLoading || !workbook ? (
-          <div className="h-48 flex items-center justify-center text-muted-foreground">Carregando planilha...</div>
-        ) : (
-          <SheetGrid
-            workbook={workbook}
-            onChange={handleChange}
-            activeTabId={activeTabId}
-            onActiveTabChange={setActiveTabId}
-          />
-        )}
-      </Card>
-    </div>
+      <div id="compras-print-root" className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 no-print">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              <ShoppingCart className="w-7 h-7 text-primary" />
+              Compras e Serviços
+            </h1>
+            <p className="text-muted-foreground mt-1">Planilha da unidade <strong>{unit}</strong> — todas as células são editáveis.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5 min-w-[110px] justify-end">
+              {saveState === "saving" && <><Loader2 className="w-3.5 h-3.5 animate-spin" />Salvando…</>}
+              {saveState === "saved" && <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />Salvo</>}
+            </div>
+            <Button variant="outline" onClick={() => window.print()} title="Exportar como PDF">
+              <Printer className="w-4 h-4 mr-2" />
+              Exportar PDF
+            </Button>
+            <Button variant="outline" onClick={handleShare}>
+              <Share2 className="w-4 h-4 mr-2" />
+              Compartilhar
+            </Button>
+            <Button onClick={handleManualSave} disabled={!workbook || saveState === "saving"}>
+              <Save className="w-4 h-4 mr-2" />
+              Salvar
+            </Button>
+          </div>
+        </div>
+        {/* Print-visible title */}
+        <div className="hidden print:block text-xl font-bold mb-2">
+          Compras e Serviços — Unidade {unit}
+        </div>
+
+        <Card id="compras-print-card" className="p-4 bg-card border-border/50">
+          {isLoading || !workbook ? (
+            <div className="h-48 flex items-center justify-center text-muted-foreground">Carregando planilha...</div>
+          ) : (
+            <SheetGrid
+              key={unit}
+              workbook={workbook}
+              onChange={handleChange}
+              activeTabId={activeTabId}
+              onActiveTabChange={setActiveTabId}
+            />
+          )}
+        </Card>
+      </div>
+    </>
   );
 }
