@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { PackageOpen, Plus, Trash2, Pencil, Check, X, Image as ImageIcon, RefreshCw } from "lucide-react";
 import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent } from "@/components/ui/card";
@@ -56,6 +56,69 @@ function parsePhotos(foto: string | null): string[] {
   return [foto];
 }
 
+// Memoized row — only re-renders when its own record or the loading flag changes.
+type RowProps = {
+  r: Withdrawal;
+  loadingPhotosId: number | null;
+  tipoBadge: (tipo: string) => string;
+  onOpenPhotos: (r: Withdrawal) => void;
+  onOpenEdit: (r: Withdrawal) => void;
+  onDelete: (id: number) => void;
+};
+
+const WithdrawalRow = memo(function WithdrawalRow({
+  r, loadingPhotosId, tipoBadge, onOpenPhotos, onOpenEdit, onDelete,
+}: RowProps) {
+  return (
+    <tr className="hover:bg-muted/10 transition-colors group">
+      <td className="px-4 py-3 border-r border-border/30 font-medium">{r.nome || <span className="text-muted-foreground italic">—</span>}</td>
+      <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm">
+        {r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
+      </td>
+      <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm text-muted-foreground">
+        {r.createdAt
+          ? new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+          : "-"}
+      </td>
+      <td className="px-4 py-3 border-r border-border/30">
+        <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", tipoBadge(r.tipo))}>
+          {r.tipo === "retirada" ? "Retirada" : "Entrega"}
+        </span>
+      </td>
+      <td className="px-4 py-3 border-r border-border/30 font-medium">{r.tipoMaterial}</td>
+      <td className="px-4 py-3 border-r border-border/30">{r.quantidade}</td>
+      <td className="px-4 py-3 border-r border-border/30 text-muted-foreground max-w-[240px] truncate" title={r.justificativa}>
+        {r.justificativa}
+      </td>
+      <td className="px-4 py-3 border-r border-border/30 text-center">
+        {r.hasFoto ? (
+          <button
+            onClick={() => onOpenPhotos(r)}
+            disabled={loadingPhotosId === r.id}
+            className="relative mx-auto inline-flex items-center justify-center w-9 h-9 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors disabled:opacity-50"
+          >
+            {loadingPhotosId === r.id
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <ImageIcon className="w-4 h-4" />}
+          </button>
+        ) : (
+          <span className="text-muted-foreground/40 text-xs">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-center">
+        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={() => onOpenEdit(r)} className="text-muted-foreground hover:text-primary transition-colors">
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button onClick={() => onDelete(r.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
 export default function RetiradaMateriais() {
   const { toast } = useToast();
   const { unit } = useUnit();
@@ -72,7 +135,7 @@ export default function RetiradaMateriais() {
   // Pagination — the list endpoint returns a bounded page so opening this
   // screen stays fast even as the table grows into the thousands. "Carregar
   // mais" fetches the next page without re-fetching what's already loaded.
-  const PAGE_SIZE = 200;
+  const PAGE_SIZE = 50;
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -95,7 +158,9 @@ export default function RetiradaMateriais() {
     }
   }, [fetchPage]);
 
-  useEffect(() => { setLoading(true); fetchAll(); }, [unit]);
+  // fetchAll already depends on unit via fetchPage; using it as the dep avoids
+  // double-firing and satisfies the exhaustive-deps rule.
+  useEffect(() => { setLoading(true); fetchAll(); }, [fetchAll]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -116,7 +181,7 @@ export default function RetiradaMateriais() {
   };
 
   /** Lazily fetch the full record (including base64 photos) for the lightbox. */
-  const openPhotos = async (r: Withdrawal) => {
+  const openPhotos = useCallback(async (r: Withdrawal) => {
     if (!r.hasFoto) return;
     setLoadingPhotosId(r.id);
     try {
@@ -130,7 +195,7 @@ export default function RetiradaMateriais() {
     } finally {
       setLoadingPhotosId(null);
     }
-  };
+  }, [toast]);
 
   const handleField = (field: keyof FormState, value: string) =>
     setForm(prev => ({ ...prev, [field]: value }));
@@ -167,7 +232,7 @@ export default function RetiradaMateriais() {
     setShowForm(true);
   };
 
-  const openEdit = async (r: Withdrawal) => {
+  const openEdit = useCallback(async (r: Withdrawal) => {
     setEditingId(r.id);
     // The list row doesn't carry `foto` (kept out of the list response for
     // speed) — fetch the full record on demand so editing still has access
@@ -193,7 +258,7 @@ export default function RetiradaMateriais() {
     });
     setPhotoPreviews(photos);
     setShowForm(true);
-  };
+  }, [toast]);
 
   const handleSave = async () => {
     if (!form.nome || !form.date || !form.tipoMaterial || !form.quantidade || !form.justificativa) {
@@ -222,7 +287,7 @@ export default function RetiradaMateriais() {
     }
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = useCallback(async (id: number) => {
     if (!confirm("Deseja excluir este registro?")) return;
     try {
       await fetch(`${BASE_URL}/api/material-withdrawals/${id}`, { method: "DELETE" });
@@ -231,12 +296,13 @@ export default function RetiradaMateriais() {
     } catch {
       toast({ title: "Erro ao excluir", variant: "destructive" });
     }
-  };
+  }, [toast, fetchAll]);
 
-  const tipoBadge = (tipo: string) =>
+  const tipoBadge = useCallback((tipo: string) =>
     tipo === "retirada"
       ? "bg-amber-500/15 text-amber-400 border border-amber-600/30"
-      : "bg-emerald-500/15 text-emerald-400 border border-emerald-600/30";
+      : "bg-emerald-500/15 text-emerald-400 border border-emerald-600/30"
+  , []);
 
   return (
     <div className="p-4 md:p-6 max-w-full mx-auto space-y-6">
@@ -394,60 +460,17 @@ export default function RetiradaMateriais() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/40">
-                {records.map(r => {
-                  return (
-                    <tr key={r.id} className="hover:bg-muted/10 transition-colors group">
-                      <td className="px-4 py-3 border-r border-border/30 font-medium">{r.nome || <span className="text-muted-foreground italic">—</span>}</td>
-                      <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm">
-                        {r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR") : "-"}
-                      </td>
-                      <td className="px-4 py-3 border-r border-border/30 whitespace-nowrap text-sm text-muted-foreground">
-                        {/* Horário de registro — vem do momento em que o registro foi criado no
-                            sistema (createdAt), é estático e não é editável. */}
-                        {r.createdAt
-                          ? new Date(r.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-                          : "-"}
-                      </td>
-                      <td className="px-4 py-3 border-r border-border/30">
-                        <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", tipoBadge(r.tipo))}>
-                          {r.tipo === "retirada" ? "Retirada" : "Entrega"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 border-r border-border/30 font-medium">{r.tipoMaterial}</td>
-                      <td className="px-4 py-3 border-r border-border/30">{r.quantidade}</td>
-                      <td className="px-4 py-3 border-r border-border/30 text-muted-foreground max-w-[240px] truncate" title={r.justificativa}>
-                        {r.justificativa}
-                      </td>
-                      <td className="px-4 py-3 border-r border-border/30 text-center">
-                        {r.hasFoto ? (
-                          <button
-                            onClick={() => openPhotos(r)}
-                            disabled={loadingPhotosId === r.id}
-                            className="relative mx-auto inline-flex items-center justify-center w-9 h-9 rounded-md bg-primary/10 hover:bg-primary/20 text-primary transition-colors disabled:opacity-50"
-                          >
-                            {loadingPhotosId === r.id ? (
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <ImageIcon className="w-4 h-4" />
-                            )}
-                          </button>
-                        ) : (
-                          <span className="text-muted-foreground/40 text-xs">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openEdit(r)} className="text-muted-foreground hover:text-primary transition-colors">
-                            <Pencil className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDelete(r.id)} className="text-muted-foreground hover:text-destructive transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {records.map(r => (
+                  <WithdrawalRow
+                    key={r.id}
+                    r={r}
+                    loadingPhotosId={loadingPhotosId}
+                    tipoBadge={tipoBadge}
+                    onOpenPhotos={openPhotos}
+                    onOpenEdit={openEdit}
+                    onDelete={handleDelete}
+                  />
+                ))}
               </tbody>
             </table>
           )}
