@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearch, useLocation } from "wouter";
 import { format } from "date-fns";
-import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw, Camera, Image as ImageIcon, X } from "lucide-react";
+import { ArrowLeft, MapPin, ClipboardList, CheckCircle2, Loader2, WifiOff, RefreshCw, Camera, Image as ImageIcon, X, Edit3, Save, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -24,11 +26,16 @@ type OS = {
   location: string;
   description?: string | null;
   department?: string | null;
+  notes?: string | null;
+  category?: string | null;
   status: string;
   priority: string;
   technicianName?: string | null;
+  scheduledAt?: string | null;
   createdAt: string;
 };
+
+type EditDraft = Pick<OS, "location" | "department" | "description" | "notes" | "priority" | "technicianName">;
 
 function getCacheKey(unit: string) {
   return `gram-fechar-os-cache-${unit}`;
@@ -63,6 +70,16 @@ export default function FecharOS() {
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [successId, setSuccessId] = useState<number | null>(null);
   const [addingMediaToId, setAddingMediaToId] = useState<number | null>(null);
+
+  // Feature: full OS edit
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState<EditDraft>({ location: "", department: "", description: "", notes: "", priority: "media", technicianName: "" });
+  const [savingId, setSavingId] = useState<number | null>(null);
+
+  // Feature: per-OS photo management (lazy-loaded on demand)
+  const [osPhotos, setOsPhotos] = useState<Record<number, string[]>>({});
+  const [loadingPhotosId, setLoadingPhotosId] = useState<number | null>(null);
+  const [showPhotosId, setShowPhotosId] = useState<number | null>(null);
 
   const handleAddMedia = async (osId: number, files: FileList | null, fromCamera = false) => {
     if (!files || files.length === 0) return;
@@ -154,6 +171,85 @@ export default function FecharOS() {
       toast({ title: "Erro ao salvar mídia", variant: "destructive" });
     } finally {
       setAddingMediaToId(null);
+    }
+  };
+
+  // ── Feature: full OS edit ──────────────────────────────────────────────
+  const startEdit = (os: OS) => {
+    setEditDraft({
+      location: os.location ?? "",
+      department: os.department ?? "",
+      description: os.description ?? "",
+      notes: os.notes ?? "",
+      priority: os.priority ?? "media",
+      technicianName: os.technicianName ?? "",
+    });
+    setEditingId(os.id);
+  };
+
+  const handleSaveEdit = async (id: number) => {
+    setSavingId(id);
+    try {
+      const res = await fetch(`${BASE_URL}/api/service-orders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editDraft),
+      });
+      if (!res.ok) throw new Error();
+      const updated: OS = await res.json();
+      setOrdens(prev => {
+        const next = prev.map(o => o.id === id ? { ...o, ...updated } : o);
+        writeCache(unitFromUrl, next);
+        return next;
+      });
+      setEditingId(null);
+      toast({ title: "OS atualizada!" });
+    } catch {
+      toast({ title: "Erro ao salvar alterações", variant: "destructive" });
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  // ── Feature: per-OS photo viewing and deletion ─────────────────────────
+  const loadPhotos = async (osId: number) => {
+    if (osPhotos[osId] !== undefined) return; // already loaded
+    setLoadingPhotosId(osId);
+    try {
+      const r = await fetch(`${BASE_URL}/api/service-orders/${osId}/photos`);
+      if (r.ok) {
+        const d = await r.json() as { photos: string | null };
+        const list: string[] = (() => { try { return JSON.parse(d.photos || "[]") ?? []; } catch { return []; } })();
+        setOsPhotos(prev => ({ ...prev, [osId]: list }));
+      }
+    } catch {
+      setOsPhotos(prev => ({ ...prev, [osId]: [] }));
+    } finally {
+      setLoadingPhotosId(null);
+    }
+  };
+
+  const togglePhotos = (osId: number) => {
+    if (showPhotosId === osId) { setShowPhotosId(null); return; }
+    setShowPhotosId(osId);
+    void loadPhotos(osId);
+  };
+
+  const handleDeleteOsPhoto = async (osId: number, idx: number) => {
+    if (!confirm("Remover este anexo da OS?")) return;
+    const current = osPhotos[osId] || [];
+    const next = current.filter((_, i) => i !== idx);
+    try {
+      const res = await fetch(`${BASE_URL}/api/service-orders/${osId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photos: JSON.stringify(next) }),
+      });
+      if (!res.ok) throw new Error();
+      setOsPhotos(prev => ({ ...prev, [osId]: next }));
+      toast({ title: "Foto removida" });
+    } catch {
+      toast({ title: "Erro ao remover foto", variant: "destructive" });
     }
   };
 
@@ -366,7 +462,7 @@ export default function FecharOS() {
             Fechar Ordem de Serviço
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Selecione o status de encerramento da OS. Apenas o campo <strong>Status</strong> pode ser alterado.
+            Atualize o status, edite os campos e gerencie as fotos de cada OS da sua unidade.
           </p>
         </div>
 
@@ -394,62 +490,170 @@ export default function FecharOS() {
                 <CardContent className="p-4 space-y-3">
                   {/* OS header */}
                   <div className="flex flex-wrap items-start gap-2 justify-between">
-                    <div className="space-y-0.5 min-w-0">
+                    <div className="space-y-0.5 min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-mono font-bold text-primary text-sm">{os.number}</span>
                         <span className="text-sm text-muted-foreground">—</span>
                         <span className="font-medium text-sm truncate">{os.title}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        Local: {os.location}{os.department ? ` · ${os.department}` : ""} · {os.technicianName ? `Técnico: ${os.technicianName}` : "Sem técnico"} · {format(new Date(os.createdAt), "dd/MM/yyyy")}
-                      </div>
-                      {os.description && (
-                        <div className="text-xs text-muted-foreground/80 mt-0.5 line-clamp-2 italic">
-                          {os.description}
-                        </div>
+                      {editingId !== os.id && (
+                        <>
+                          <div className="text-xs text-muted-foreground">
+                            Local: {os.location}{os.department ? ` · ${os.department}` : ""} · {os.technicianName ? `Técnico: ${os.technicianName}` : "Sem técnico"} · {format(new Date(os.createdAt), "dd/MM/yyyy")}
+                          </div>
+                          {os.description && (
+                            <div className="text-xs text-muted-foreground/80 mt-0.5 line-clamp-2 italic">
+                              {os.description}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                    {successId === os.id && (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {successId === os.id && <CheckCircle2 className="w-5 h-5 text-emerald-500" />}
+                      {editingId === os.id ? (
+                        <>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)} className="h-7 px-2 text-xs gap-1">
+                            <X className="w-3.5 h-3.5" /> Cancelar
+                          </Button>
+                          <Button size="sm" onClick={() => void handleSaveEdit(os.id)} disabled={savingId === os.id} className="h-7 px-2 text-xs gap-1">
+                            {savingId === os.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                            Salvar
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="sm" variant="ghost" onClick={() => startEdit(os)} className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground">
+                          <Edit3 className="w-3.5 h-3.5" /> Editar
+                        </Button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Read-only fields */}
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority] ?? ""}>
-                      {PRIORITY_LABELS[os.priority as ServiceOrderPriority] || os.priority}
-                    </Badge>
-                  </div>
+                  {/* ── Inline edit form ── */}
+                  {editingId === os.id && (
+                    <div className="space-y-3 pt-2 border-t border-border/40">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Local</label>
+                          <Input value={editDraft.location ?? ""} onChange={e => setEditDraft(d => ({ ...d, location: e.target.value }))} placeholder="Local do serviço" className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Departamento</label>
+                          <Input value={editDraft.department ?? ""} onChange={e => setEditDraft(d => ({ ...d, department: e.target.value }))} placeholder="Departamento / setor" className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Técnico Responsável</label>
+                          <Input value={editDraft.technicianName ?? ""} onChange={e => setEditDraft(d => ({ ...d, technicianName: e.target.value }))} placeholder="Nome do técnico" className="h-8 text-sm" />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-muted-foreground">Prioridade</label>
+                          <Select value={editDraft.priority ?? "media"} onValueChange={val => setEditDraft(d => ({ ...d, priority: val }))}>
+                            <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(PRIORITY_LABELS).map(([v, l]) => (
+                                <SelectItem key={v} value={v}>{l}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Descrição</label>
+                        <Textarea value={editDraft.description ?? ""} onChange={e => setEditDraft(d => ({ ...d, description: e.target.value }))} placeholder="Descrição do serviço..." className="min-h-[60px] text-sm" />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-muted-foreground">Notas / Andamento</label>
+                        <Textarea value={editDraft.notes ?? ""} onChange={e => setEditDraft(d => ({ ...d, notes: e.target.value }))} placeholder="Observações, materiais utilizados..." className="min-h-[60px] text-sm" />
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Photo / video upload */}
-                  <div className="flex items-center gap-2 pt-1 border-t border-border/30">
-                    <span className="text-xs text-muted-foreground shrink-0">Fotos/Vídeo:</span>
-                    <button
-                      type="button"
-                      title="Tirar foto"
-                      disabled={addingMediaToId === os.id}
-                      onClick={() => document.getElementById(`media-camera-${os.id}`)?.click()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                    >
-                      <Camera className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Galeria"
-                      disabled={addingMediaToId === os.id}
-                      onClick={() => document.getElementById(`media-gallery-${os.id}`)?.click()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-                    >
-                      <ImageIcon className="w-4 h-4" />
-                    </button>
-                    {addingMediaToId === os.id && (
-                      <span className="text-xs text-primary animate-pulse ml-1">Salvando…</span>
+                  {/* Priority badge (hidden while editing) */}
+                  {editingId !== os.id && (
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority] ?? ""}>
+                        {PRIORITY_LABELS[os.priority as ServiceOrderPriority] || os.priority}
+                      </Badge>
+                    </div>
+                  )}
+
+                  {/* Photo / video upload + existing photo viewer */}
+                  <div className="space-y-2 pt-1 border-t border-border/30">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground shrink-0">Fotos/Vídeo:</span>
+                      <button
+                        type="button"
+                        title="Tirar foto"
+                        disabled={addingMediaToId === os.id}
+                        onClick={() => document.getElementById(`media-camera-${os.id}`)?.click()}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        <Camera className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        title="Galeria"
+                        disabled={addingMediaToId === os.id}
+                        onClick={() => document.getElementById(`media-gallery-${os.id}`)?.click()}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                      </button>
+                      {addingMediaToId === os.id && (
+                        <span className="text-xs text-primary animate-pulse ml-1">Salvando…</span>
+                      )}
+                      {/* Toggle to view / manage existing photos */}
+                      <button
+                        type="button"
+                        onClick={() => togglePhotos(os.id)}
+                        className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        title="Ver / remover fotos existentes"
+                      >
+                        {loadingPhotosId === os.id
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : showPhotosId === os.id
+                            ? <ChevronUp className="w-3.5 h-3.5" />
+                            : <ChevronDown className="w-3.5 h-3.5" />}
+                        Ver fotos
+                      </button>
+                      {/* Gallery includes videos; video camera recording removed for stability */}
+                      <input id={`media-camera-${os.id}`} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => { void handleAddMedia(os.id, e.target.files, true); if (showPhotosId === os.id) setOsPhotos(p => ({ ...p, [os.id]: undefined as any })); }} />
+                      <input id={`media-gallery-${os.id}`} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => { void handleAddMedia(os.id, e.target.files, false); if (showPhotosId === os.id) setOsPhotos(p => ({ ...p, [os.id]: undefined as any })); }} />
+                    </div>
+
+                    {/* Existing photos grid with delete buttons */}
+                    {showPhotosId === os.id && (
+                      <div className="pt-1">
+                        {(osPhotos[os.id] ?? []).length === 0 ? (
+                          <p className="text-xs text-muted-foreground/60 italic">Nenhuma foto anexada.</p>
+                        ) : (
+                          <div className="grid grid-cols-3 gap-2">
+                            {(osPhotos[os.id] ?? []).map((src, idx) => {
+                              const isVideo = src.startsWith("data:video/") || /\.(mp4|webm|mov)(\?|$)/i.test(src);
+                              return (
+                                <div key={idx} className="relative group rounded border border-border overflow-hidden">
+                                  {isVideo ? (
+                                    <div className="w-full h-20 flex items-center justify-center bg-muted/40">
+                                      <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                                    </div>
+                                  ) : (
+                                    <img src={src} alt="Anexo" className="w-full h-20 object-cover" />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => void handleDeleteOsPhoto(os.id, idx)}
+                                    title="Remover foto"
+                                    className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     )}
-                    {/* Gallery includes videos; video camera recording removed for stability */}
-                    {/* fromCamera=true bypasses isImageFile() — camera inputs may deliver
-                        file.type="" on Android OEM browsers (Samsung Internet, etc.) */}
-                    <input id={`media-camera-${os.id}`} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files, true)} />
-                    <input id={`media-gallery-${os.id}`} type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => void handleAddMedia(os.id, e.target.files, false)} />
                   </div>
 
                   {/* Editable status */}

@@ -1,33 +1,25 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Share2, Copy, CheckCircle2, X } from "lucide-react";
+import {
+  CalendarDays, ChevronLeft, ChevronRight, Plus, RefreshCw, Share2, Copy, CheckCircle2, X, User,
+} from "lucide-react";
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   addDays, isSameMonth, isSameDay, addMonths, subMonths,
 } from "date-fns";
-import { useListServiceOrders } from "@workspace/api-client-react";
+import { useListServiceOrders, useListTechnicians } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUnit } from "@/contexts/unit-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { STATUS_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-
-const STATUS_DOT: Record<string, string> = {
-  aberta: "bg-blue-500",
-  em_andamento: "bg-yellow-500",
-  concluida: "bg-emerald-500",
-  cancelada: "bg-red-500",
-};
-
-const STATUS_BADGE: Record<string, string> = {
-  aberta: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  em_andamento: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  concluida: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  cancelada: "bg-red-500/15 text-red-400 border-red-500/30",
-};
+import { CalendarSummaryCards, type CalendarSummary } from "@/components/calendario/summary-cards";
+import { OrderChip, STATUS_COLORS, STATUS_DOT, isOverdue, type CalendarOrder } from "@/components/calendario/order-chip";
+import { OrderDetailsDrawer } from "@/components/calendario/order-drawer";
 
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const MONTH_NAMES = [
@@ -36,6 +28,26 @@ const MONTH_NAMES = [
 ];
 
 const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+// Max OS chips shown directly inside a day cell before collapsing into "+X OS".
+const MAX_VISIBLE_PER_DAY = 2;
+
+type QuickFilter = "todos" | "minhas" | "aberta" | "em_andamento" | "concluida" | "cancelada" | "urgente";
+
+const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
+  { key: "todos", label: "Todos" },
+  { key: "minhas", label: "Minhas OS" },
+  { key: "aberta", label: "Abertas" },
+  { key: "em_andamento", label: "Em Andamento" },
+  { key: "concluida", label: "Concluídas" },
+  { key: "cancelada", label: "Canceladas" },
+  { key: "urgente", label: "Urgentes" },
+];
+
+// Persists which technician "is me" for the "Minhas OS" quick filter — purely
+// a local UI convenience (no auth system exists in this app), stored per
+// browser and scoped only to this page.
+const MY_TECH_STORAGE_KEY = "calendario_meu_tecnico_id";
 
 export default function Calendario() {
   const [, setLocation] = useLocation();
@@ -51,6 +63,9 @@ export default function Calendario() {
   const [refreshing, setRefreshing] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<CalendarOrder | null>(null);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("todos");
+  const [myTechId, setMyTechId] = useState<string>(() => localStorage.getItem(MY_TECH_STORAGE_KEY) || "");
 
   // Key stabilised — period:"annual" always returns the current year so the year
   // number does NOT need to be part of the key; including it caused a new fetch
@@ -60,6 +75,11 @@ export default function Calendario() {
   const { data: orders = [] } = useListServiceOrders(
     { period: "annual", unidade: unit } as any,
     { query: { enabled: true, queryKey } }
+  );
+
+  const { data: technicians = [] } = useListTechnicians(
+    { unidade: unit } as any,
+    { query: { enabled: !isReadOnly, queryKey: ["calendario-technicians", unit] } }
   );
 
   const handleRefresh = useCallback(async () => {
@@ -78,10 +98,34 @@ export default function Calendario() {
     });
   };
 
-  const filteredOrders = useMemo(
+  useEffect(() => {
+    if (myTechId) localStorage.setItem(MY_TECH_STORAGE_KEY, myTechId);
+  }, [myTechId]);
+
+  const unitOrders = useMemo(
     () => (orders as any[]).filter((os: any) => !os.unidade || os.unidade === unit),
     [orders, unit]
   );
+
+  // Quick-filter applied on top of the unit-scoped orders — affects only what
+  // is shown in the grid (dots/chips/day counts), never the underlying data.
+  const filteredOrders = useMemo(() => {
+    switch (quickFilter) {
+      case "minhas":
+        return myTechId
+          ? unitOrders.filter((os: any) => String(os.technicianId ?? "") === myTechId)
+          : [];
+      case "urgente":
+        return unitOrders.filter((os: any) => os.priority === "urgente");
+      case "aberta":
+      case "em_andamento":
+      case "concluida":
+      case "cancelada":
+        return unitOrders.filter((os: any) => os.status === quickFilter);
+      default:
+        return unitOrders;
+    }
+  }, [unitOrders, quickFilter, myTechId]);
 
   const ordersByDate = useMemo(() => {
     const map = new Map<string, typeof filteredOrders>();
@@ -117,12 +161,59 @@ export default function Calendario() {
 
   const today = new Date();
 
+  // Max OS count across the visible month — used to scale the "busy day"
+  // highlight so it stays relative to this month, not an absolute number.
+  const maxOrdersInMonth = useMemo(() => {
+    let max = 0;
+    for (const week of weeks) {
+      for (const date of week) {
+        if (!isSameMonth(date, currentDate)) continue;
+        const key = format(date, "yyyy-MM-dd");
+        max = Math.max(max, (ordersByDate.get(key) || []).length);
+      }
+    }
+    return max;
+  }, [weeks, currentDate, ordersByDate]);
+
+  // Summary cards — scoped to the currently visible month (unit-filtered,
+  // independent from the quick filter chips so it always reflects the full
+  // picture regardless of which subset is being browsed).
+  const monthSummary: CalendarSummary = useMemo(() => {
+    const inMonth = unitOrders.filter((os: any) => {
+      const raw = os.scheduledAt || os.createdAt;
+      if (!raw) return false;
+      const d = new Date(raw);
+      return d >= monthStart && d <= monthEnd;
+    });
+    return {
+      total: inMonth.length,
+      abertas: inMonth.filter((os: any) => os.status === "aberta").length,
+      emAndamento: inMonth.filter((os: any) => os.status === "em_andamento").length,
+      concluidas: inMonth.filter((os: any) => os.status === "concluida").length,
+      canceladas: inMonth.filter((os: any) => os.status === "cancelada").length,
+      atrasadas: inMonth.filter((os: any) => isOverdue(os)).length,
+    };
+  }, [unitOrders, monthStart, monthEnd]);
+
   // Orders for the selected day (used in the expansion modal)
   const selectedDayOrders = useMemo(() => {
     if (!selectedDay) return [];
     const key = format(selectedDay, "yyyy-MM-dd");
     return ordersByDate.get(key) || [];
   }, [selectedDay, ordersByDate]);
+
+  const openOrder = (os: CalendarOrder) => setSelectedOrder(os);
+
+  const goToFullOrder = (id: number | string) => {
+    setSelectedOrder(null);
+    setSelectedDay(null);
+    setLocation(`/ordens/${id}`);
+  };
+
+  const handleNewOsForDay = (date: Date) => {
+    if (isReadOnly) return;
+    setLocation(`/ordens/nova?data=${format(date, "yyyy-MM-dd")}`);
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-full">
@@ -179,6 +270,43 @@ export default function Calendario() {
         </div>
       </div>
 
+      {/* Summary cards */}
+      <CalendarSummaryCards summary={monthSummary} />
+
+      {/* Quick filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        {QUICK_FILTERS.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setQuickFilter(f.key)}
+            className={cn(
+              "text-xs font-medium px-3 py-1.5 rounded-full border transition-all",
+              quickFilter === f.key
+                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                : "bg-card text-muted-foreground border-border hover:border-primary/40 hover:text-foreground"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+
+        {quickFilter === "minhas" && !isReadOnly && (
+          <div className="flex items-center gap-1.5 ml-1">
+            <User className="w-3.5 h-3.5 text-muted-foreground" />
+            <Select value={myTechId} onValueChange={setMyTechId}>
+              <SelectTrigger className="h-7 text-xs w-[160px]">
+                <SelectValue placeholder="Eu sou..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(technicians as any[]).map((t: any) => (
+                  <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
+
       {/* Legend */}
       <div className="flex flex-wrap gap-4 text-xs">
         {Object.entries(STATUS_DOT).map(([status, color]) => (
@@ -210,58 +338,64 @@ export default function Calendario() {
                 const isCurrentMonth = isSameMonth(date, currentDate);
                 const isToday = isSameDay(date, today);
                 const hasOrders = dayOrders.length > 0;
+                const isBusyDay = maxOrdersInMonth >= 3 && dayOrders.length >= Math.max(3, Math.ceil(maxOrdersInMonth * 0.7));
 
                 return (
                   <div
                     key={di}
                     onClick={() => hasOrders && setSelectedDay(date)}
+                    onDoubleClick={() => handleNewOsForDay(date)}
                     className={cn(
-                      "min-h-[90px] md:min-h-[110px] p-1 border-r border-border/20 last:border-r-0 transition-colors",
+                      "min-h-[90px] md:min-h-[110px] p-1 border-r border-border/20 last:border-r-0 transition-all duration-150",
                       !isCurrentMonth && "bg-muted/20",
-                      isToday && "bg-primary/5",
-                      hasOrders && "cursor-pointer hover:bg-muted/30"
+                      isToday && "bg-primary/[0.07] ring-1 ring-inset ring-primary/40",
+                      isBusyDay && !isToday && "bg-amber-500/[0.06]",
+                      hasOrders && "cursor-pointer hover:bg-muted/30",
+                      !isReadOnly && "cursor-pointer"
                     )}
-                    title={hasOrders ? `${dayOrders.length} ordem${dayOrders.length > 1 ? "s" : ""} — clique para expandir` : undefined}
+                    title={
+                      hasOrders
+                        ? `${dayOrders.length} ordem${dayOrders.length > 1 ? "s" : ""} — clique para expandir${!isReadOnly ? " · duplo clique para nova OS" : ""}`
+                        : !isReadOnly
+                        ? "Duplo clique para criar uma nova OS nesta data"
+                        : undefined
+                    }
                   >
                     {/* Day number */}
-                    <div className={cn(
-                      "text-xs font-semibold mb-1 w-6 h-6 flex items-center justify-center rounded-full",
-                      isToday
-                        ? "bg-primary text-primary-foreground"
-                        : isCurrentMonth
-                        ? "text-foreground"
-                        : "text-muted-foreground/30"
-                    )}>
-                      {format(date, "d")}
+                    <div className="flex items-center justify-between mb-1">
+                      <div className={cn(
+                        "text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full transition-colors",
+                        isToday
+                          ? "bg-primary text-primary-foreground shadow-sm ring-2 ring-primary/30"
+                          : isCurrentMonth
+                          ? "text-foreground"
+                          : "text-muted-foreground/30"
+                      )}>
+                        {format(date, "d")}
+                      </div>
+                      {isBusyDay && (
+                        <span className="text-[9px] font-semibold text-amber-500 bg-amber-500/10 rounded-full px-1.5 py-0.5">
+                          {dayOrders.length}
+                        </span>
+                      )}
                     </div>
 
-                    {/* Order dots */}
+                    {/* Order chips */}
                     <div className="space-y-0.5">
-                      {dayOrders.slice(0, 3).map((os: any) => (
-                        <button
+                      {dayOrders.slice(0, MAX_VISIBLE_PER_DAY).map((os: any) => (
+                        <OrderChip
                           key={os.id}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (!isReadOnly) setLocation(`/ordens/${os.id}`);
-                          }}
-                          className={cn(
-                            "w-full text-left flex items-center gap-1 px-1 py-0.5 rounded text-[10px] transition-colors group",
-                            isReadOnly ? "cursor-default" : "hover:bg-muted/60"
-                          )}
-                          title={`${os.number} — ${os.title}`}
-                        >
-                          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", STATUS_DOT[os.status] || "bg-muted")} />
-                          <span className="truncate text-foreground/80 group-hover:text-primary leading-tight">
-                            {os.number}
-                          </span>
-                        </button>
+                          os={os}
+                          dense
+                          onClick={(e) => { e.stopPropagation(); openOrder(os); }}
+                        />
                       ))}
-                      {dayOrders.length > 3 && (
+                      {dayOrders.length > MAX_VISIBLE_PER_DAY && (
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedDay(date); }}
-                          className="text-[10px] text-primary/70 hover:text-primary pl-1 w-full text-left transition-colors"
+                          className="text-[10px] font-medium text-primary/70 hover:text-primary pl-1 w-full text-left transition-colors"
                         >
-                          +{dayOrders.length - 3} mais
+                          +{dayOrders.length - MAX_VISIBLE_PER_DAY} OS
                         </button>
                       )}
                     </div>
@@ -276,7 +410,7 @@ export default function Calendario() {
       <p className="text-xs text-muted-foreground">
         {isReadOnly
           ? "📅 Modo de visualização — somente leitura"
-          : "💡 Clique em qualquer dia com OS para expandir · Clique em uma OS para ver os detalhes"}
+          : "💡 Clique em um dia para expandir · Duplo clique em um dia para criar uma OS · Clique em uma OS para ver os detalhes"}
       </p>
 
       {/* Floating Action Button (mobile only) */}
@@ -306,57 +440,62 @@ export default function Calendario() {
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 mt-2">
-            {selectedDayOrders.map((os: any) => (
-              <div
-                key={os.id}
-                className={cn(
-                  "rounded-lg border p-3 space-y-1.5",
-                  "bg-muted/30 border-border/50"
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-start gap-2 min-w-0">
-                    <span className={cn("w-2 h-2 rounded-full shrink-0 mt-1.5", STATUS_DOT[os.status] || "bg-muted")} />
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground leading-snug">{os.title}</p>
-                      <p className="text-xs text-muted-foreground">{os.number}</p>
+            {selectedDayOrders.map((os: any) => {
+              const overdue = isOverdue(os);
+              return (
+                <button
+                  key={os.id}
+                  onClick={() => openOrder(os)}
+                  className={cn(
+                    "w-full text-left rounded-lg border p-3 space-y-1.5 transition-colors",
+                    "bg-muted/30 border-border/50 hover:bg-muted/50 hover:border-border"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 min-w-0">
+                      <span className={cn("w-2 h-2 rounded-full shrink-0 mt-1.5", STATUS_DOT[os.status] || "bg-muted")} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground leading-snug flex items-center gap-1.5">
+                          {os.title}
+                          {overdue && <span title="Atrasada" className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse shrink-0" />}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{os.number}</p>
+                      </div>
                     </div>
+                    <span className={cn(
+                      "text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0",
+                      STATUS_COLORS[os.status as keyof typeof STATUS_COLORS] || "bg-muted/50 text-muted-foreground border-border"
+                    )}>
+                      {STATUS_LABELS[os.status as keyof typeof STATUS_LABELS] || os.status}
+                    </span>
                   </div>
-                  <span className={cn(
-                    "text-[10px] font-medium px-1.5 py-0.5 rounded border shrink-0",
-                    STATUS_BADGE[os.status] || "bg-muted/50 text-muted-foreground border-border"
-                  )}>
-                    {STATUS_LABELS[os.status as keyof typeof STATUS_LABELS] || os.status}
-                  </span>
-                </div>
 
-                {os.location && (
-                  <p className="text-xs text-muted-foreground pl-4 truncate">{os.location}</p>
-                )}
+                  {os.location && (
+                    <p className="text-xs text-muted-foreground pl-4 truncate">{os.location}</p>
+                  )}
 
-                {(os.scheduledAt || os.createdAt) && (
-                  <p className="text-[10px] text-muted-foreground/60 pl-4">
-                    {os.scheduledAt
-                      ? `Agendado: ${format(new Date(os.scheduledAt), "dd/MM/yyyy")}`
-                      : `Criado: ${format(new Date(os.createdAt), "dd/MM/yyyy")}`}
-                  </p>
-                )}
-
-                {!isReadOnly && (
-                  <div className="pl-4">
-                    <button
-                      onClick={() => { setSelectedDay(null); setLocation(`/ordens/${os.id}`); }}
-                      className="text-xs text-primary hover:text-primary/80 transition-colors"
-                    >
-                      Ver detalhes →
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                  {(os.scheduledAt || os.createdAt) && (
+                    <p className="text-[10px] text-muted-foreground/60 pl-4">
+                      {os.scheduledAt
+                        ? `Agendado: ${format(new Date(os.scheduledAt), "dd/MM/yyyy")}`
+                        : `Criado: ${format(new Date(os.createdAt), "dd/MM/yyyy")}`}
+                    </p>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* OS details side panel */}
+      <OrderDetailsDrawer
+        order={selectedOrder}
+        open={Boolean(selectedOrder)}
+        onOpenChange={(open) => !open && setSelectedOrder(null)}
+        onOpenFull={goToFullOrder}
+        readOnly={isReadOnly}
+      />
     </div>
   );
 }

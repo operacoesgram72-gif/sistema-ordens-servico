@@ -1,4 +1,4 @@
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,7 +8,7 @@ import {
   MapPin, Camera, LocateFixed, Loader2,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 import {
   useCreateServiceOrder,
@@ -80,6 +80,7 @@ type MediaFile = { src: string; type: "image" | "video"; name: string };
 
 export default function NovaOS() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const createOrder = useCreateServiceOrder();
@@ -101,6 +102,16 @@ export default function NovaOS() {
   const processingPhotosRef = useRef(0);
   const { vibrate } = useVibration();
 
+  // Optional pre-fill from the calendar's "duplo clique no dia" shortcut
+  // (?data=YYYY-MM-DD). Purely a convenience default — absent param behaves
+  // exactly as before (no scheduledAt default).
+  const prefilledDate = useMemo(() => {
+    const raw = new URLSearchParams(search).get("data");
+    if (!raw) return undefined;
+    const parsed = new Date(`${raw}T00:00:00`);
+    return isNaN(parsed.getTime()) ? undefined : parsed;
+  }, [search]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -111,6 +122,7 @@ export default function NovaOS() {
       technicianName: "",
       photos: "",
       origem: "manual",
+      scheduledAt: prefilledDate,
     },
   });
 

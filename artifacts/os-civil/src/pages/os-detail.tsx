@@ -1,10 +1,10 @@
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, useSearch } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
 import {
   ArrowLeft, Clock, MapPin, User, Calendar, Save, Trash2, Edit3,
   MessageSquare, Briefcase, CheckCircle2, X, Image, Film, FileText,
-  SquarePen, Camera, Video, Loader2,
+  SquarePen, Camera, Video, Loader2, Share2, Copy,
 } from "lucide-react";
 import { isImageFile, isVideoFile, getVideoContentType } from "@/lib/media-utils";
 import { useQueryClient } from "@tanstack/react-query";
@@ -50,44 +50,58 @@ function detectMediaType(src: string): "image" | "video" | "pdf" | "unknown" {
 function MediaThumbnail({
   src,
   onClick,
+  onDelete,
 }: {
   src: string;
   onClick: () => void;
+  onDelete?: () => void;
 }) {
   const type = detectMediaType(src);
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="relative rounded-md border border-border overflow-hidden group hover:border-primary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
-    >
-      {type === "image" && (
-        <img src={src} alt="Anexo" className="w-full h-28 md:h-32 object-cover" />
-      )}
-      {type === "video" && (
-        <div className="w-full h-28 md:h-32 flex flex-col items-center justify-center gap-2 bg-muted/40">
-          <Film className="w-8 h-8 text-primary" />
-          <span className="text-xs text-muted-foreground">Vídeo</span>
+    <div className="relative rounded-md border border-border overflow-hidden group hover:border-primary transition-colors">
+      <button
+        type="button"
+        onClick={onClick}
+        className="w-full focus:outline-none focus:ring-2 focus:ring-primary"
+      >
+        {type === "image" && (
+          <img src={src} alt="Anexo" className="w-full h-28 md:h-32 object-cover" />
+        )}
+        {type === "video" && (
+          <div className="w-full h-28 md:h-32 flex flex-col items-center justify-center gap-2 bg-muted/40">
+            <Film className="w-8 h-8 text-primary" />
+            <span className="text-xs text-muted-foreground">Vídeo</span>
+          </div>
+        )}
+        {type === "pdf" && (
+          <div className="w-full h-28 md:h-32 flex flex-col items-center justify-center gap-2 bg-muted/40">
+            <FileText className="w-8 h-8 text-rose-400" />
+            <span className="text-xs text-muted-foreground">PDF</span>
+          </div>
+        )}
+        {type === "unknown" && (
+          <div className="w-full h-28 md:h-32 flex flex-col items-center justify-center gap-2 bg-muted/40">
+            <Image className="w-8 h-8 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Arquivo</span>
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+          <span className="opacity-0 group-hover:opacity-100 text-white text-xs font-medium bg-black/60 px-2 py-1 rounded transition-opacity">
+            Visualizar
+          </span>
         </div>
+      </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="Excluir anexo"
+          className="absolute top-1 right-1 z-10 p-0.5 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
       )}
-      {type === "pdf" && (
-        <div className="w-full h-28 md:h-32 flex flex-col items-center justify-center gap-2 bg-muted/40">
-          <FileText className="w-8 h-8 text-rose-400" />
-          <span className="text-xs text-muted-foreground">PDF</span>
-        </div>
-      )}
-      {type === "unknown" && (
-        <div className="w-full h-28 md:h-32 flex flex-col items-center justify-center gap-2 bg-muted/40">
-          <Image className="w-8 h-8 text-muted-foreground" />
-          <span className="text-xs text-muted-foreground">Arquivo</span>
-        </div>
-      )}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-        <span className="opacity-0 group-hover:opacity-100 text-white text-xs font-medium bg-black/60 px-2 py-1 rounded transition-opacity">
-          Visualizar
-        </span>
-      </div>
-    </button>
+    </div>
   );
 }
 
@@ -151,10 +165,17 @@ function MediaLightbox({ src, onClose }: { src: string; onClose: () => void }) {
 export default function OSDetail() {
   const [, setLocation] = useLocation();
   const params = useParams<{ id: string }>();
+  const search = useSearch();
   const id = Number(params.id);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { vibrate } = useVibration();
+
+  // ?view=1 activates read-only / share mode — edit, delete, sign, and media
+  // upload buttons are hidden. Any third-party who receives the link can view
+  // the OS details but cannot change anything.
+  const isReadOnly = new URLSearchParams(search).get("view") === "1";
+  const [copiedShare, setCopiedShare] = useState(false);
 
   const { data: os, isLoading } = useGetServiceOrder(id, {
     query: { enabled: !!id, queryKey: getGetServiceOrderQueryKey(id) },
@@ -339,6 +360,35 @@ export default function OSDetail() {
     }
   };
 
+  // Delete a single photo by its index in the photos array. Saves the new
+  // array via PATCH — no new API endpoint needed, reuses the existing one.
+  const handleDeletePhoto = (idx: number) => {
+    if (!os || !confirm("Remover este anexo da OS?")) return;
+    const current: string[] = (() => {
+      try { return os.photos ? (JSON.parse(os.photos) as string[]) : []; } catch { return []; }
+    })();
+    const next = current.filter((_, i) => i !== idx);
+    updateOs.mutate(
+      { id, data: { photos: JSON.stringify(next) } as any },
+      {
+        onSuccess: () => {
+          toast({ title: "Anexo removido" });
+          queryClient.invalidateQueries({ queryKey: getGetServiceOrderQueryKey(id) });
+        },
+        onError: () => toast({ title: "Erro ao remover anexo", variant: "destructive" }),
+      }
+    );
+  };
+
+  const copyShareLink = () => {
+    const url = `${window.location.origin}${window.location.pathname}?view=1`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedShare(true);
+      setTimeout(() => setCopiedShare(false), 2500);
+      toast({ title: "Link de somente leitura copiado!", description: "Compartilhe para que terceiros possam visualizar esta OS sem editar." });
+    });
+  };
+
   const handleDelete = () => {
     if (confirm("Tem certeza que deseja excluir esta OS? Esta ação não pode ser desfeita.")) {
       deleteOs.mutate(
@@ -409,20 +459,32 @@ export default function OSDetail() {
           </div>
         </div>
         <div className="flex gap-2 w-full md:w-auto flex-wrap">
-          {!editMode && (
+          {/* Share / read-only link — always visible so managers can share */}
+          <Button variant="outline" size="sm" onClick={copyShareLink} className="gap-2" title="Copiar link somente leitura">
+            {copiedShare ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
+            {copiedShare ? "Copiado!" : "Compartilhar"}
+          </Button>
+          {!isReadOnly && !editMode && (
             <Button variant="outline" onClick={enterEditMode} className="gap-2">
               <SquarePen className="w-4 h-4" />
               Editar OS
             </Button>
           )}
-          <Button
-            variant="outline"
-            className="text-destructive border-destructive hover:bg-destructive/10"
-            onClick={handleDelete}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Excluir
-          </Button>
+          {!isReadOnly && (
+            <Button
+              variant="outline"
+              className="text-destructive border-destructive hover:bg-destructive/10"
+              onClick={handleDelete}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Excluir
+            </Button>
+          )}
+          {isReadOnly && (
+            <span className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted text-muted-foreground border border-border">
+              Somente Leitura
+            </span>
+          )}
         </div>
       </div>
 
@@ -572,45 +634,47 @@ export default function OSDetail() {
                     <Image className="w-4 h-4" />
                     Anexos {photos.length > 0 && `(${photos.length})`}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      title="Tirar foto"
-                      disabled={addingMedia || updateOs.isPending}
-                      onClick={() => document.getElementById("os-detail-camera")?.click()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
-                    >
-                      <Camera className="w-4 h-4" />
-                      <span className="hidden sm:inline">Câmera</span>
-                    </button>
-                    <button
-                      type="button"
-                      title="Galeria de fotos/vídeos"
-                      disabled={addingMedia || updateOs.isPending}
-                      onClick={() => document.getElementById("os-detail-gallery")?.click()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
-                    >
-                      <Image className="w-4 h-4" />
-                      <span className="hidden sm:inline">Galeria</span>
-                    </button>
-                    <button
-                      type="button"
-                      title="Selecionar vídeo da galeria"
-                      disabled={addingMedia || updateOs.isPending}
-                      onClick={() => document.getElementById("os-detail-video")?.click()}
-                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
-                    >
-                      <Video className="w-4 h-4" />
-                      <span className="hidden sm:inline">Vídeo</span>
-                    </button>
-                    {(addingMedia || updateOs.isPending) && (
-                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                    )}
-                    {/* Video camera recording removed for stability; users select from gallery */}
-                    <input id="os-detail-camera" type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
-                    <input id="os-detail-gallery" type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
-                    <input id="os-detail-video" type="file" accept="video/*" className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
-                  </div>
+                  {!isReadOnly && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        title="Tirar foto"
+                        disabled={addingMedia || updateOs.isPending}
+                        onClick={() => document.getElementById("os-detail-camera")?.click()}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span className="hidden sm:inline">Câmera</span>
+                      </button>
+                      <button
+                        type="button"
+                        title="Galeria de fotos/vídeos"
+                        disabled={addingMedia || updateOs.isPending}
+                        onClick={() => document.getElementById("os-detail-gallery")?.click()}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                      >
+                        <Image className="w-4 h-4" />
+                        <span className="hidden sm:inline">Galeria</span>
+                      </button>
+                      <button
+                        type="button"
+                        title="Selecionar vídeo da galeria"
+                        disabled={addingMedia || updateOs.isPending}
+                        onClick={() => document.getElementById("os-detail-video")?.click()}
+                        className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40"
+                      >
+                        <Video className="w-4 h-4" />
+                        <span className="hidden sm:inline">Vídeo</span>
+                      </button>
+                      {(addingMedia || updateOs.isPending) && (
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      )}
+                      {/* Video camera recording removed for stability; users select from gallery */}
+                      <input id="os-detail-camera" type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                      <input id="os-detail-gallery" type="file" accept="image/*,video/*" multiple className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                      <input id="os-detail-video" type="file" accept="video/*" className="hidden" onChange={e => { void handleAddMediaToOS(e.target.files); e.target.value = ""; }} />
+                    </div>
+                  )}
                 </div>
                 {photos.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -619,6 +683,7 @@ export default function OSDetail() {
                         key={i}
                         src={src}
                         onClick={() => setLightboxSrc(src)}
+                        onDelete={isReadOnly ? undefined : () => handleDeletePhoto(i)}
                       />
                     ))}
                   </div>
@@ -631,8 +696,8 @@ export default function OSDetail() {
             </CardContent>
           </Card>
 
-          {/* ── Manager Signature ── */}
-          <Card className="bg-card border-border/50">
+          {/* ── Manager Signature — hidden in read-only share mode ── */}
+          {!isReadOnly && <Card className="bg-card border-border/50">
             <CardHeader>
               <CardTitle className="text-lg">Encerramento pelo Gestor</CardTitle>
             </CardHeader>
@@ -667,7 +732,7 @@ export default function OSDetail() {
                 </div>
               )}
             </CardContent>
-          </Card>
+          </Card>}
         </div>
 
         {/* ── Sidebar ── */}
@@ -702,46 +767,48 @@ export default function OSDetail() {
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg">Atualizar Status</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Select
-                value={statusInput}
-                onValueChange={(v) => setStatusInput(v as ServiceOrderStatus)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Novo Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                    <SelectItem key={val} value={val} disabled={val === os.status}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {!isReadOnly && (
+            <Card className="bg-card border-border/50">
+              <CardHeader>
+                <CardTitle className="text-lg">Atualizar Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Select
+                  value={statusInput}
+                  onValueChange={(v) => setStatusInput(v as ServiceOrderStatus)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Novo Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                      <SelectItem key={val} value={val} disabled={val === os.status}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-              {statusInput && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                  <Textarea
-                    placeholder="Adicionar nota ou justificativa..."
-                    value={notesInput}
-                    onChange={(e) => setNotesInput(e.target.value)}
-                    className="min-h-[80px]"
-                  />
-                  <Button
-                    className="w-full"
-                    onClick={handleUpdateStatus}
-                    disabled={updateStatus.isPending}
-                  >
-                    {updateStatus.isPending ? "Atualizando..." : "Confirmar Alteração"}
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {statusInput && (
+                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                    <Textarea
+                      placeholder="Adicionar nota ou justificativa..."
+                      value={notesInput}
+                      onChange={(e) => setNotesInput(e.target.value)}
+                      className="min-h-[80px]"
+                    />
+                    <Button
+                      className="w-full"
+                      onClick={handleUpdateStatus}
+                      disabled={updateStatus.isPending}
+                    >
+                      {updateStatus.isPending ? "Atualizando..." : "Confirmar Alteração"}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
