@@ -10,7 +10,7 @@ import { useLocation, useSearch } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useRef } from "react";
 
-import { useCreateServiceOrder, getListServiceOrdersQueryKey } from "@workspace/api-client-react";
+import { useCreateServiceOrder, getListServiceOrdersQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
 import { useSystemStatus } from "@/hooks/use-system-status";
 import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 import { Button } from "@/components/ui/button";
@@ -28,12 +28,13 @@ import { Label } from "@/components/ui/label";
 import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS, STATUS_LABELS } from "@/lib/constants";
 
 const MARKET_RATES: Record<string, number> = {
-  civil: 280,
-  refrigeracao: 350,
-  hidraulica: 250,
-  mecanica: 320,
-  eletrica: 290,
-  outros: 180,
+  civil: 195,
+  refrigeracao: 245,
+  hidraulica: 170,
+  mecanica: 190,
+  eletrica: 185,
+  ronda: 55,
+  outros: 145,
 };
 
 const formSchema = z.object({
@@ -351,6 +352,11 @@ export default function RegistrarOS() {
       {
         onSuccess: (data) => {
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-timeline"] });
+          queryClient.invalidateQueries({ queryKey: ["available-years"] });
           setSubmittedOffline(false);
           setSubmitted((data as any).number || "OS registrada");
           form.reset();

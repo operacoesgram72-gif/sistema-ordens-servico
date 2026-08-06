@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Camera, Loader2, FileDown } from "lucide-react";
+import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Camera, Loader2, FileDown, BarChart2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -788,6 +788,27 @@ export default function Pmoc({ unit: unitProp = "AM" }: { unit?: string } = {}) 
   const defaultTab: StateTabKey = UNIT_TO_STATE_TAB[effectiveUnit] ?? "amazonas";
   const [activeStateTab, setActiveStateTab] = useState<StateTabKey>(defaultTab);
   const [activeBebedourosTab, setActiveBebedourosTab] = useState<StateTabKey>(defaultTab);
+  const [indicadoresOpen, setIndicadoresOpen] = useState<{ storageKey: string; label: string } | null>(null);
+
+  // Compute PMOC stats from localStorage for a given storage key
+  const computePmocStats = (storageKey: string) => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const rows: PmocRow[] = raw ? JSON.parse(raw) : [];
+      const qKeys: QuarterKey[] = ["q1", "q2", "q3", "q4"];
+      const qLabels = ["JAN–MAR", "ABR–JUN", "JUL–SET", "OUT–DEZ"];
+      const total = rows.length;
+      const withAnyOk = rows.filter(r => qKeys.some(q => r[q].ok)).length;
+      const withNoneOk = total - withAnyOk;
+      const perQuarter = qKeys.map((qk, i) => ({
+        label: qLabels[i],
+        ok: rows.filter(r => r[qk].ok).length,
+        pendente: rows.filter(r => !r[qk].ok && r[qk].execucao?.trim()).length,
+        semDados: rows.filter(r => !r[qk].ok && !r[qk].execucao?.trim()).length,
+      }));
+      return { total, withAnyOk, withNoneOk, perQuarter };
+    } catch { return null; }
+  };
 
   // Generate a PDF of preventivas with status OK from a given PMOC storage key.
   const gerarRelatorioPmoc = (storageKey: string, label: string) => {
@@ -850,6 +871,85 @@ export default function Pmoc({ unit: unitProp = "AM" }: { unit?: string } = {}) 
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {/* ── Indicadores Modal ── */}
+      {indicadoresOpen && (() => {
+        const stats = computePmocStats(indicadoresOpen.storageKey);
+        if (!stats) return null;
+        const maxTotal = Math.max(...stats.perQuarter.map(q => q.ok + q.pendente + q.semDados), 1);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+            onClick={() => setIndicadoresOpen(null)}
+          >
+            <div
+              className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 p-6 space-y-5"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart2 className="w-5 h-5 text-primary" />
+                  <h2 className="font-semibold text-base">Indicadores — {indicadoresOpen.label}</h2>
+                </div>
+                <button onClick={() => setIndicadoresOpen(null)} className="text-muted-foreground hover:text-foreground">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Summary pills */}
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="text-2xl font-bold">{stats.total}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Total</div>
+                </div>
+                <div className="bg-emerald-500/10 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-emerald-500">{stats.withAnyOk}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Com OK</div>
+                </div>
+                <div className="bg-amber-500/10 rounded-lg p-3">
+                  <div className="text-2xl font-bold text-amber-500">{stats.withNoneOk}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">Pendente</div>
+                </div>
+              </div>
+
+              {/* Per-quarter bars */}
+              {stats.total > 0 && (
+                <div className="space-y-3">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Por Trimestre</div>
+                  {stats.perQuarter.map(q => {
+                    const rowTotal = q.ok + q.pendente + q.semDados;
+                    const pOk      = rowTotal ? Math.round((q.ok / rowTotal) * 100) : 0;
+                    const pPend    = rowTotal ? Math.round((q.pendente / rowTotal) * 100) : 0;
+                    const pSem     = rowTotal ? 100 - pOk - pPend : 0;
+                    return (
+                      <div key={q.label} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-medium">{q.label}</span>
+                          <span className="text-muted-foreground">{q.ok} OK · {q.pendente} Pend. · {q.semDados} S/D</span>
+                        </div>
+                        <div className="h-2.5 rounded-full overflow-hidden bg-muted flex">
+                          {pOk   > 0 && <div className="bg-emerald-500 transition-all" style={{ width: `${pOk}%` }} />}
+                          {pPend > 0 && <div className="bg-amber-400 transition-all"   style={{ width: `${pPend}%` }} />}
+                          {pSem  > 0 && <div className="bg-muted-foreground/20 transition-all" style={{ width: `${pSem}%` }} />}
+                        </div>
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />OK {pOk}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />Pendente {pPend}%</span>
+                          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/30 inline-block" />S/Dados {pSem}%</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {stats.total === 0 && (
+                <p className="text-center text-muted-foreground text-sm py-4">Nenhum equipamento cadastrado nesta aba.</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="bg-background border-b border-border/30 shrink-0">
         <div className="px-4 md:px-6 pt-4 pb-4 flex items-center justify-between">
           <div>
@@ -884,18 +984,32 @@ export default function Pmoc({ unit: unitProp = "AM" }: { unit?: string } = {}) 
               <Badge variant="outline" className="text-primary border-primary/40 font-semibold px-3 py-1">
                 PMOC — Ar-Condicionado
               </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 border-dashed"
-                onClick={() => gerarRelatorioPmoc(
-                  `pmoc_state_${activeStateTab}`,
-                  visibleTabs.find(t => t.key === activeStateTab)?.label ?? activeStateTab
-                )}
-              >
-                <FileDown className="w-4 h-4" />
-                Relatório Pronto
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-dashed"
+                  onClick={() => setIndicadoresOpen({
+                    storageKey: `pmoc_state_${activeStateTab}`,
+                    label: visibleTabs.find(t => t.key === activeStateTab)?.label ?? activeStateTab,
+                  })}
+                >
+                  <BarChart2 className="w-4 h-4" />
+                  Indicadores
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-dashed"
+                  onClick={() => gerarRelatorioPmoc(
+                    `pmoc_state_${activeStateTab}`,
+                    visibleTabs.find(t => t.key === activeStateTab)?.label ?? activeStateTab
+                  )}
+                >
+                  <FileDown className="w-4 h-4" />
+                  Relatório Pronto
+                </Button>
+              </div>
             </div>
             {visibleTabs.length > 1 && (
               <div className="border-b border-border">
@@ -926,18 +1040,32 @@ export default function Pmoc({ unit: unitProp = "AM" }: { unit?: string } = {}) 
               <Badge variant="outline" className="text-blue-400 border-blue-400/40 font-semibold px-3 py-1">
                 Bebedouros
               </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 border-dashed"
-                onClick={() => gerarRelatorioPmoc(
-                  `bebedouros_${activeBebedourosTab}`,
-                  `Bebedouros — ${visibleTabs.find(t => t.key === activeBebedourosTab)?.label ?? activeBebedourosTab}`
-                )}
-              >
-                <FileDown className="w-4 h-4" />
-                Relatório Pronto
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-dashed"
+                  onClick={() => setIndicadoresOpen({
+                    storageKey: `bebedouros_${activeBebedourosTab}`,
+                    label: `Bebedouros — ${visibleTabs.find(t => t.key === activeBebedourosTab)?.label ?? activeBebedourosTab}`,
+                  })}
+                >
+                  <BarChart2 className="w-4 h-4" />
+                  Indicadores
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-dashed"
+                  onClick={() => gerarRelatorioPmoc(
+                    `bebedouros_${activeBebedourosTab}`,
+                    `Bebedouros — ${visibleTabs.find(t => t.key === activeBebedourosTab)?.label ?? activeBebedourosTab}`
+                  )}
+                >
+                  <FileDown className="w-4 h-4" />
+                  Relatório Pronto
+                </Button>
+              </div>
             </div>
             {visibleTabs.length > 1 && (
               <div className="border-b border-border">

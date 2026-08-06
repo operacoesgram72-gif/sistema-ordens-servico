@@ -224,6 +224,9 @@ export default function OSDetail() {
           toast({ title: "OS Atualizada", description: "As alterações foram salvas." });
           queryClient.invalidateQueries({ queryKey: getGetServiceOrderQueryKey(id) });
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-timeline"] });
           setEditMode(false);
           vibrate([100, 50, 100]);
         },
@@ -244,6 +247,10 @@ export default function OSDetail() {
           queryClient.invalidateQueries({ queryKey: getGetServiceOrderQueryKey(id) });
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-timeline"] });
+          queryClient.invalidateQueries({ queryKey: ["available-years"] });
           setStatusInput("");
           setNotesInput("");
           vibrate(200);
@@ -265,6 +272,10 @@ export default function OSDetail() {
           queryClient.invalidateQueries({ queryKey: getGetServiceOrderQueryKey(id) });
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-timeline"] });
+          queryClient.invalidateQueries({ queryKey: ["available-years"] });
           setGestorName("");
           vibrate([100, 100, 300]);
         },
@@ -406,6 +417,10 @@ export default function OSDetail() {
             toast({ title: "OS Excluída", description: "Ordem de serviço removida." });
             queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
             queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+            queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] });
+            queryClient.invalidateQueries({ queryKey: ["dashboard-timeline"] });
+            queryClient.invalidateQueries({ queryKey: ["available-years"] });
             setLocation("/ordens");
           },
         }
@@ -609,6 +624,16 @@ export default function OSDetail() {
                         {format(new Date(os.createdAt), "dd/MM/yyyy HH:mm")}
                       </div>
                     </div>
+                    {(os as any).completedAt && (
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Data de Conclusão
+                        </div>
+                        <div className="font-medium text-emerald-500">
+                          {format(new Date((os as any).completedAt), "dd/MM/yyyy HH:mm")}
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <div className="text-sm text-muted-foreground">Valor Estimado</div>
                       <div className="font-medium font-mono text-amber-500">

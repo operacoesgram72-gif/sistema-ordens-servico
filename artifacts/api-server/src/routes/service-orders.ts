@@ -17,15 +17,15 @@ import { broadcast } from "../lib/sse-broadcast";
 
 const router = Router();
 
-// Market value reference per formato_servico (R$/service average)
+// Market value reference per formato_servico (R$/h) — SINAPI 2025 / TCPO reference
 const MARKET_RATES: Record<string, number> = {
-  civil: 280,
-  refrigeracao: 350,
-  hidraulica: 250,
-  mecanica: 320,
-  eletrica: 290,
-  ronda: 120,
-  outros: 180,
+  civil: 195,        // 2 ops × ~R$97/h (pedreiro + enc.) + materiais leves
+  refrigeracao: 245, // técnico frigorista R$140/h + gás + ferramentas
+  hidraulica: 170,   // encanador R$100/h + materiais básicos
+  mecanica: 190,     // mecânico predial R$115/h + ferramentas
+  eletrica: 185,     // eletricista R$110/h + materiais elétricos
+  ronda: 55,         // operador de ronda/limpeza R$55/h
+  outros: 145,       // serviço genérico — média conservadora
 };
 
 function generateNumber(): string {
@@ -197,8 +197,9 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
     const number = generateNumber();
 
     // Calculate estimated value using tipo multiplier × base rate × 4 hours × IPCA 1.046
+    // Multipliers match nova-os.tsx: SINAPI 2025 / TCPO reference
     const TIPO_MULT: Record<string, number> = {
-      reforma: 1.5, revitalizacao: 1.2, preventiva: 0.8, corretiva: 1.0, outros: 1.0,
+      reforma: 2.2, revitalizacao: 1.5, preventiva: 0.8, corretiva: 1.0, outros: 1.0,
     };
     const baseRate = body.formatoServico ? (MARKET_RATES[body.formatoServico] ?? null) : null;
     const tipoMult = body.tipo ? (TIPO_MULT[body.tipo] ?? 1.0) : 1.0;

@@ -315,6 +315,7 @@ export default function Ordens() {
               <TableHead>Tipo</TableHead>
               <TableHead>Formato</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="w-[110px] text-emerald-400">Conclusão</TableHead>
               <TableHead>Prioridade</TableHead>
               <TableHead>Técnico</TableHead>
               <TableHead className="w-[70px]">Fotos</TableHead>
@@ -336,6 +337,7 @@ export default function Ordens() {
                     <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-9 w-9 rounded" /></TableCell>
@@ -345,7 +347,7 @@ export default function Ordens() {
               </>
             ) : ordens?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={12} className="h-32 text-center text-muted-foreground">
                   Nenhuma ordem de serviço encontrada para a unidade {unit}.
                 </TableCell>
               </TableRow>
@@ -373,6 +375,11 @@ export default function Ordens() {
                     <TableCell className="text-sm">{os.formatoServico ? FORMATO_SERVICO_LABELS[os.formatoServico] : "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={STATUS_COLORS[os.status as ServiceOrderStatus]}>{STATUS_LABELS[os.status as ServiceOrderStatus]}</Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-emerald-400 whitespace-nowrap">
+                      {(os as any).completedAt
+                        ? format(new Date((os as any).completedAt), "dd/MM/yy HH:mm")
+                        : <span className="text-muted-foreground/30">—</span>}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority]}>{PRIORITY_LABELS[os.priority as ServiceOrderPriority]}</Badge>
