@@ -75,9 +75,12 @@ interface IndicadoresTimelineProps {
  * the technician participated appear. Multi-tech OS ("A / B") are included
  * for both A and B without creating duplicate records.
  */
+const PAGE_SIZE = 10;
+
 export default function IndicadoresTimeline({ tecnico }: IndicadoresTimelineProps) {
   const { unit } = useUnit();
   const [viewMode, setViewMode] = useState<"lista" | "grafico">("lista");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const { data: events, isLoading } = useQuery<TimelineEvent[]>({
     queryKey: ["dashboard-timeline", unit, tecnico ?? "all"],
@@ -168,10 +171,10 @@ export default function IndicadoresTimeline({ tecnico }: IndicadoresTimelineProp
             Nenhum evento recente para exibir.
           </p>
         ) : viewMode === "lista" ? (
-          <div className="relative max-h-[420px] overflow-y-auto pr-1">
+          <div className="relative pr-1">
             <div className="absolute left-[15px] top-1 bottom-1 w-px bg-border" aria-hidden="true" />
             <ul className="space-y-4">
-              {events.map((ev) => {
+              {events.slice(0, visibleCount).map((ev) => {
                 const meta = EVENT_META[ev.type] ?? EVENT_META.os_criada;
                 const Icon = meta.icon;
                 return (
@@ -194,6 +197,18 @@ export default function IndicadoresTimeline({ tecnico }: IndicadoresTimelineProp
                 );
               })}
             </ul>
+            {visibleCount < events.length && (
+              <div className="pt-4 flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-muted-foreground gap-1"
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                >
+                  Carregar mais ({events.length - visibleCount} restantes)
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={300}>

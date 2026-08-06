@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useGetDashboardIndicators } from "@workspace/api-client-react";
 import { useUnit } from "@/contexts/unit-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart, Line, Legend, LabelList,
 } from "recharts";
-import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X, FileDown } from "lucide-react";
+import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X, FileDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import IndicadoresTimeline from "@/components/indicadores-timeline";
 
@@ -122,6 +122,7 @@ export default function Indicadores() {
     return rows.filter((r: any) => r.technicianName === filterTecnico);
   }, [indicators, filterTecnico]);
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const hasActiveFilter = filterFormato !== "all" || filterTipo !== "all" || filterTecnico !== "all";
 
   const formatCurrency = (value: number) =>
@@ -169,8 +170,20 @@ export default function Indicadores() {
           </Button>
         </div>
 
-        {/* Unified filter bar — Período + Desempenho in one scrollable row */}
-        <div className="px-6 md:px-8 pb-3 flex flex-wrap items-center gap-2">
+        {/* Mobile: single "Filtros" button */}
+        <div className="md:hidden px-6 pb-3">
+          <button
+            className="flex items-center gap-2 text-sm font-medium w-full px-4 py-2.5 bg-card border border-border/50 rounded-lg"
+            onClick={() => setFiltersOpen(true)}
+          >
+            <Filter className="w-4 h-4 text-primary" />
+            Filtros
+            {hasActiveFilter && <span className="ml-auto w-2 h-2 rounded-full bg-primary shrink-0" />}
+          </button>
+        </div>
+
+        {/* Desktop: unified filter bar */}
+        <div className="hidden md:flex px-6 md:px-8 pb-3 flex-wrap items-center gap-2">
           {/* Período */}
           <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground shrink-0">
             <Calendar className="w-4 h-4 text-primary" />
@@ -284,11 +297,88 @@ export default function Indicadores() {
           )}
         </div>
       </div>
+
+      {/* Mobile filter drawer */}
+      {filtersOpen && (
+        <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setFiltersOpen(false)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-xl p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-base">Filtros</span>
+              <button onClick={() => setFiltersOpen(false)} className="text-muted-foreground hover:text-foreground p-1 rounded"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Período</label>
+                <Select value={periodMode} onValueChange={(val) => { const m = val as "ano"|"mes"|"dia"; setPeriodMode(m); if (m !== "mes") setSelectedMonth(0); }}>
+                  <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="ano">Ano</SelectItem><SelectItem value="mes">Mês</SelectItem><SelectItem value="dia">Dia</SelectItem></SelectContent>
+                </Select>
+              </div>
+              {isDiaMode ? (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Data</label>
+                  <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" />
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ano</label>
+                    <Select value={selectedYear.toString()} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                      <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>{years.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  {periodMode === "mes" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mês</label>
+                      <Select value={selectedMonth.toString()} onValueChange={(v) => setSelectedMonth(parseInt(v))}>
+                        <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                        <SelectContent>{MONTHS.slice(1).map((m, i) => <SelectItem key={i+1} value={(i+1).toString()}>{m}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Formato de Serviço</label>
+                <Select value={filterFormato} onValueChange={setFilterFormato}>
+                  <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">Todos os formatos</SelectItem>{Object.entries(FORMATO_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Tipo</label>
+                <Select value={filterTipo} onValueChange={setFilterTipo}>
+                  <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">Todos os tipos</SelectItem>{Object.entries(TIPO_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Técnico</label>
+                <Select value={filterTecnico} onValueChange={setFilterTecnico}>
+                  <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">Todos os técnicos</SelectItem>{allTechnicians.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-1">
+              {hasActiveFilter && (
+                <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => { setFilterFormato("all"); setFilterTipo("all"); setFilterTecnico("all"); }}>
+                  Limpar
+                </Button>
+              )}
+              <Button size="sm" className="flex-1" onClick={() => setFiltersOpen(false)}>Aplicar</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-6">
 
       {/* ── Summary cards ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border/50">
           <CardContent className="p-6">
             <div className="flex items-center gap-2 mb-2">
@@ -401,11 +491,20 @@ export default function Indicadores() {
                 <YAxis
                   dataKey="location"
                   type="category"
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                   width={130}
                   tickLine={false}
                   axisLine={false}
-                  tickFormatter={(v: string) => v.length > 20 ? v.slice(0, 18) + "…" : v}
+                  tick={(props: any) => {
+                    const { x, y, payload } = props;
+                    const full: string = payload.value ?? "";
+                    const display = full.length > 20 ? full.slice(0, 18) + "…" : full;
+                    return (
+                      <g transform={`translate(${x},${y})`}>
+                        <title>{full}</title>
+                        <text x={0} y={0} dy={4} textAnchor="end" fontSize={10} fill="hsl(var(--muted-foreground))">{display}</text>
+                      </g>
+                    );
+                  }}
                 />
                 <Tooltip
                   contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 8 }}
@@ -475,40 +574,70 @@ export default function Indicadores() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Técnico</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="text-right">Concluídas</TableHead>
-                    <TableHead className="text-right">Taxa</TableHead>
-                    <TableHead className="text-right">Valor Est.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {byTechnicianFiltered.length > 0 ? (
-                    byTechnicianFiltered.map((row: any) => (
-                      <TableRow key={row.technicianName}>
-                        <TableCell className="font-medium">{row.technicianName || "Não atribuído"}</TableCell>
-                        <TableCell className="text-right font-mono">{row.total}</TableCell>
-                        <TableCell className="text-right font-mono text-emerald-500">{row.completed}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {row.total > 0 ? `${Math.round((row.completed / row.total) * 100)}%` : "—"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-amber-500">{formatCurrency(row.estimatedValue ?? 0)}</TableCell>
+            {byTechnicianFiltered.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-6">Nenhum resultado para os filtros selecionados.</p>
+            ) : (
+              <>
+                {/* Mobile: card list — hidden md:block */}
+                <div className="md:hidden space-y-3">
+                  {byTechnicianFiltered.map((row: any) => {
+                    const taxa = row.total > 0 ? Math.round((row.completed / row.total) * 100) : null;
+                    return (
+                      <div key={row.technicianName} className="p-4 rounded-lg border border-border/50 bg-muted/20 space-y-2">
+                        <div className="font-medium text-sm truncate">{row.technicianName || "Não atribuído"}</div>
+                        <div className="grid grid-cols-3 gap-3 text-xs">
+                          <div>
+                            <div className="text-muted-foreground mb-0.5">Total</div>
+                            <div className="font-mono font-bold text-base">{row.total}</div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground mb-0.5">Concluídas</div>
+                            <div className="font-mono font-bold text-base text-emerald-500">{row.completed}</div>
+                          </div>
+                          <div>
+                            <div className="text-muted-foreground mb-0.5">Taxa</div>
+                            <div className={`font-mono font-bold text-base ${taxa !== null ? (taxa >= 50 ? "text-emerald-500" : "text-red-400") : ""}`}>
+                              {taxa !== null ? `${taxa}%` : "—"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-xs flex items-center justify-between pt-1 border-t border-border/30">
+                          <span className="text-muted-foreground">Valor Estimado</span>
+                          <span className="font-mono text-amber-500 font-medium">{formatCurrency(row.estimatedValue ?? 0)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Desktop: table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Técnico</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="text-right">Concluídas</TableHead>
+                        <TableHead className="text-right">Taxa</TableHead>
+                        <TableHead className="text-right">Valor Est.</TableHead>
                       </TableRow>
-                    ))
-                  ) : (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                        Nenhum resultado para os filtros selecionados.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {byTechnicianFiltered.map((row: any) => (
+                        <TableRow key={row.technicianName}>
+                          <TableCell className="font-medium">{row.technicianName || "Não atribuído"}</TableCell>
+                          <TableCell className="text-right font-mono">{row.total}</TableCell>
+                          <TableCell className="text-right font-mono text-emerald-500">{row.completed}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {row.total > 0 ? `${Math.round((row.completed / row.total) * 100)}%` : "—"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-amber-500">{formatCurrency(row.estimatedValue ?? 0)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

@@ -298,7 +298,10 @@ router.get("/dashboard/indicators", async (req, res) => {
     const getTechName = (o: typeof allOrders[0]): string => {
       const raw = (o as any).technicianNameFree || o.technicianName;
       if (!raw) return "Não atribuído";
-      return raw.split(" / ").map((part: string) => normalizeName(part)).join(" / ");
+      // Normalize separators: commas, semicolons, and slashes all become " / "
+      // then sort names alphabetically so "A / B" and "B / A" merge as the same team.
+      const parts = raw.split(/\s*[,;]\s*|\s*\/\s*/).map((s: string) => s.trim()).filter(Boolean);
+      return parts.map((part: string) => normalizeName(part)).sort().join(" / ");
     };
 
     // BY LOCATION

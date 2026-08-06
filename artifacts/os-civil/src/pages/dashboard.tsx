@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays, MapPin, RefreshCw, FileDown } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend, Label } from "recharts";
+import { ClipboardList, CheckCircle2, Clock, TrendingUp, CalendarDays, MapPin, RefreshCw, FileDown, Filter, X } from "lucide-react";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { useState, useCallback, useMemo } from "react";
 import { useUnit } from "@/contexts/unit-context";
@@ -38,6 +38,7 @@ export default function Dashboard() {
   const [filterDay, setFilterDay] = useState<string>("0");
   const [filterUnit, setFilterUnit] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const isAM = unit === "AM";
   // Effective unit for API calls: AM can filter by sub-unit; other units always see themselves
@@ -104,7 +105,7 @@ export default function Dashboard() {
           <Skeleton className="h-9 w-64" />
           <Skeleton className="h-4 w-80" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="bg-card border-border/50">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -174,82 +175,133 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-3 bg-card border border-border/50 rounded-lg px-4 py-3">
+        {/* Mobile: single "Filtros" button */}
+        <button
+          className="md:hidden flex items-center gap-2 text-sm font-medium w-full px-4 py-2.5 bg-card border border-border/50 rounded-lg"
+          onClick={() => setFiltersOpen(true)}
+        >
+          <Filter className="w-4 h-4 text-primary" />
+          Filtros
+          {filterLabel && (
+            <span className="ml-1 text-xs text-primary truncate max-w-[180px]">{filterLabel}</span>
+          )}
+          {(filterMonth !== "0" || filterDay !== "0" || (isAM && filterUnit !== "all")) && (
+            <span className="ml-auto w-2 h-2 rounded-full bg-primary shrink-0" />
+          )}
+        </button>
+
+        {/* Desktop: inline filter bar */}
+        <div className="hidden md:flex flex-wrap items-center gap-3 bg-card border border-border/50 rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground shrink-0">
             <CalendarDays className="w-4 h-4 text-primary" />
             Período:
           </div>
           <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setFilterMonth("0"); setFilterDay("0"); }}>
-            <SelectTrigger className="w-28 h-8 text-sm">
-              <SelectValue placeholder="Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
-            </SelectContent>
+            <SelectTrigger className="w-28 h-8 text-sm"><SelectValue placeholder="Ano" /></SelectTrigger>
+            <SelectContent>{years.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
           </Select>
-
           <Select value={filterMonth} onValueChange={(v) => { setFilterMonth(v); setFilterDay("0"); }}>
-            <SelectTrigger className="w-36 h-8 text-sm">
-              <SelectValue placeholder="Mês" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m, i) => <SelectItem key={i} value={i.toString()}>{m}</SelectItem>)}
-            </SelectContent>
+            <SelectTrigger className="w-36 h-8 text-sm"><SelectValue placeholder="Mês" /></SelectTrigger>
+            <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={i.toString()}>{m}</SelectItem>)}</SelectContent>
           </Select>
-
           <Select value={filterDay} onValueChange={setFilterDay} disabled={filterMonth === "0"}>
-            <SelectTrigger className="w-28 h-8 text-sm">
-              <SelectValue placeholder="Dia" />
-            </SelectTrigger>
+            <SelectTrigger className="w-28 h-8 text-sm"><SelectValue placeholder="Dia" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="0">Todos</SelectItem>
               {dayOptions.map(d => <SelectItem key={d} value={d.toString()}>Dia {d}</SelectItem>)}
             </SelectContent>
           </Select>
-
-          {/* UF filter — only for AM (main office) */}
           {isAM && (
             <>
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground shrink-0 ml-2 pl-2 border-l border-border">
-                <MapPin className="w-4 h-4 text-primary" />
-                UF:
+                <MapPin className="w-4 h-4 text-primary" />UF:
               </div>
               <Select value={filterUnit} onValueChange={setFilterUnit}>
-                <SelectTrigger className="w-32 h-8 text-sm">
-                  <SelectValue placeholder="Unidade" />
-                </SelectTrigger>
+                <SelectTrigger className="w-32 h-8 text-sm"><SelectValue placeholder="Unidade" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas</SelectItem>
-                  {REGIONAL_UNITS.map(u => (
-                    <SelectItem key={u} value={u}>{u}</SelectItem>
-                  ))}
+                  {REGIONAL_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                 </SelectContent>
               </Select>
             </>
           )}
-
           {(filterMonth !== "0" || filterDay !== "0") && (
             <>
-              <span className="text-xs text-primary font-medium">
-                Exibindo: {filterLabel}
-              </span>
-              <button
-                onClick={() => { setFilterMonth("0"); setFilterDay("0"); }}
-                className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
-              >
-                Limpar
-              </button>
+              <span className="text-xs text-primary font-medium">Exibindo: {filterLabel}</span>
+              <button onClick={() => { setFilterMonth("0"); setFilterDay("0"); }} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2">Limpar</button>
             </>
           )}
         </div>
+
+        {/* Mobile filter drawer */}
+        {filtersOpen && (
+          <div className="fixed inset-0 z-50 md:hidden" aria-modal="true">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setFiltersOpen(false)} />
+            <div className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-xl p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-base">Filtros</span>
+                <button onClick={() => setFiltersOpen(false)} className="text-muted-foreground hover:text-foreground p-1 rounded">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Ano</label>
+                  <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setFilterMonth("0"); setFilterDay("0"); }}>
+                    <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>{years.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mês</label>
+                  <Select value={filterMonth} onValueChange={(v) => { setFilterMonth(v); setFilterDay("0"); }}>
+                    <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>{MONTHS.map((m, i) => <SelectItem key={i} value={i.toString()}>{m}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dia</label>
+                  <Select value={filterDay} onValueChange={setFilterDay} disabled={filterMonth === "0"}>
+                    <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Todos os dias</SelectItem>
+                      {dayOptions.map(d => <SelectItem key={d} value={d.toString()}>Dia {d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {isAM && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Unidade (UF)</label>
+                    <Select value={filterUnit} onValueChange={setFilterUnit}>
+                      <SelectTrigger className="w-full h-10 text-sm"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as unidades</SelectItem>
+                        {REGIONAL_UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-3 pt-1">
+                {(filterMonth !== "0" || filterDay !== "0") && (
+                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => { setFilterMonth("0"); setFilterDay("0"); }}>
+                    Limpar
+                  </Button>
+                )}
+                <Button size="sm" className="flex-1" onClick={() => setFiltersOpen(false)}>
+                  Aplicar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-8">
 
       {/* Cards de resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Abertas</CardTitle>
@@ -286,7 +338,7 @@ export default function Dashboard() {
         <Card className="bg-card border-border/50">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Taxa de Conclusão</CardTitle>
-            <AlertTriangle className="w-4 h-4 text-primary" />
+            <TrendingUp className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">{summary.completionRate.toFixed(1)}%</div>
@@ -418,6 +470,20 @@ ${priorityRows ? `
                   {summary.byPriority.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={PIE_COLORS[entry.priority as keyof typeof PIE_COLORS] || "#888"} />
                   ))}
+                  <Label
+                    content={({ viewBox }) => {
+                      const vb = viewBox as { cx?: number; cy?: number };
+                      const cx = vb?.cx ?? 0;
+                      const cy = vb?.cy ?? 0;
+                      const total = summary.byPriority.reduce((a, b) => a + b.count, 0);
+                      return (
+                        <text textAnchor="middle" dominantBaseline="middle">
+                          <tspan x={cx} y={cy - 6} fontSize="22" fontWeight="700" fill="hsl(var(--foreground))">{total}</tspan>
+                          <tspan x={cx} y={cy + 14} fontSize="11" fill="hsl(var(--muted-foreground))">OS</tspan>
+                        </text>
+                      );
+                    }}
+                  />
                 </Pie>
                 <Tooltip
                   contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
@@ -425,7 +491,7 @@ ${priorityRows ? `
                 />
               </PieChart>
             </ResponsiveContainer>
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-2">
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 mt-2">
               {summary.byPriority.map(p => (
                 <div key={p.priority} className="flex items-center gap-1.5 text-xs">
                   <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[p.priority as keyof typeof PIE_COLORS] }} />
