@@ -382,7 +382,6 @@ export default function Ordens() {
             ) : (
               ordens?.map(os => {
                 const rawName = (os as any).technicianNameFree || os.technicianName;
-                const photosCount = (os as any).photosCount as number ?? 0;
                 return (
                   <div
                     key={os.id}
@@ -409,10 +408,8 @@ export default function Ordens() {
                       <span className="text-xs text-muted-foreground truncate flex-1 min-w-0">
                         {rawName || "Não atribuído"}
                       </span>
-                      {photosCount > 0 && (
-                        <span className="flex items-center gap-0.5 text-xs text-primary/70">
-                          <Camera className="w-3 h-3" />{photosCount}
-                        </span>
+                      {Boolean((os as any).hasPhotos) && (
+                        <Camera className="w-3 h-3 text-primary/70" />
                       )}
                       <span className="font-mono text-xs text-yellow-500 font-medium shrink-0">
                         {formatCurrency(os.estimatedValue ?? undefined)}
@@ -497,7 +494,6 @@ export default function Ordens() {
                   ) : (
                     ordens?.map(os => {
                       const hasPhotos = Boolean((os as any).hasPhotos);
-                      const photosCount = (os as any).photosCount as number ?? 0;
                       const loadedPhoto = loadedPhotos[os.id];
                       const rawName = (os as any).technicianNameFree || os.technicianName;
                       const techs = rawName
@@ -644,15 +640,12 @@ export default function Ordens() {
                                     }
                                   }}
                                   onMouseLeave={() => setHoveredPhoto(null)}
-                                  title={`${photosCount} foto${photosCount !== 1 ? "s" : ""} — clique para ver`}
+                                  title="Ver fotos"
                                 >
                                   {loadedPhoto ? (
                                     <img src={loadedPhoto} alt="foto" className="w-8 h-8 rounded object-cover border border-border shadow-sm" />
                                   ) : (
                                     <Camera className="w-4 h-4 text-primary" />
-                                  )}
-                                  {photosCount > 0 && (
-                                    <span className="text-xs font-mono text-primary/70">{photosCount}</span>
                                   )}
                                 </div>
                               ) : (

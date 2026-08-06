@@ -63,9 +63,10 @@ const LIST_COLUMNS = {
   // photos and signature intentionally omitted from list — heavy base64 blobs
   // hasPhotos is a lightweight boolean so the list UI can show a camera indicator
   // without loading the actual base64 payload.
+  // NOTE: do NOT add json_array_length(photos::json) here — it forces the DB to
+  // deserialize the entire base64 blob array (can be 76 MB+) per row, causing
+  // statement timeouts on the list endpoint.
   hasPhotos:        sql<boolean>`(photos IS NOT NULL AND photos NOT IN ('[]', 'null', ''))`.as("has_photos"),
-  // photosCount returns the number of photos (JSON array length) without loading blobs.
-  photosCount:      sql<number>`(CASE WHEN photos IS NULL OR photos IN ('[]', 'null', '') THEN 0 ELSE COALESCE(json_array_length(photos::json), 0) END)`.as("photos_count"),
   signedBy:         serviceOrdersTable.signedBy,
   signedAt:         serviceOrdersTable.signedAt,
   estimatedValue:   serviceOrdersTable.estimatedValue,
