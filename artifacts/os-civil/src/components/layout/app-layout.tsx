@@ -8,6 +8,7 @@ import {
   Moon, Sun,
 } from "lucide-react";
 import { useTheme } from "@/contexts/theme-context";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useUnit, UNITS } from "@/contexts/unit-context";
@@ -124,6 +125,9 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
         <div className="mt-3 pt-3 border-t border-border/60">
           <span className="text-xs font-semibold text-primary uppercase tracking-widest">Painel de Serviços</span>
         </div>
+        <div className="mt-2.5">
+          <GlobalSearch />
+        </div>
         <div className="mt-2">
           <p className="text-[10px] text-muted-foreground/60 mb-1.5 uppercase tracking-widest">Unidade</p>
           {locked ? (
@@ -207,19 +211,19 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
             Copiar link — {unit}
           </button>
         </div>
-        <div className="mt-3 pt-3 border-t border-border/40 flex items-center justify-between">
-          <p className="text-[10px] text-muted-foreground/50 leading-snug">
-            Desenvolvido por <span className="text-muted-foreground/70 font-medium">Aristoteles Melo</span>
+        <div className="mt-3 pt-3 border-t border-border/40 flex items-center justify-between gap-2">
+          <p className="text-[10px] text-muted-foreground/50 leading-snug truncate">
+            Dev. <span className="text-muted-foreground/70 font-medium">Aristoteles Melo</span>
           </p>
           <button
             onClick={toggleTheme}
             title={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
-            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md border border-border/50 text-muted-foreground hover:text-foreground hover:bg-muted hover:border-border transition-colors shrink-0 text-[10px] font-medium"
             aria-label="Alternar tema"
           >
             {theme === "dark"
-              ? <Sun className="w-3.5 h-3.5" />
-              : <Moon className="w-3.5 h-3.5" />
+              ? <><Sun className="w-3.5 h-3.5" /><span>Claro</span></>
+              : <><Moon className="w-3.5 h-3.5" /><span>Escuro</span></>
             }
           </button>
         </div>

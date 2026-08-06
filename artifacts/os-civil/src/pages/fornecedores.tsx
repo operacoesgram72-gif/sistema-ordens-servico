@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Plus, Pencil, Trash2, Search, Truck, MapPin, Share2, FileText, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Truck, MapPin, Share2, FileText, RefreshCw, Map } from "lucide-react";
 import {
   useCreateSupplier,
   useUpdateSupplier,
@@ -77,6 +77,8 @@ export default function Fornecedores() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<SupplierForm>(empty);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [mapaOpen, setMapaOpen] = useState(false);
+  const [mapaMaterial, setMapaMaterial] = useState("");
 
   const filtered = (suppliers ?? []).filter((s) =>
     (s.razaoSocial ?? "").toLowerCase().includes(search.toLowerCase()) ||
@@ -204,6 +206,10 @@ export default function Fornecedores() {
             <Share2 className="w-4 h-4 mr-2" />
             Compartilhar Lista
           </Button>
+          <Button variant="outline" onClick={() => { setMapaMaterial(""); setMapaOpen(true); }}>
+            <Map className="w-4 h-4 mr-2" />
+            Mapa
+          </Button>
           <Button onClick={openNew}>
             <Plus className="w-4 h-4 mr-2" />
             Novo Fornecedor
@@ -281,6 +287,78 @@ export default function Fornecedores() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Mapa de Fornecedores Dialog */}
+      <Dialog open={mapaOpen} onOpenChange={setMapaOpen}>
+        <DialogContent className="max-w-sm bg-card text-foreground border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Map className="w-4 h-4 text-primary" />
+              Mapa de Fornecedores
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Informe o material desejado para localizar fornecedores e lojas próximas no Google Maps.
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="mapa-material">Material ou produto</Label>
+              <Input
+                id="mapa-material"
+                value={mapaMaterial}
+                onChange={(e) => setMapaMaterial(e.target.value)}
+                placeholder="Ex: cano PVC, fio elétrico, tinta..."
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && mapaMaterial.trim()) {
+                    window.open(
+                      `https://www.google.com/maps/search/${encodeURIComponent("fornecedor de " + mapaMaterial.trim())}`,
+                      "_blank"
+                    );
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            {/* Quick links for suppliers already registered with location */}
+            {(suppliers ?? []).filter(s => s.localizacaoLink).length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Fornecedores cadastrados com localização
+                </p>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {(suppliers ?? []).filter(s => s.localizacaoLink).map(s => (
+                    <a
+                      key={s.id}
+                      href={s.localizacaoLink!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-sm text-primary hover:underline truncate"
+                    >
+                      <MapPin className="w-3 h-3 shrink-0" />
+                      <span className="truncate">{s.razaoSocial || s.cnpjCpf || "Fornecedor"}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setMapaOpen(false)}>Fechar</Button>
+            <Button
+              onClick={() => {
+                const query = mapaMaterial.trim() || "fornecedor de materiais de construção";
+                window.open(
+                  `https://www.google.com/maps/search/${encodeURIComponent("fornecedor de " + query)}`,
+                  "_blank"
+                );
+              }}
+            >
+              <Map className="w-4 h-4 mr-2" />
+              Abrir no Google Maps
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

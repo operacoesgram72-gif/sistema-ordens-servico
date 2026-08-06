@@ -532,32 +532,94 @@ router.get("/dashboard/timeline", async (req, res) => {
   }
 });
 
+// ── Gerador de resumo local ───────────────────────────────────────────────────
+function buildLocalSummary(s: any, filterLabel?: string): string {
+  const total = (s.totalOpen ?? 0) + (s.totalInProgress ?? 0) + (s.totalCompleted ?? 0) + (s.totalCanceled ?? 0);
+  const rate = parseFloat(s.completionRate ?? s.averageCompletionRate ?? 0);
+  const overdue = s.totalOverdue ?? 0;
+  const open = s.totalOpen ?? 0;
+  const inProgress = s.totalInProgress ?? 0;
+  const completed = s.totalCompleted ?? 0;
+  const today = s.totalToday ?? 0;
+  const thisMonth = s.totalThisMonth ?? 0;
+
+  const topTech = (s.byTechnician ?? [])[0];
+  const worstTech = (s.byTechnician ?? []).find((t: any) => t.pending > 0);
+  const topLocation = (s.byLocation ?? [])[0];
+
+  const parts: string[] = [];
+
+  const periodo = filterLabel && filterLabel !== "Atual" ? `no período ${filterLabel}` : "no período atual";
+  parts.push(`${total > 0 ? `Foram registradas ${total} ordens de serviço ${periodo}.` : `Nenhuma OS registrada ${periodo}.`}`);
+
+  if (rate >= 80) {
+    parts.push(`A taxa de conclusão está em ${rate.toFixed(1)}%, indicando bom desempenho operacional.`);
+  } else if (rate >= 60) {
+    parts.push(`A taxa de conclusão é de ${rate.toFixed(1)}%, dentro da margem aceitável, mas com espaço para melhoria.`);
+  } else if (total > 0) {
+    parts.push(`A taxa de conclusão é de apenas ${rate.toFixed(1)}%, abaixo do ideal — recomenda-se atenção imediata ao fluxo de trabalho.`);
+  }
+
+  if (overdue > 0) {
+    parts.push(`⚠ Atenção: ${overdue} OS ultrapassaram o prazo e requerem ação urgente.`);
+  }
+
+  const activeLoad = open + inProgress;
+  if (activeLoad > 0) {
+    parts.push(`Há atualmente ${activeLoad} OS ativas (${open} abertas e ${inProgress} em andamento).`);
+  }
+
+  if (today > 0) {
+    parts.push(`${today} OS foram registradas hoje${thisMonth > today ? `, totalizando ${thisMonth} no mês.` : "."}`);
+  } else if (thisMonth > 0) {
+    parts.push(`${thisMonth} OS foram registradas este mês.`);
+  }
+
+  if (topTech) {
+    const techRate = topTech.total > 0 ? ((topTech.completed / topTech.total) * 100).toFixed(0) : "0";
+    parts.push(`Técnico destaque: ${topTech.technicianName} com ${topTech.total} OS (${techRate}% de conclusão).`);
+  }
+
+  if (worstTech && worstTech !== topTech && worstTech.pending > 2) {
+    parts.push(`${worstTech.technicianName} possui ${worstTech.pending} OS pendentes em aberto.`);
+  }
+
+  if (topLocation) {
+    parts.push(`Local com maior volume: "${topLocation.location}" (${topLocation.total} OS).`);
+  }
+
+  if (completed > 0 && rate >= 70) {
+    parts.push("O nível de serviço está adequado para as operações da unidade.");
+  } else if (total === 0) {
+    parts.push("Nenhuma OS foi registrada neste período — verifique se os filtros estão corretos.");
+  }
+
+  return parts.join(" ");
+}
+
 // ── POST /dashboard/ai-summary ───────────────────────────────────────────────
-// Generates an executive text summary of the current dashboard data using
-// OpenAI. Requires OPENAI_API_KEY (or AI_INTEGRATIONS_OPENAI_API_KEY) env var.
+// Gera resumo executivo do painel. Usa OpenAI se OPENAI_API_KEY estiver
+// configurada; caso contrário, gera um resumo inteligente com lógica interna.
 router.post("/dashboard/ai-summary", async (req, res) => {
   try {
+    const body = req.body as { summary?: any; filterLabel?: string };
+    const s = body.summary ?? {};
+
     const apiKey =
       process.env["OPENAI_API_KEY"] ||
       process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
+
+    // ── Fallback local (sem API key) ────────────────────────────────────────
+    if (!apiKey) {
+      res.json({ text: buildLocalSummary(s, body.filterLabel), source: "local" });
+      return;
+    }
+
+    // ── Caminho OpenAI ──────────────────────────────────────────────────────
     const baseUrl = (
       process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"] || "https://api.openai.com/v1"
     ).replace(/\/$/, "");
 
-    if (!apiKey) {
-      res.status(503).json({
-        error:
-          "Chave OpenAI não configurada. Adicione OPENAI_API_KEY nas variáveis de ambiente do projeto.",
-      });
-      return;
-    }
-
-    const body = req.body as {
-      summary?: any;
-      filterLabel?: string;
-    };
-
-    const s = body.summary ?? {};
     const topTechs = (s.byTechnician ?? [])
       .slice(0, 6)
       .map((t: any) => `${t.technicianName}: ${t.total} OS, ${t.completed} concluídas`)
@@ -567,22 +629,19 @@ router.post("/dashboard/ai-summary", async (req, res) => {
       .map((l: any) => `${l.location} (${l.total})`)
       .join(", ");
 
-    const dataText = `
-Período: ${body.filterLabel || "Atual"}
-OS Abertas: ${s.totalOpen ?? 0} | Em Andamento: ${s.totalInProgress ?? 0} | Concluídas: ${s.totalCompleted ?? 0} | Canceladas: ${s.totalCanceled ?? 0} | Atrasadas: ${s.totalOverdue ?? 0}
-Hoje: ${s.totalToday ?? 0} | Este mês: ${s.totalThisMonth ?? 0}
-Taxa de conclusão: ${s.completionRate ?? s.averageCompletionRate ?? 0}%
-Valor estimado: R$ ${(s.totalValue ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-Top técnicos: ${topTechs || "N/A"}
-Principais locais: ${topLocals || "N/A"}
-    `.trim();
+    const dataText = [
+      `Período: ${body.filterLabel || "Atual"}`,
+      `Abertas: ${s.totalOpen ?? 0} | Andamento: ${s.totalInProgress ?? 0} | Concluídas: ${s.totalCompleted ?? 0} | Canceladas: ${s.totalCanceled ?? 0} | Atrasadas: ${s.totalOverdue ?? 0}`,
+      `Hoje: ${s.totalToday ?? 0} | Este mês: ${s.totalThisMonth ?? 0}`,
+      `Taxa de conclusão: ${s.completionRate ?? 0}%`,
+      `Valor estimado: R$ ${(s.totalValue ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+      `Top técnicos: ${topTechs || "N/A"}`,
+      `Principais locais: ${topLocals || "N/A"}`,
+    ].join("\n");
 
     const aiResponse = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [
@@ -591,10 +650,7 @@ Principais locais: ${topLocals || "N/A"}
             content:
               "Você é um assistente de gestão operacional para o Grupo Rede Amazônica. Analise os dados do painel de ordens de serviço e forneça um resumo executivo conciso (máximo 120 palavras) em português. Destaque pontos críticos, tendências e recomendações práticas sem usar bullet points.",
           },
-          {
-            role: "user",
-            content: `Dados do Painel:\n${dataText}`,
-          },
+          { role: "user", content: `Dados do Painel:\n${dataText}` },
         ],
         max_tokens: 300,
         temperature: 0.3,
@@ -602,17 +658,19 @@ Principais locais: ${topLocals || "N/A"}
     });
 
     if (!aiResponse.ok) {
-      res.status(500).json({ error: `Erro da API: ${aiResponse.status}` });
+      // OpenAI falhou — usa fallback local em vez de retornar erro
+      res.json({ text: buildLocalSummary(s, body.filterLabel), source: "local" });
       return;
     }
 
     const aiData = (await aiResponse.json()) as any;
-    const text =
-      aiData?.choices?.[0]?.message?.content ?? "Resumo não disponível.";
-    res.json({ text });
+    const text = aiData?.choices?.[0]?.message?.content ?? buildLocalSummary(s, body.filterLabel);
+    res.json({ text, source: "openai" });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Erro ao gerar resumo." });
+    // Nunca retorna erro — sempre entrega o fallback local
+    const s = (req.body as any)?.summary ?? {};
+    res.json({ text: buildLocalSummary(s, (req.body as any)?.filterLabel), source: "local" });
   }
 });
 

@@ -14,6 +14,7 @@ import linksRouter from "./links";
 import storageRouter from "./storage";
 import purchaseSheetsRouter from "./purchase-sheets";
 import pmocRouter from "./pmoc";
+import searchRouter from "./search";
 
 const router: IRouter = Router();
 
@@ -34,5 +35,6 @@ router.use(linksRouter);
 router.use(storageRouter);
 router.use(purchaseSheetsRouter);
 router.use(pmocRouter);
+router.use(searchRouter);
 
 export default router;
