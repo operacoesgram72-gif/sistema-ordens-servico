@@ -1,0 +1,30 @@
+O sistema de Ordens de Serviço já possui uma estimativa de valor para cada serviço. No entanto, os valores atualmente cadastrados aparentam não refletir a realidade do mercado.
+
+Solicito uma revisão completa da metodologia utilizada para definir os valores estimados de cada Ordem de Serviço, sem criar novas funcionalidades e sem alterar o funcionamento atual do sistema.
+
+O objetivo é apenas recalcular e atualizar os valores existentes para que representem uma estimativa mais precisa e coerente com o mercado brasileiro.
+
+Para definir o valor médio de cada serviço, considere os seguintes critérios:
+
+Tipo de serviço executado;
+Complexidade da atividade;
+Tempo médio de execução;
+Quantidade média de profissionais necessários;
+Grau de especialização da mão de obra;
+Equipamentos normalmente utilizados;
+Materiais normalmente empregados quando fizerem parte do serviço;
+Valores médios praticados por empresas de manutenção predial, facilities, construção civil, instalações elétricas, hidráulicas, climatização e demais áreas relacionadas.
+
+Sempre que possível, utilize como referência bases reconhecidas do mercado, como SINAPI, TCPO/PINI, SICRO (quando aplicável) e médias praticadas por empresas privadas, adotando uma média nacional para evitar distorções regionais.
+
+Os valores devem seguir uma lógica consistente, evitando situações como:
+
+Serviços simples com valor superior a serviços complexos;
+Serviços semelhantes com diferenças desproporcionais de preço;
+Valores incompatíveis com o tempo e a dificuldade da execução.
+
+A revisão deve abranger toda a base de serviços existente, mantendo exatamente os mesmos nomes, categorias e funcionamento do sistema.
+
+O resultado esperado é que cada Ordem de Serviço apresente um valor estimado mais realista, servindo como uma referência confiável para orçamentos, análises gerenciais e indicadores financeiros.
+
+Importante: não criar novos campos, novas tabelas ou novas funcionalidades. Apenas revisar e recalibrar os valores estimados existentes utilizando uma metodologia técnica e consistente baseada em referências de mercado.

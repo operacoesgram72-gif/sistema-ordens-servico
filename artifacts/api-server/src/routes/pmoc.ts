@@ -4,10 +4,10 @@ import { sql } from "drizzle-orm";
 
 const router = Router();
 
-// Allowed storage key patterns: pmoc_main, pmoc_state_<name>
+// Allowed storage key patterns: pmoc_main, pmoc_state_<name>, bebedouros_<name>
 // This prevents arbitrary namespace access while keeping the key scheme open
 // to the fixed set used by the frontend.
-const VALID_STORAGE_KEY = /^pmoc_(main|state_[a-z]+)$/;
+const VALID_STORAGE_KEY = /^(pmoc_(main|state_[a-z]+)|bebedouros_[a-z]+)$/;
 
 function validateKey(key: string): boolean {
   return VALID_STORAGE_KEY.test(key);

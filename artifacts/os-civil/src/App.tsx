@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppLayout } from "@/components/layout/app-layout";
-import { UnitProvider, type Unit } from "@/contexts/unit-context";
+import { UnitProvider, useUnit, type Unit } from "@/contexts/unit-context";
 import { ShareProvider, useShare } from "@/contexts/share-context";
 import { StatusAlertsProvider } from "@/contexts/status-alerts-context";
 import CalendarAlerts from "@/components/calendar-alerts";
@@ -25,7 +25,7 @@ const FornecedoresPublico = lazy(() => import("@/pages/fornecedores-publico"));
 const ComprasServicos     = lazy(() => import("@/pages/compras-servicos"));
 const ComprasServicosPublico = lazy(() => import("@/pages/compras-servicos-publico"));
 const Configuracoes     = lazy(() => import("@/pages/configuracoes"));
-const Pmoc              = lazy(() => import("@/pages/pmoc"));
+const PmocPage          = lazy(() => import("@/pages/pmoc"));
 const RetiradaMateriais = lazy(() => import("@/pages/retirada-materiais"));
 const Calendario        = lazy(() => import("@/pages/calendario"));
 const Arquivos          = lazy(() => import("@/pages/arquivos"));
@@ -34,6 +34,13 @@ const RegistrarPmoc     = lazy(() => import("@/pages/registrar-pmoc"));
 const FecharOS          = lazy(() => import("@/pages/fechar-os"));
 const OsPublica         = lazy(() => import("@/pages/os-publica"));
 const NotFound          = lazy(() => import("@/pages/not-found"));
+
+// Thin wrapper so Pmoc receives the current management-portal unit without
+// calling useUnit() inside a lazy-loaded component that might lack the provider.
+function PmocManagement() {
+  const { unit } = useUnit();
+  return <PmocPage unit={unit} />;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -143,7 +150,7 @@ function ManagementRouter() {
               <Route path="/fornecedores" component={Fornecedores} />
               <Route path="/compras" component={ComprasServicos} />
               <Route path="/configuracoes" component={Configuracoes} />
-              <Route path="/pmoc" component={() => <Pmoc />} />
+              <Route path="/pmoc" component={PmocManagement} />
               <Route path="/retirada-materiais" component={RetiradaMateriais} />
               <Route path="/calendario" component={Calendario} />
               <Route path="/arquivos" component={Arquivos} />

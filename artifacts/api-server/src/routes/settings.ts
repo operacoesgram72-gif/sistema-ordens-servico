@@ -585,7 +585,6 @@ export async function sendOsNotification(os: {
             <tr><td style="padding:6px 0;color:#666">Formato</td><td>${os.formatoServico || "-"}</td></tr>
             <tr><td style="padding:6px 0;color:#666">Técnico</td><td>${os.technicianName || "Não atribuído"}</td></tr>
             ${descriptionRow}
-            <tr><td style="padding:6px 0;color:#666">Valor Estimado</td><td style="color:#f59e0b;font-weight:bold">${valor}</td></tr>
             ${photosRow}
             ${videosRow}
           </table>

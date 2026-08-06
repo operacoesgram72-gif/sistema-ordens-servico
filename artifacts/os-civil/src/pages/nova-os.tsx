@@ -31,22 +31,25 @@ import { useUnit } from "@/contexts/unit-context";
 import { useGps, useVibration } from "@/hooks/use-native";
 import { isImageFile, isVideoFile, getVideoContentType, compressImage, MAX_COMPRESS_BYTES } from "@/lib/media-utils";
 
+// Effective hourly billing rate (R$/h) for a typical service team.
+// References: SINAPI 2025 (composições de serviço), TCPO/PINI, médias de
+// empresas de facilities / manutenção predial com BDI ~28%.
 const MARKET_RATES: Record<string, number> = {
-  civil: 280,
-  refrigeracao: 350,
-  hidraulica: 250,
-  mecanica: 320,
-  eletrica: 290,
-  ronda: 120,
-  outros: 180,
+  civil: 195,        // 2 ops × ~R$97/h (pedreiro + enc.) + materiais leves
+  refrigeracao: 245, // técnico frigorista R$140/h + gás + ferramentas
+  hidraulica: 170,   // encanador R$100/h + materiais básicos
+  mecanica: 190,     // mecânico predial R$115/h + ferramentas
+  eletrica: 185,     // eletricista R$110/h + materiais elétricos
+  ronda: 55,         // operador de ronda/limpeza R$55/h
+  outros: 145,       // serviço genérico — média conservadora
 };
 
-// Multiplier per service type (normalized to a single visit)
+// Multiplier per service type reflecting team size and material complexity
 const TIPO_MULTIPLIER: Record<string, number> = {
-  reforma: 1.5,
-  revitalizacao: 1.2,
-  preventiva: 0.8,
-  corretiva: 1.0,
+  reforma: 2.2,       // equipe maior + materiais pesados + andaimes
+  revitalizacao: 1.5, // pintura / acabamentos / equipe mediana
+  preventiva: 0.8,    // rotineira: mais rápida, materiais básicos
+  corretiva: 1.0,     // baseline
   outros: 1.0,
 };
 

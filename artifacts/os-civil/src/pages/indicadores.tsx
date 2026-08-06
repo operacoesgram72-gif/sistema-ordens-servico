@@ -143,7 +143,7 @@ export default function Indicadores() {
 
   const totalOs = filteredMonths.reduce((acc: number, curr: any) => acc + curr.total, 0);
   const totalCompleted = filteredMonths.reduce((acc: number, curr: any) => acc + curr.completed, 0);
-  const totalValue = filteredMonths.reduce((acc: number, curr: any) => acc + (curr.value ?? 0), 0);
+  const totalValue = filteredMonths.reduce((acc: number, curr: any) => acc + (curr.estimatedValue ?? 0), 0);
   const completionRate = totalOs > 0 ? (totalCompleted / totalOs) * 100 : 0;
   const avgValue = totalOs > 0 ? totalValue / totalOs : 0;
 

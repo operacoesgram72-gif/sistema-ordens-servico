@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Camera, Loader2 } from "lucide-react";
+import { Wind, Link as LinkIcon, Plus, Trash2, ExternalLink, Pencil, Check, X, Image as ImageIcon, Camera, Loader2, FileDown } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -776,63 +776,192 @@ const UNIT_TO_STATE_TAB: Record<string, StateTabKey> = {
   PA: "interiores",
 };
 
-export default function Pmoc({ unit }: { unit?: string } = {}) {
-  const defaultTab: StateTabKey =
-    (unit && UNIT_TO_STATE_TAB[unit]) ? UNIT_TO_STATE_TAB[unit] : "amazonas";
+export default function Pmoc({ unit: unitProp = "AM" }: { unit?: string } = {}) {
+  const effectiveUnit = unitProp;
+  const isAM = effectiveUnit === "AM";
+
+  // Tabs visible to this unit: non-AM sees only their own state; AM sees all.
+  const visibleTabs = isAM
+    ? STATE_TABS
+    : STATE_TABS.filter(t => t.key === (UNIT_TO_STATE_TAB[effectiveUnit] ?? "amazonas"));
+
+  const defaultTab: StateTabKey = UNIT_TO_STATE_TAB[effectiveUnit] ?? "amazonas";
   const [activeStateTab, setActiveStateTab] = useState<StateTabKey>(defaultTab);
+  const [activeBebedourosTab, setActiveBebedourosTab] = useState<StateTabKey>(defaultTab);
+
+  // Generate a PDF of preventivas with status OK from a given PMOC storage key.
+  const gerarRelatorioPmoc = (storageKey: string, label: string) => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const rows: PmocRow[] = raw ? JSON.parse(raw) : [];
+      const okRows = rows.filter(r => r.q1.ok || r.q2.ok || r.q3.ok || r.q4.ok);
+      const qLabels = ["JAN–MAR", "ABR–JUN", "JUL–SET", "OUT–DEZ"];
+      const qKeys: QuarterKey[] = ["q1", "q2", "q3", "q4"];
+
+      const tableRows = okRows.map(row =>
+        `<tr>
+          <td>${row.cod}</td><td>${row.modelo}</td><td>${row.local}</td>
+          <td>${row.btu}</td><td>${row.tensao ? row.tensao + "V" : ""}</td>
+          ${qKeys.map(qk =>
+            `<td style="text-align:center;color:${row[qk].ok ? "#059669" : "#aaa"}">${
+              row[qk].ok ? "✓ " + (row[qk].execucao || "OK") : "—"
+            }</td>`
+          ).join("")}
+          <td>${row.observacao || ""}</td>
+        </tr>`
+      ).join("");
+
+      const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>PMOC — ${label}</title>
+<style>
+  body{font-family:Arial,sans-serif;font-size:11px;color:#111;padding:20px}
+  h1{font-size:16px;margin-bottom:4px}
+  .sub{color:#555;font-size:11px;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid #ddd;padding:5px 8px;font-size:10px}
+  th{background:#f0f0f0;font-weight:bold}
+  tr:nth-child(even){background:#fafafa}
+  @media print{body{padding:8px}}
+</style></head><body>
+<h1>PMOC — Preventivas com Status OK</h1>
+<div class="sub">${label} · Gerado em: ${new Date().toLocaleString("pt-BR")}</div>
+<table>
+  <thead><tr>
+    <th>Cód.</th><th>Modelo</th><th>Local</th><th>BTU</th><th>Tensão</th>
+    ${qLabels.map(q => `<th>${q}</th>`).join("")}
+    <th>Observações</th>
+  </tr></thead>
+  <tbody>${tableRows || `<tr><td colspan="9" style="text-align:center;padding:12px;color:#888">
+    Nenhuma preventiva com status OK encontrada.</td></tr>`}
+  </tbody>
+</table>
+</body></html>`;
+
+      const w = window.open("", "_blank", "width=1100,height=750");
+      if (!w) { alert("Permita pop-ups para gerar o relatório."); return; }
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      setTimeout(() => w.print(), 400);
+    } catch {
+      alert("Erro ao gerar relatório.");
+    }
+  };
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="bg-background border-b border-border/30 shrink-0">
         <div className="px-4 md:px-6 pt-4 pb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <Wind className="w-7 h-7 text-primary" />
-            PMOC e Bebedouros
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Cronograma anual de manutenção preventiva. Alterações salvas automaticamente.
-          </p>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+              <Wind className="w-7 h-7 text-primary" />
+              PMOC e Bebedouros
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Cronograma anual de manutenção preventiva. Alterações salvas automaticamente.
+            </p>
+          </div>
         </div>
-      </div>
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-4 md:px-6 pb-6 pt-4 space-y-8">
 
-      {/* Tabela Principal */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-primary border-primary/40 font-semibold px-3 py-1">
-            Tabela Principal
-          </Badge>
-        </div>
-        <PmocTable storageKey="pmoc_main" initialRows={defaultRows} />
-      </div>
+          {/* Tabela Principal — apenas AM vê todas as filiais */}
+          {isAM && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="text-primary border-primary/40 font-semibold px-3 py-1">
+                  Tabela Principal
+                </Badge>
+              </div>
+              <PmocTable storageKey="pmoc_main" initialRows={defaultRows} />
+            </div>
+          )}
 
-      {/* Abas por Estado */}
-      <div className="space-y-4">
-        <div className="border-b border-border">
-          <div className="flex gap-1 overflow-x-auto pb-0 scrollbar-hide">
-            {STATE_TABS.map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveStateTab(tab.key)}
-                className={cn(
-                  "px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
-                  activeStateTab === tab.key
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+          {/* PMOC por Estado — Ar-Condicionado */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="outline" className="text-primary border-primary/40 font-semibold px-3 py-1">
+                PMOC — Ar-Condicionado
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-dashed"
+                onClick={() => gerarRelatorioPmoc(
+                  `pmoc_state_${activeStateTab}`,
+                  visibleTabs.find(t => t.key === activeStateTab)?.label ?? activeStateTab
                 )}
               >
-                {tab.label}
-              </button>
-            ))}
+                <FileDown className="w-4 h-4" />
+                Relatório Pronto
+              </Button>
+            </div>
+            {visibleTabs.length > 1 && (
+              <div className="border-b border-border">
+                <div className="flex gap-1 overflow-x-auto pb-0 scrollbar-hide">
+                  {visibleTabs.map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveStateTab(tab.key)}
+                      className={cn(
+                        "px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
+                        activeStateTab === tab.key
+                          ? "border-primary text-primary"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <PmocTable key={activeStateTab} storageKey={`pmoc_state_${activeStateTab}`} initialRows={[]} />
           </div>
-        </div>
 
-        <PmocTable key={activeStateTab} storageKey={`pmoc_state_${activeStateTab}`} initialRows={[]} />
-      </div>
-    
+          {/* Bebedouros por Estado */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-2">
+              <Badge variant="outline" className="text-blue-400 border-blue-400/40 font-semibold px-3 py-1">
+                Bebedouros
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-dashed"
+                onClick={() => gerarRelatorioPmoc(
+                  `bebedouros_${activeBebedourosTab}`,
+                  `Bebedouros — ${visibleTabs.find(t => t.key === activeBebedourosTab)?.label ?? activeBebedourosTab}`
+                )}
+              >
+                <FileDown className="w-4 h-4" />
+                Relatório Pronto
+              </Button>
+            </div>
+            {visibleTabs.length > 1 && (
+              <div className="border-b border-border">
+                <div className="flex gap-1 overflow-x-auto pb-0 scrollbar-hide">
+                  {visibleTabs.map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveBebedourosTab(tab.key)}
+                      className={cn(
+                        "px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors",
+                        activeBebedourosTab === tab.key
+                          ? "border-blue-400 text-blue-400"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                      )}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <PmocTable key={`beb_${activeBebedourosTab}`} storageKey={`bebedouros_${activeBebedourosTab}`} initialRows={[]} />
+          </div>
+
         </div>
       </div>
     </div>

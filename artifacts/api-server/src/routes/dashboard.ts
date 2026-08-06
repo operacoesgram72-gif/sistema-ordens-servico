@@ -264,23 +264,40 @@ router.get("/dashboard/indicators", async (req, res) => {
       .where(and(...conditions))
       .limit(2000);
 
-    // Market value fallback per formato
+    // Market value fallback per formato — used when the OS has no estimatedValue stored.
+    // Values represent the average per-OS cost for a typical corretiva visit (4h, SINAPI 2025 reference).
     const MARKET_RATES: Record<string, number> = {
-      civil: 280, refrigeracao: 350, hidraulica: 250, mecanica: 320, eletrica: 290, outros: 180,
+      civil: 816, refrigeracao: 1025, hidraulica: 711, mecanica: 795, eletrica: 775, ronda: 230, outros: 607,
     };
     const getValue = (o: typeof allOrders[0]) => {
       if (o.estimatedValue !== null && o.estimatedValue !== undefined) return Number(o.estimatedValue);
       return MARKET_RATES[o.formatoServico ?? ""] ?? 200;
     };
-    // Normalize a single technician name to Title Case so "max", "MAX" and "Max"
-    // all map to the same bucket in every aggregation (byTechnician, byFormat, etc.).
-    const normalizeName = (n: string): string =>
-      n.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    // Canonical name map — maps partial/nickname/misspelling → full canonical name.
+    // Applied AFTER title-case normalization so "erielder" → "Erielder" → "Erielder Ribeiro".
+    const CANONICAL_NAMES: Record<string, string> = {
+      "Erielder": "Erielder Ribeiro",
+      "Erielder Ribei": "Erielder Ribeiro",
+      "Jose": "José Ramon",
+      "José": "José Ramon",
+      "Jose Ramon": "José Ramon",
+      "Max": "Max Lucas",
+      "Lucas": "Max Lucas",
+      "Max E Lucas": "Max Lucas",
+      "Ewerton": "Ewerton Moreira",
+      "Ewerton More": "Ewerton Moreira",
+      "Jose Ramon Albu": "José Ramon",
+    };
+
+    // Normalize a single technician name to Title Case, then apply canonical map.
+    const normalizeName = (n: string): string => {
+      const tc = n.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+      return CANONICAL_NAMES[tc] ?? tc;
+    };
 
     const getTechName = (o: typeof allOrders[0]): string => {
       const raw = (o as any).technicianNameFree || o.technicianName;
       if (!raw) return "Não atribuído";
-      // Normalize each part when multiple technicians are separated by " / "
       return raw.split(" / ").map((part: string) => normalizeName(part)).join(" / ");
     };
 
