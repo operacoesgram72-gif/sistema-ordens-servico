@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useOfflineQueue } from "@/hooks/use-offline-queue";
 import { cn } from "@/lib/utils";
 import { Label } from "@/components/ui/label";
-import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS } from "@/lib/constants";
+import { CATEGORY_LABELS, PRIORITY_LABELS, TIPO_LABELS, FORMATO_SERVICO_LABELS, STATUS_LABELS } from "@/lib/constants";
 
 const MARKET_RATES: Record<string, number> = {
   civil: 280,
@@ -47,6 +47,7 @@ const formSchema = z.object({
   formatoServico: z.enum(["civil", "refrigeracao", "hidraulica", "mecanica", "eletrica", "outros"]).optional(),
   photos: z.string().optional(),
   temPte: z.enum(["sim", "nao"]).optional(),
+  status: z.enum(["aberta", "em_andamento", "concluida", "cancelada", "impedimento"]).optional(),
 });
 
 export default function RegistrarOS() {
@@ -316,6 +317,7 @@ export default function RegistrarOS() {
       unidade: unitFromUrl,
       origem: "manual",
       estimatedValue: estimativaAuto || undefined,
+      status: values.status || undefined,
     };
 
     // Offline: queue submission and show deferred success
@@ -648,6 +650,30 @@ export default function RegistrarOS() {
                                 </FormControl>
                                 <SelectContent>
                                   {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                                    <SelectItem key={val} value={val}>{label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Status inicial */}
+                        <FormField
+                          control={form.control}
+                          name="status"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Status</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value || "aberta"}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Aberta" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {Object.entries(STATUS_LABELS).map(([val, label]) => (
                                     <SelectItem key={val} value={val}>{label}</SelectItem>
                                   ))}
                                 </SelectContent>

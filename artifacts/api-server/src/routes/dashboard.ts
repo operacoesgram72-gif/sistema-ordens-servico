@@ -296,9 +296,17 @@ router.get("/dashboard/indicators", async (req, res) => {
       };
 
       const le = bump(locationMap, loc); le.total++; if (done) le.completed++; le.value += val;
-      const te = bump(techMapAgg,  name); te.total++; if (done) te.completed++; te.value += val;
       const me = bump(monthMap,    mKey); me.total++; if (done) me.completed++; me.value += val;
       const fe = bump(formatoMap,  fmt);  fe.total++;                           fe.value += val;
+
+      // Split multi-technician OS (stored as "Tech A / Tech B") so each
+      // technician gets their own row in byTechnician without creating
+      // duplicate OS records or altering OS numbering.
+      const techNames = name.split(" / ").map((s: string) => s.trim()).filter(Boolean);
+      const effectiveTechs = techNames.length > 0 ? techNames : ["Não atribuído"];
+      for (const techName of effectiveTechs) {
+        const te = bump(techMapAgg, techName); te.total++; if (done) te.completed++; te.value += val;
+      }
     }
 
     const round = (n: number) => Math.round(n * 100) / 100;
@@ -356,6 +364,12 @@ router.get("/dashboard/timeline", async (req, res) => {
 
     const unitCond = (col: any) => (unidade ? eq(col, unidade) : undefined);
 
+    // Optional technician filter — when set, only OS events for that technician
+    // are returned. Multi-tech OS ("João / Maria") match when the tech name
+    // appears as one of the slash-separated parts. Material events are always
+    // included (they are not OS-specific).
+    const filtroTecnico = req.query.tecnico as string | undefined;
+
     const [created, completed, scheduled, withdrawals] = await Promise.all([
       db.select({
           id: serviceOrdersTable.id,
@@ -363,6 +377,7 @@ router.get("/dashboard/timeline", async (req, res) => {
           title: serviceOrdersTable.title,
           location: serviceOrdersTable.location,
           formatoServico: serviceOrdersTable.formatoServico,
+          technicianNameFree: (serviceOrdersTable as any).technicianNameFree,
           date: serviceOrdersTable.createdAt,
         })
         .from(serviceOrdersTable)
@@ -375,6 +390,7 @@ router.get("/dashboard/timeline", async (req, res) => {
           title: serviceOrdersTable.title,
           location: serviceOrdersTable.location,
           formatoServico: serviceOrdersTable.formatoServico,
+          technicianNameFree: (serviceOrdersTable as any).technicianNameFree,
           date: serviceOrdersTable.completedAt,
         })
         .from(serviceOrdersTable)
@@ -391,6 +407,7 @@ router.get("/dashboard/timeline", async (req, res) => {
           title: serviceOrdersTable.title,
           location: serviceOrdersTable.location,
           formatoServico: serviceOrdersTable.formatoServico,
+          technicianNameFree: (serviceOrdersTable as any).technicianNameFree,
           date: serviceOrdersTable.scheduledAt,
         })
         .from(serviceOrdersTable)
@@ -423,7 +440,17 @@ router.get("/dashboard/timeline", async (req, res) => {
 
     const events: TimelineEvent[] = [];
 
+    // Helper: check if an OS belongs to the requested technician.
+    // technicianNameFree may hold "João" or "João / Maria" for multi-tech OS.
+    // Returns true when no filter is set (show all).
+    const techMatches = (techFree: string | null | undefined): boolean => {
+      if (!filtroTecnico) return true;
+      if (!techFree) return false;
+      return techFree.split(" / ").map((s: string) => s.trim()).includes(filtroTecnico);
+    };
+
     for (const o of created) {
+      if (!techMatches((o as any).technicianNameFree)) continue;
       events.push({
         id: `criada-${o.id}`,
         type: "os_criada",
@@ -434,6 +461,7 @@ router.get("/dashboard/timeline", async (req, res) => {
     }
     for (const o of completed) {
       if (!o.date) continue;
+      if (!techMatches((o as any).technicianNameFree)) continue;
       events.push({
         id: `concluida-${o.id}`,
         type: "os_concluida",
@@ -444,6 +472,7 @@ router.get("/dashboard/timeline", async (req, res) => {
     }
     for (const o of scheduled) {
       if (!o.date) continue;
+      if (!techMatches((o as any).technicianNameFree)) continue;
       events.push({
         id: `programada-${o.id}`,
         type: "os_programada",

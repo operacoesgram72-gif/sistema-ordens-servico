@@ -60,20 +60,31 @@ function formatRelativeDate(iso: string): string {
   return `${dateStr} · ${time}`;
 }
 
+interface IndicadoresTimelineProps {
+  /** When set, only events for this technician are shown (multi-tech OS included). */
+  tecnico?: string;
+}
+
 /**
  * Timeline of recent events for the Indicadores screen.
  * Purely additive widget — reads from GET /api/dashboard/timeline (read-only
  * aggregation endpoint) and renders as a standalone Card. Does not alter,
  * wrap, or depend on any other section of the page.
+ *
+ * When `tecnico` is provided, the API filters OS events so only events where
+ * the technician participated appear. Multi-tech OS ("A / B") are included
+ * for both A and B without creating duplicate records.
  */
-export default function IndicadoresTimeline() {
+export default function IndicadoresTimeline({ tecnico }: IndicadoresTimelineProps) {
   const { unit } = useUnit();
   const [viewMode, setViewMode] = useState<"lista" | "grafico">("lista");
 
   const { data: events, isLoading } = useQuery<TimelineEvent[]>({
-    queryKey: ["dashboard-timeline", unit],
+    queryKey: ["dashboard-timeline", unit, tecnico ?? "all"],
     queryFn: async () => {
-      const res = await fetch(`${BASE_URL}/api/dashboard/timeline?unidade=${unit}&limit=25`);
+      const params = new URLSearchParams({ unidade: unit, limit: "25" });
+      if (tecnico && tecnico !== "all") params.set("tecnico", tecnico);
+      const res = await fetch(`${BASE_URL}/api/dashboard/timeline?${params.toString()}`);
       if (!res.ok) return [];
       return res.json();
     },

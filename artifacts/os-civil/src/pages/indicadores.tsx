@@ -9,7 +9,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ComposedChart, Line, Legend, LabelList,
 } from "recharts";
-import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X } from "lucide-react";
+import { ClipboardList, CheckCircle2, DollarSign, TrendingUp, Target, Calendar, RefreshCw, X, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import IndicadoresTimeline from "@/components/indicadores-timeline";
 
@@ -513,9 +513,86 @@ export default function Indicadores() {
         </Card>
       )}
 
+      {/* ── Relatório PDF ─────────────────────────────────────────────────── */}
+      <div className="flex justify-center">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 border-dashed"
+          onClick={() => {
+            const periodoLabel = isDiaMode
+              ? selectedDate.split("-").reverse().join("/")
+              : `${selectedYear}${selectedMonth > 0 ? ` — ${MONTHS[selectedMonth]}` : " (ano completo)"}`;
+            const filtrosAtivos: string[] = [];
+            if (filterFormato !== "all") filtrosAtivos.push(`Formato: ${FORMATO_LABELS[filterFormato] ?? filterFormato}`);
+            if (filterTipo    !== "all") filtrosAtivos.push(`Tipo: ${TIPO_LABELS[filterTipo] ?? filterTipo}`);
+            if (filterTecnico !== "all") filtrosAtivos.push(`Técnico: ${filterTecnico}`);
+
+            const tecRows = byTechnicianFiltered.map((r: any) =>
+              `<tr>
+                <td>${r.technicianName || "Não atribuído"}</td>
+                <td style="text-align:right">${r.total}</td>
+                <td style="text-align:right">${r.completed}</td>
+                <td style="text-align:right">${r.total > 0 ? Math.round((r.completed / r.total) * 100) + "%" : "—"}</td>
+                <td style="text-align:right">${formatCurrency(r.estimatedValue ?? 0)}</td>
+              </tr>`
+            ).join("");
+
+            const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>Relatório de Indicadores</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 24px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .subtitle { color: #555; margin-bottom: 16px; font-size: 12px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .card { border: 1px solid #ddd; border-radius: 6px; padding: 12px 16px; min-width: 140px; }
+  .card-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .card-value { font-size: 20px; font-weight: bold; font-family: monospace; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 10px; font-size: 11px; }
+  th { background: #f5f5f5; font-weight: bold; }
+  tr:nth-child(even) { background: #fafafa; }
+  .section-title { font-size: 13px; font-weight: bold; margin: 20px 0 6px; }
+  @media print { body { padding: 12px; } }
+</style></head><body>
+<h1>Relatório de Indicadores — Grupo Rede Amazônica</h1>
+<div class="subtitle">
+  Período: ${periodoLabel}
+  ${filtrosAtivos.length > 0 ? " &nbsp;|&nbsp; Filtros: " + filtrosAtivos.join(", ") : ""}
+  &nbsp;|&nbsp; Gerado em: ${new Date().toLocaleString("pt-BR")}
+</div>
+<div class="cards">
+  <div class="card"><div class="card-label">Total de OS</div><div class="card-value">${totalOs}</div></div>
+  <div class="card"><div class="card-label">OS Concluídas</div><div class="card-value" style="color:#059669">${totalCompleted}</div></div>
+  <div class="card"><div class="card-label">Taxa de Conclusão</div><div class="card-value" style="color:#2563eb">${completionRate.toFixed(1)}%</div></div>
+  <div class="card"><div class="card-label">Valor Total Est.</div><div class="card-value" style="color:#d97706">${formatCurrency(totalValue)}</div></div>
+  <div class="card"><div class="card-label">Ticket Médio</div><div class="card-value" style="color:#7c3aed">${formatCurrency(avgValue)}</div></div>
+</div>
+${tecRows ? `
+<div class="section-title">Desempenho por Técnico</div>
+<table>
+  <thead><tr><th>Técnico</th><th>Total</th><th>Concluídas</th><th>Taxa</th><th>Valor Est.</th></tr></thead>
+  <tbody>${tecRows}</tbody>
+</table>` : ""}
+</body></html>`;
+
+            const w = window.open("", "_blank", "width=900,height=700");
+            if (!w) { alert("Permita pop-ups para gerar o relatório."); return; }
+            w.document.write(html);
+            w.document.close();
+            w.focus();
+            setTimeout(() => { w.print(); }, 400);
+          }}
+        >
+          <FileDown className="w-4 h-4" />
+          Relatório Pronto
+        </Button>
+      </div>
+
       {/* ── Timeline de Eventos ────────────────────────────────────────────── */}
-      {/* Purely additive — standalone card, does not alter any section above. */}
-      <IndicadoresTimeline />
+      {/* Passes the active technician filter so multi-tech OS events are shown
+          only for the selected technician without creating duplicate records. */}
+      <IndicadoresTimeline tecnico={filterTecnico} />
     
         </div>
       </div>

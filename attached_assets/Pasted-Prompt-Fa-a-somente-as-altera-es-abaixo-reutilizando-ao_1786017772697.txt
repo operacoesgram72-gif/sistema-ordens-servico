@@ -1,0 +1,22 @@
+Prompt:
+
+Faça somente as alterações abaixo, reutilizando ao máximo a estrutura, componentes e lógica existentes para minimizar o consumo de créditos do Agent. Não altere regras de negócio, não faça refatorações desnecessárias e não modifique funcionalidades que já estejam funcionando corretamente.
+
+Alterações:
+
+Status da OS (Portal do Funcionário): Disponibilizar o campo Status da Ordem de Serviço em todos os Portais do Funcionário de todas as UF (Estados). Permitir que o usuário selecione ou altere qualquer status disponível sem bloqueios ou restrições, mantendo apenas as permissões de acesso já existentes.
+Indicadores por Técnico: Na aba Indicadores, exibir os resultados das Ordens de Serviço de forma individual por técnico responsável. Quando uma OS possuir mais de um técnico, ela deve ser contabilizada para cada técnico em seus respectivos indicadores, sem criar Ordens de Serviço duplicadas no banco de dados e sem alterar a numeração da OS.
+Linha do Tempo de Eventos: Aplicar a mesma lógica aos eventos. Quando uma OS possuir múltiplos técnicos, cada técnico deve visualizar o evento em sua própria linha do tempo, sem gerar registros duplicados da Ordem de Serviço e mantendo apenas uma OS compartilhada entre os participantes.
+Relatório do Painel de Controle: Criar um botão "Relatório Pronto" no Painel de Controle, posicionado abaixo dos gráficos. Ao clicar, o sistema deve gerar e exportar automaticamente um PDF contendo os resultados exibidos na tela, respeitando todos os filtros aplicados (período, técnico, formato, tipo, status e demais filtros disponíveis), mantendo o mesmo padrão visual do painel.
+
+Importante:
+
+Faça apenas essas alterações.
+Preserve todas as funcionalidades existentes.
+Não introduza novos bugs.
+Reutilize componentes e códigos existentes sempre que possível.
+Não altere a estrutura do banco de dados além do estritamente necessário.
+Priorize desempenho, estabilidade e uma boa experiência do usuário (UI/UX).
+Aplique as alterações de forma global para todas as UF (Estados), Portal do Funcionário, Área de Gestão, Web e Mobile/App.
+Caso os créditos do Agent estejam próximos do limite, implemente e valide uma funcionalidade por vez, concluindo completamente cada etapa antes de iniciar a próxima.
+Não deixe nenhuma funcionalidade incompleta e não consuma créditos com modificações desnecessárias.
