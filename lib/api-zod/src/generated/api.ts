@@ -74,7 +74,7 @@ export const CreateServiceOrderBody = zod.object({
   "notes": zod.string().optional(),
   "tipo": zod.enum(['reforma', 'revitalizacao', 'preventiva', 'corretiva', 'outros']).optional(),
   "formatoServico": zod.enum(['civil', 'refrigeracao', 'hidraulica', 'mecanica', 'eletrica', 'ronda', 'outros']).optional(),
-  "status": zod.enum(['aberta', 'impedimento']).optional().describe('Status inicial — padrão aberta'),
+  "status": zod.enum(['aberta', 'em_andamento', 'concluida', 'cancelada', 'impedimento']).optional().describe('Status inicial — padrão aberta'),
   "photos": zod.string().optional(),
   "scheduledAt": zod.string().optional()
 })

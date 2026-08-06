@@ -555,7 +555,6 @@ export default function RegistrarOS() {
                                       field.onChange(date);
                                       setCalendarOpen(false);
                                     }}
-                                    disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                                     initialFocus
                                     className="[--cell-size:2.75rem] text-base"
                                   />

@@ -377,7 +377,17 @@ export default function Ordens() {
                     <TableCell>
                       <Badge variant="outline" className={PRIORITY_COLORS[os.priority as ServiceOrderPriority]}>{PRIORITY_LABELS[os.priority as ServiceOrderPriority]}</Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{os.technicianName || <span className="text-muted-foreground italic">Não atribuído</span>}</TableCell>
+                    <TableCell>
+                      {os.technicianName
+                        ? <div className="flex flex-wrap gap-1">
+                            {os.technicianName.split(" / ").map((t: string, i: number) => (
+                              <span key={i} className="inline-block text-xs bg-primary/10 text-primary border border-primary/20 rounded px-1.5 py-0.5 whitespace-nowrap font-medium">
+                                {t.trim()}
+                              </span>
+                            ))}
+                          </div>
+                        : <span className="text-muted-foreground italic text-sm">Não atribuído</span>}
+                    </TableCell>
                     <TableCell>
                       {hasPhotos ? (
                         <div

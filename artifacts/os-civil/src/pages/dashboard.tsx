@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays, MapPin, RefreshCw } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, AlertTriangle, CalendarDays, MapPin, RefreshCw, FileDown } from "lucide-react";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { useState, useCallback, useMemo } from "react";
 import { useUnit } from "@/contexts/unit-context";
@@ -293,6 +293,75 @@ export default function Dashboard() {
             <p className="text-xs text-muted-foreground mt-1">Percentual de OS finalizadas</p>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Relatório PDF */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 border-dashed"
+          onClick={() => {
+            const filtrosAtivos: string[] = [
+              `Ano: ${filterYear}`,
+              filterMonth !== "0" ? `Mês: ${MONTHS[parseInt(filterMonth)]}` : null,
+              filterDay !== "0" ? `Dia: ${filterDay}` : null,
+              isAM && filterUnit !== "all" ? `UF: ${filterUnit}` : null,
+            ].filter(Boolean) as string[];
+
+            const priorityRows = summary.byPriority.map((p: any) =>
+              `<tr><td>${PRIORITY_LABELS[p.priority as keyof typeof PRIORITY_LABELS] || p.priority}</td><td style="text-align:right">${p.count}</td></tr>`
+            ).join("");
+
+            const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>Relatório — Painel de Controle</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 24px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .subtitle { color: #555; margin-bottom: 16px; font-size: 12px; }
+  .cards { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+  .card { border: 1px solid #ddd; border-radius: 6px; padding: 12px 16px; min-width: 140px; }
+  .card-label { font-size: 10px; color: #666; margin-bottom: 4px; }
+  .card-value { font-size: 20px; font-weight: bold; font-family: monospace; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { border: 1px solid #ddd; padding: 6px 10px; font-size: 11px; }
+  th { background: #f5f5f5; font-weight: bold; }
+  tr:nth-child(even) { background: #fafafa; }
+  .section-title { font-size: 13px; font-weight: bold; margin: 20px 0 6px; }
+  @media print { body { padding: 12px; } }
+</style></head><body>
+<h1>Painel de Controle — Grupo Rede Amazônica</h1>
+<div class="subtitle">
+  Filtros: ${filtrosAtivos.join(", ")}
+  &nbsp;|&nbsp; Gerado em: ${new Date().toLocaleString("pt-BR")}
+</div>
+<div class="cards">
+  <div class="card"><div class="card-label">OS Abertas</div><div class="card-value">${summary.totalOpen}</div></div>
+  <div class="card"><div class="card-label">Em Andamento</div><div class="card-value" style="color:#d97706">${summary.totalInProgress}</div></div>
+  <div class="card"><div class="card-label">Concluídas</div><div class="card-value" style="color:#059669">${summary.totalCompleted}</div></div>
+  <div class="card"><div class="card-label">Taxa de Conclusão</div><div class="card-value">${summary.completionRate.toFixed(1)}%</div></div>
+  <div class="card"><div class="card-label">Hoje</div><div class="card-value">${summary.totalToday}</div></div>
+  <div class="card"><div class="card-label">Este Mês</div><div class="card-value">${summary.totalThisMonth}</div></div>
+</div>
+${priorityRows ? `
+<div class="section-title">Por Prioridade</div>
+<table>
+  <thead><tr><th>Prioridade</th><th>Quantidade</th></tr></thead>
+  <tbody>${priorityRows}</tbody>
+</table>` : ""}
+</body></html>`;
+
+            const w = window.open("", "_blank", "width=900,height=700");
+            if (!w) { alert("Permita pop-ups para gerar o relatório."); return; }
+            w.document.write(html);
+            w.document.close();
+            w.focus();
+            setTimeout(() => { w.print(); }, 400);
+          }}
+        >
+          <FileDown className="w-4 h-4" />
+          Relatório Pronto
+        </Button>
       </div>
 
       {/* Gráficos */}

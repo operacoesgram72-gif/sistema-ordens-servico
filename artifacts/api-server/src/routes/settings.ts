@@ -540,6 +540,7 @@ export async function sendOsNotification(os: {
   formatoServico?: string | null;
   estimatedValue?: number | null;
   photos?: string | null;
+  unidade?: string | null;
 }) {
   const valor = os.estimatedValue
     ? new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(os.estimatedValue)
@@ -573,7 +574,7 @@ export async function sendOsNotification(os: {
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:auto;border:1px solid #ddd;border-radius:8px;overflow:hidden">
         <div style="background:#f59e0b;color:#fff;padding:16px 20px">
-          <strong style="font-size:18px">Nova Ordem de Serviço Registrada</strong>
+          <strong style="font-size:18px">Nova Ordem de Serviço Registrada${os.unidade ? ` — ${os.unidade}` : ""}</strong>
         </div>
         <div style="padding:20px;color:#333">
           <table style="width:100%;border-collapse:collapse">

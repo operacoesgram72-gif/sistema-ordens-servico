@@ -260,6 +260,7 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
       formatoServico: created.formatoServico ?? null,
       estimatedValue: created.estimatedValue ? Number(created.estimatedValue) : null,
       photos: created.photos ?? null,
+      unidade: unidade || null,
     }).catch(() => {}); // already handled internally
   } catch (err) {
     req.log.error(err);

@@ -381,8 +381,14 @@ export default function NovaOS() {
       {
         onSuccess: (_data: any) => {
           toast({ title: "OS criada com sucesso", description: "A ordem de serviço foi registrada." });
+          // Invalidate all data that depends on OS records so every view
+          // (list, dashboard, indicators, timeline) refreshes automatically.
           queryClient.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-indicators"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard-timeline"] });
+          queryClient.invalidateQueries({ queryKey: ["available-years"] });
           vibrate([100, 100, 300]);
           setLocation("/ordens");
         },
@@ -455,7 +461,6 @@ export default function NovaOS() {
                               field.onChange(date);
                               setCalendarOpen(false);
                             }}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                             initialFocus
                             className="[--cell-size:2.75rem] text-base"
                           />

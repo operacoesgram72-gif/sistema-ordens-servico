@@ -272,8 +272,17 @@ router.get("/dashboard/indicators", async (req, res) => {
       if (o.estimatedValue !== null && o.estimatedValue !== undefined) return Number(o.estimatedValue);
       return MARKET_RATES[o.formatoServico ?? ""] ?? 200;
     };
-    const getTechName = (o: typeof allOrders[0]) =>
-      (o as any).technicianNameFree || o.technicianName || "Não atribuído";
+    // Normalize a single technician name to Title Case so "max", "MAX" and "Max"
+    // all map to the same bucket in every aggregation (byTechnician, byFormat, etc.).
+    const normalizeName = (n: string): string =>
+      n.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+
+    const getTechName = (o: typeof allOrders[0]): string => {
+      const raw = (o as any).technicianNameFree || o.technicianName;
+      if (!raw) return "Não atribuído";
+      // Normalize each part when multiple technicians are separated by " / "
+      return raw.split(" / ").map((part: string) => normalizeName(part)).join(" / ");
+    };
 
     // BY LOCATION
     const locationMap = new Map<string, { total: number; completed: number; value: number }>();
