@@ -413,9 +413,9 @@ export default function Indicadores() {
                   cursor={{ fill: "hsl(var(--muted)/0.4)" }}
                   formatter={(v: number) => [v, "Ordens de Serviço"]}
                 />
-                <Bar dataKey="count" name="OS" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
+                <Bar dataKey="total" name="OS" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]}>
                   <LabelList
-                    dataKey="count"
+                    dataKey="total"
                     position="right"
                     style={{ fontSize: 11, fill: "hsl(var(--muted-foreground))", fontWeight: 600 }}
                   />

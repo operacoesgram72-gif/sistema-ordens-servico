@@ -95,7 +95,7 @@ export default function RegistrarOS() {
 
   const formatoServico = form.watch("formatoServico");
   const tipoOS = form.watch("tipo");
-  const TIPO_MULT: Record<string, number> = { reforma: 1.5, revitalizacao: 1.2, preventiva: 0.8, corretiva: 1.0, outros: 1.0 };
+  const TIPO_MULT: Record<string, number> = { reforma: 2.2, revitalizacao: 1.5, preventiva: 0.8, corretiva: 1.0, outros: 1.0 };
   const estimativaAuto = formatoServico
     ? Math.round(MARKET_RATES[formatoServico] * (TIPO_MULT[tipoOS ?? "corretiva"] ?? 1.0) * 4 * 1.046)
     : null;

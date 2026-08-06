@@ -178,9 +178,11 @@ router.get("/service-orders", async (req, res) => {
       .offset(offset);
 
     const enriched = await enrichWithTechnician(rows);
-    // Short cache: 30 s browser cache + ETag so repeated navigations are instant
-    // but new records appear within half a minute without a manual refresh.
-    res.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+    // no-cache: browser must revalidate on every request.
+    // React Query invalidateQueries() marks the entry stale and fires a refetch —
+    // if the server had max-age=30 the browser would return the cached stale response
+    // and the UI would never see the new data. "no-cache" forces the round-trip.
+    res.set("Cache-Control", "no-cache, no-store");
     res.json(enriched);
   } catch (err) {
     req.log.error(err);
@@ -379,7 +381,13 @@ router.patch("/service-orders/:id/status", async (req, res) => {
 
     const updateData: any = { status: body.status, updatedAt: new Date() };
     if (body.notes) updateData.notes = body.notes;
-    if (body.status === "concluida") updateData.completedAt = new Date();
+    // Set completedAt when finalising; clear it when re-opening the OS so the
+    // field only exists while the OS actually has status "concluida".
+    if (body.status === "concluida") {
+      updateData.completedAt = new Date();
+    } else {
+      updateData.completedAt = null;
+    }
 
     const [updated] = await db
       .update(serviceOrdersTable)
