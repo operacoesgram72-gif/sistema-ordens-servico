@@ -64,6 +64,8 @@ const LIST_COLUMNS = {
   // hasPhotos is a lightweight boolean so the list UI can show a camera indicator
   // without loading the actual base64 payload.
   hasPhotos:        sql<boolean>`(photos IS NOT NULL AND photos NOT IN ('[]', 'null', ''))`.as("has_photos"),
+  // photosCount returns the number of photos (JSON array length) without loading blobs.
+  photosCount:      sql<number>`(CASE WHEN photos IS NULL OR photos IN ('[]', 'null', '') THEN 0 ELSE COALESCE(json_array_length(photos::json), 0) END)`.as("photos_count"),
   signedBy:         serviceOrdersTable.signedBy,
   signedAt:         serviceOrdersTable.signedAt,
   estimatedValue:   serviceOrdersTable.estimatedValue,
