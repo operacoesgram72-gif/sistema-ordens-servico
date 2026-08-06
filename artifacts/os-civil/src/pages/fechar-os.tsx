@@ -212,15 +212,37 @@ export default function FecharOS() {
   };
 
   const handleSaveEdit = async (id: number) => {
+    const technicianName = editTechnicians.filter(t => t.trim()).join(" / ") || "";
+    const body = { ...editDraft, technicianName };
+
+    // Offline path: queue the edit and apply it optimistically to local state
+    if (!isOnline) {
+      enqueue({
+        type: "patch-edit",
+        endpoint: `/api/service-orders/${id}`,
+        method: "PATCH",
+        body: body as Record<string, unknown>,
+        unit: unitFromUrl,
+        label: `Editar OS #${id}`,
+      });
+      setOrdens(prev => {
+        const next = prev.map(o => o.id === id ? { ...o, ...body } : o);
+        writeCache(unitFromUrl, next);
+        return next;
+      });
+      setEditingId(null);
+      toast({ title: "Alterações salvas localmente", description: "Serão enviadas ao reconectar." });
+      return;
+    }
+
     setSavingId(id);
     try {
-      const technicianName = editTechnicians.filter(t => t.trim()).join(" / ") || "";
       const res = await fetch(`${BASE_URL}/api/service-orders/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...editDraft, technicianName }),
+        body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const updated: OS = await res.json();
       setOrdens(prev => {
         const next = prev.map(o => o.id === id ? { ...o, ...updated } : o);
@@ -229,8 +251,28 @@ export default function FecharOS() {
       });
       setEditingId(null);
       toast({ title: "OS atualizada!" });
-    } catch {
-      toast({ title: "Erro ao salvar alterações", variant: "destructive" });
+    } catch (e) {
+      // Network-level failure while navigator.onLine = true: queue for later
+      const isNetErr = e instanceof TypeError && /fetch|network|failed|load/i.test((e as TypeError).message);
+      if (isNetErr) {
+        enqueue({
+          type: "patch-edit",
+          endpoint: `/api/service-orders/${id}`,
+          method: "PATCH",
+          body: body as Record<string, unknown>,
+          unit: unitFromUrl,
+          label: `Editar OS #${id}`,
+        });
+        setOrdens(prev => {
+          const next = prev.map(o => o.id === id ? { ...o, ...body } : o);
+          writeCache(unitFromUrl, next);
+          return next;
+        });
+        setEditingId(null);
+        toast({ title: "Salvo localmente", description: "Será sincronizado ao reconectar." });
+      } else {
+        toast({ title: "Erro ao salvar alterações", variant: "destructive" });
+      }
     } finally {
       setSavingId(null);
     }
@@ -382,7 +424,7 @@ export default function FecharOS() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       // Persist confirmed state to cache
       setOrdens(prev => {
         writeCache(unitFromUrl, prev);
@@ -391,10 +433,33 @@ export default function FecharOS() {
       setSuccessId(id);
       setTimeout(() => setSuccessId(null), 2000);
       toast({ title: "Status atualizado!" });
-    } catch {
-      // Revert to captured previousStatus using functional setter (no stale closure)
-      setOrdens(prev => prev.map(o => o.id === id ? { ...o, status: previousStatus } : o));
-      toast({ title: "Erro ao atualizar status", variant: "destructive" });
+    } catch (e) {
+      // Network-level failure while navigator.onLine = true (weak signal,
+      // captive portal, etc.) → queue the change instead of reverting,
+      // keeping the optimistic update visible to the technician.
+      const isNetErr = e instanceof TypeError && /fetch|network|failed|load/i.test((e as TypeError).message);
+      if (isNetErr) {
+        const os = ordens.find(o => o.id === id);
+        enqueue({
+          type: "patch-status",
+          endpoint: `/api/service-orders/${id}/status`,
+          method: "PATCH",
+          body: { status: newStatus },
+          unit: unitFromUrl,
+          label: `Status ${os?.number || id} → ${STATUS_LABELS[newStatus as ServiceOrderStatus] || newStatus}`,
+        });
+        setOrdens(prev => {
+          writeCache(unitFromUrl, prev);
+          return prev;
+        });
+        setSuccessId(id);
+        setTimeout(() => setSuccessId(null), 2000);
+        toast({ title: "Status salvo localmente", description: "Será sincronizado ao reconectar." });
+      } else {
+        // Server error (4xx/5xx) — revert optimistic update
+        setOrdens(prev => prev.map(o => o.id === id ? { ...o, status: previousStatus } : o));
+        toast({ title: "Erro ao atualizar status", variant: "destructive" });
+      }
     } finally {
       setUpdatingId(null);
     }

@@ -354,8 +354,36 @@ export default function RegistrarOS() {
           form.reset();
           setPhotosBase64([]);
         },
-        onError: () => {
-          toast({ title: "Erro", description: "Não foi possível registrar a OS. Tente novamente.", variant: "destructive" });
+        onError: (error) => {
+          // navigator.onLine can report "online" while the server is actually
+          // unreachable (weak signal, captive portal, etc.).  When the mutation
+          // fails with a network-level TypeError, fall back to the offline queue
+          // so the submission is not silently lost.
+          const isNetErr =
+            error instanceof TypeError &&
+            /fetch|network|failed|load/i.test(error.message);
+          if (isNetErr) {
+            const persisted = enqueue({
+              type: "create-os",
+              endpoint: "/api/service-orders",
+              method: "POST",
+              body: payload as Record<string, unknown>,
+              unit: unitFromUrl,
+              label: `OS — ${autoTitle}`,
+            });
+            if (persisted) {
+              setSubmittedOffline(true);
+              setSubmitted("Em fila — aguardando conexão");
+              form.reset();
+              setPhotosBase64([]);
+              return;
+            }
+          }
+          toast({
+            title: "Erro ao registrar OS",
+            description: "Verifique sua conexão e tente novamente.",
+            variant: "destructive",
+          });
         },
       }
     );
