@@ -46,6 +46,7 @@ export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   concluida: "Concluída",
   cancelada: "Cancelada",
   impedimento: "Impedimento",
+  atrasada: "Atrasada",
 };
 
 export const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
@@ -54,4 +55,5 @@ export const STATUS_COLORS: Record<ServiceOrderStatus, string> = {
   concluida: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
   cancelada: "bg-red-500/10 text-red-500 border-red-500/20",
   impedimento: "bg-orange-500/10 text-orange-500 border-orange-500/20",
+  atrasada: "bg-red-900/20 text-red-400 border-red-500/30",
 };

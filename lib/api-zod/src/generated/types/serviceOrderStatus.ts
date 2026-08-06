@@ -15,4 +15,5 @@ export const ServiceOrderStatus = {
   concluida: 'concluida',
   cancelada: 'cancelada',
   impedimento: 'impedimento',
+  atrasada: 'atrasada',
 } as const;

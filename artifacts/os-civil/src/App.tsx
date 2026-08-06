@@ -7,6 +7,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { UnitProvider, useUnit, type Unit } from "@/contexts/unit-context";
 import { ShareProvider, useShare } from "@/contexts/share-context";
 import { StatusAlertsProvider } from "@/contexts/status-alerts-context";
+import { ThemeProvider } from "@/contexts/theme-context";
 import CalendarAlerts from "@/components/calendar-alerts";
 
 const Dashboard         = lazy(() => import("@/pages/dashboard"));
@@ -64,7 +65,7 @@ function PageFallback() {
 
 function MaintenancePage() {
   return (
-    <div className="min-h-screen bg-background text-foreground dark flex flex-col items-center justify-center gap-6 p-8">
+    <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center gap-6 p-8">
       <div className="flex flex-col items-center gap-4 text-center max-w-sm">
         <img src="/logo-amazonica.png" alt="Logo" className="h-16 w-16 object-contain opacity-70" />
         <div>
@@ -110,7 +111,7 @@ function StandaloneGuard() {
   if (isViewOnly && location === "/calendario") {
     return (
       <UnitProvider>
-        <div className="min-h-screen bg-background text-foreground dark">
+        <div className="min-h-screen bg-background text-foreground">
           <Suspense fallback={<PageFallback />}>
             <Calendario />
           </Suspense>
@@ -168,6 +169,7 @@ function ManagementRouter() {
 
 function App() {
   return (
+    <ThemeProvider>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
@@ -191,6 +193,7 @@ function App() {
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

@@ -5,7 +5,9 @@ import {
   LayoutDashboard, ClipboardList, PlusCircle, Users, TrendingUp,
   Share2, Copy, BookUser, Settings2, Wind, PackageOpen, CalendarDays, Folder,
   Menu, X, Wifi, WifiOff, Truck, Lock, ClipboardCheck, ShoppingCart,
+  Moon, Sun,
 } from "lucide-react";
+import { useTheme } from "@/contexts/theme-context";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useUnit, UNITS } from "@/contexts/unit-context";
@@ -71,6 +73,7 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
   const { unit, setUnit, locked } = useUnit();
   const { isShareMode } = useShare();
   const queryClient = useQueryClient();
+  const { theme, toggleTheme } = useTheme();
 
   // For AM: prefetch all-units summary (default view); for others: prefetch own unit
   const dashEffectiveUnit = unit !== "AM" ? unit : undefined;
@@ -204,10 +207,21 @@ function SidebarContent({ onNavClick }: { onNavClick?: () => void }) {
             Copiar link — {unit}
           </button>
         </div>
-        <div className="mt-3 pt-3 border-t border-border/40 text-center">
+        <div className="mt-3 pt-3 border-t border-border/40 flex items-center justify-between">
           <p className="text-[10px] text-muted-foreground/50 leading-snug">
             Desenvolvido por <span className="text-muted-foreground/70 font-medium">Aristoteles Melo</span>
           </p>
+          <button
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro"}
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            aria-label="Alternar tema"
+          >
+            {theme === "dark"
+              ? <Sun className="w-3.5 h-3.5" />
+              : <Moon className="w-3.5 h-3.5" />
+            }
+          </button>
         </div>
       </div>
     </>
@@ -221,7 +235,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground dark">
+    <div className="min-h-screen bg-background flex flex-col md:flex-row text-foreground">
 
       {/* ── Online/Offline banner (mobile + desktop) ── */}
       {!isOnline && (

@@ -275,18 +275,21 @@ router.get("/dashboard/indicators", async (req, res) => {
     };
     // Canonical name map — maps partial/nickname/misspelling → full canonical name.
     // Applied AFTER title-case normalization so "erielder" → "Erielder" → "Erielder Ribeiro".
+    // NOTE: Max and Lucas are distinct technicians — do NOT merge them.
     const CANONICAL_NAMES: Record<string, string> = {
       "Erielder": "Erielder Ribeiro",
       "Erielder Ribei": "Erielder Ribeiro",
       "Jose": "José Ramon",
       "José": "José Ramon",
       "Jose Ramon": "José Ramon",
-      "Max": "Max Lucas",
-      "Lucas": "Max Lucas",
-      "Max E Lucas": "Max Lucas",
-      "Ewerton": "Ewerton Moreira",
-      "Ewerton More": "Ewerton Moreira",
       "Jose Ramon Albu": "José Ramon",
+      // Ewenton Moreira — both spellings (Ewenton/Ewerton) map to the same person
+      "Ewenton": "Ewenton Moreira",
+      "Ewenton More": "Ewenton Moreira",
+      "Ewenton Morei": "Ewenton Moreira",
+      "Ewerton": "Ewenton Moreira",
+      "Ewerton Moreira": "Ewenton Moreira",
+      "Ewerton More": "Ewenton Moreira",
     };
 
     // Normalize a single technician name to Title Case, then apply canonical map.
@@ -526,6 +529,90 @@ router.get("/dashboard/timeline", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+// ── POST /dashboard/ai-summary ───────────────────────────────────────────────
+// Generates an executive text summary of the current dashboard data using
+// OpenAI. Requires OPENAI_API_KEY (or AI_INTEGRATIONS_OPENAI_API_KEY) env var.
+router.post("/dashboard/ai-summary", async (req, res) => {
+  try {
+    const apiKey =
+      process.env["OPENAI_API_KEY"] ||
+      process.env["AI_INTEGRATIONS_OPENAI_API_KEY"];
+    const baseUrl = (
+      process.env["AI_INTEGRATIONS_OPENAI_BASE_URL"] || "https://api.openai.com/v1"
+    ).replace(/\/$/, "");
+
+    if (!apiKey) {
+      res.status(503).json({
+        error:
+          "Chave OpenAI não configurada. Adicione OPENAI_API_KEY nas variáveis de ambiente do projeto.",
+      });
+      return;
+    }
+
+    const body = req.body as {
+      summary?: any;
+      filterLabel?: string;
+    };
+
+    const s = body.summary ?? {};
+    const topTechs = (s.byTechnician ?? [])
+      .slice(0, 6)
+      .map((t: any) => `${t.technicianName}: ${t.total} OS, ${t.completed} concluídas`)
+      .join("; ");
+    const topLocals = (s.byLocation ?? [])
+      .slice(0, 5)
+      .map((l: any) => `${l.location} (${l.total})`)
+      .join(", ");
+
+    const dataText = `
+Período: ${body.filterLabel || "Atual"}
+OS Abertas: ${s.totalOpen ?? 0} | Em Andamento: ${s.totalInProgress ?? 0} | Concluídas: ${s.totalCompleted ?? 0} | Canceladas: ${s.totalCanceled ?? 0} | Atrasadas: ${s.totalOverdue ?? 0}
+Hoje: ${s.totalToday ?? 0} | Este mês: ${s.totalThisMonth ?? 0}
+Taxa de conclusão: ${s.completionRate ?? s.averageCompletionRate ?? 0}%
+Valor estimado: R$ ${(s.totalValue ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+Top técnicos: ${topTechs || "N/A"}
+Principais locais: ${topLocals || "N/A"}
+    `.trim();
+
+    const aiResponse = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um assistente de gestão operacional para o Grupo Rede Amazônica. Analise os dados do painel de ordens de serviço e forneça um resumo executivo conciso (máximo 120 palavras) em português. Destaque pontos críticos, tendências e recomendações práticas sem usar bullet points.",
+          },
+          {
+            role: "user",
+            content: `Dados do Painel:\n${dataText}`,
+          },
+        ],
+        max_tokens: 300,
+        temperature: 0.3,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      res.status(500).json({ error: `Erro da API: ${aiResponse.status}` });
+      return;
+    }
+
+    const aiData = (await aiResponse.json()) as any;
+    const text =
+      aiData?.choices?.[0]?.message?.content ?? "Resumo não disponível.";
+    res.json({ text });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Erro ao gerar resumo." });
   }
 });
 

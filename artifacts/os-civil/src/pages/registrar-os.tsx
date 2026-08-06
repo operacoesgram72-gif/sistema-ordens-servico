@@ -68,6 +68,7 @@ export default function RegistrarOS() {
   const [submitted, setSubmitted] = useState<string | null>(null);
   const [submittedOffline, setSubmittedOffline] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const search = useSearch();
   const searchParams = new URLSearchParams(search);
   const unitFromUrl = searchParams.get("u") || "AM";
@@ -104,6 +105,15 @@ export default function RegistrarOS() {
   useEffect(() => {
     return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
   }, []);
+
+  // Load location autocomplete suggestions for this unit
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    fetch(`${base}/api/service-orders/distinct-locations?unidade=${unitFromUrl}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setLocationSuggestions(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [unitFromUrl]);
 
   // Tracks the number of in-flight FileReader operations.
   // Used in onSubmit to prevent submitting before base64 encoding completes.
@@ -579,8 +589,11 @@ export default function RegistrarOS() {
                             <FormItem>
                               <FormLabel>Local <span className="text-destructive">*</span></FormLabel>
                               <FormControl>
-                                <Input placeholder="Ex: Andar 3, Bloco B, Corredor" {...field} />
+                                <Input placeholder="Ex: Andar 3, Bloco B, Corredor" {...field} list="reg-os-location-list" />
                               </FormControl>
+                              <datalist id="reg-os-location-list">
+                                {locationSuggestions.map(loc => <option key={loc} value={loc} />)}
+                              </datalist>
                               <FormMessage />
                             </FormItem>
                           )}

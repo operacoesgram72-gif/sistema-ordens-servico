@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import app from "./app";
 import { logger } from "./lib/logger";
+import { startAutoLateScheduler } from "./lib/auto-late-job";
 
 // ── Global safety nets — must be registered before any async code ────────────
 // These prevent silent crashes from unhandled rejections / exceptions.
@@ -75,6 +76,9 @@ app.listen(boundPort, (err) => {
     process.exit(1);
   }
   logger.info({ port: boundPort }, "Server listening");
+
+  // ── Auto-late scheduler — marks overdue OS as "atrasada" ─────────────────
+  startAutoLateScheduler();
 
   // ── Self-ping — keeps the Render free-tier instance awake ───────────────
   // Render suspends free services after 15 min of inactivity, causing a

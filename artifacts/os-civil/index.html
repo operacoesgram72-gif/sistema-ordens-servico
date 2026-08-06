@@ -167,6 +167,15 @@
     </style>
   </head>
   <body>
+    <!-- Apply saved theme before first paint to prevent flash of wrong theme -->
+    <script>
+      try {
+        var t = localStorage.getItem('os-civil-theme');
+        if (!t || t === 'dark') document.documentElement.classList.add('dark');
+      } catch(e) {
+        document.documentElement.classList.add('dark');
+      }
+    </script>
     <div id="splash">
       <img id="splash-logo" src="/logo-amazonica.png" alt="GRAM Operações" />
       <div id="splash-name">GRAM Operações</div>

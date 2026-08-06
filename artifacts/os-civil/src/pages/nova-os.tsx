@@ -110,6 +110,7 @@ export default function NovaOS() {
   const videoUrlsRef = useRef<string[]>([]);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const { unit } = useUnit();
   const { getLocation } = useGps();
 
@@ -148,6 +149,15 @@ export default function NovaOS() {
   useEffect(() => {
     return () => { videoUrlsRef.current.forEach(URL.revokeObjectURL); };
   }, []);
+
+  // Location autocomplete suggestions
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    fetch(`${base}/api/service-orders/distinct-locations?unidade=${unit}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setLocationSuggestions(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [unit]);
 
   const uploadVideoToStorage = async (file: File, entryId: string) => {
     try {
@@ -483,7 +493,7 @@ export default function NovaOS() {
                       <FormLabel>Local</FormLabel>
                       <div className="flex gap-2">
                         <FormControl>
-                          <Input placeholder="Ex: Andar 3, Bloco B, Corredor Principal" {...field} />
+                          <Input placeholder="Ex: Andar 3, Bloco B, Corredor Principal" {...field} list="nova-os-location-list" />
                         </FormControl>
                         <Button
                           type="button"
@@ -501,6 +511,9 @@ export default function NovaOS() {
                           )}
                         </Button>
                       </div>
+                      <datalist id="nova-os-location-list">
+                        {locationSuggestions.map(loc => <option key={loc} value={loc} />)}
+                      </datalist>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -1,6 +1,8 @@
 import { useLocation, useParams, useSearch } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
+
+const BASE_URL = import.meta.env.BASE_URL.replace(/\/$/, "");
 import {
   ArrowLeft, Clock, MapPin, User, Calendar, Save, Trash2, Edit3,
   MessageSquare, Briefcase, CheckCircle2, X, Image, Film, FileText,
@@ -198,6 +200,17 @@ export default function OSDetail() {
   const [editDescription, setEditDescription] = useState("");
   const [editTechnician, setEditTechnician] = useState("");
   const [editNotes, setEditNotes] = useState("");
+  const [editScheduledAt, setEditScheduledAt] = useState(""); // "YYYY-MM-DD"
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+
+  // Fetch location autocomplete suggestions for the OS's unit
+  useEffect(() => {
+    if (!os?.unidade) return;
+    fetch(`${BASE_URL}/api/service-orders/distinct-locations?unidade=${os.unidade}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setLocationSuggestions(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [os?.unidade]);
 
   const enterEditMode = () => {
     if (!os) return;
@@ -205,6 +218,9 @@ export default function OSDetail() {
     setEditDescription(os.description ?? "");
     setEditTechnician(os.technicianName ?? "");
     setEditNotes(os.notes ?? "");
+    setEditScheduledAt(
+      os.scheduledAt ? new Date(os.scheduledAt).toISOString().split("T")[0] : ""
+    );
     setEditMode(true);
   };
 
@@ -217,6 +233,10 @@ export default function OSDetail() {
           description: editDescription || undefined,
           technicianName: editTechnician || undefined,
           notes: editNotes || undefined,
+          // Transmit noon UTC to avoid off-by-one day due to timezone shifts
+          scheduledAt: editScheduledAt
+            ? new Date(editScheduledAt + "T12:00:00Z").toISOString()
+            : undefined,
         } as any,
       },
       {
@@ -549,6 +569,23 @@ export default function OSDetail() {
                       value={editLocation}
                       onChange={(e) => setEditLocation(e.target.value)}
                       placeholder="Local do serviço"
+                      list="os-detail-location-list"
+                    />
+                    <datalist id="os-detail-location-list">
+                      {locationSuggestions.map(loc => (
+                        <option key={loc} value={loc} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-muted-foreground" /> Data Prevista
+                    </label>
+                    <input
+                      type="date"
+                      value={editScheduledAt}
+                      onChange={(e) => setEditScheduledAt(e.target.value)}
+                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
                     />
                   </div>
                   <div className="space-y-1.5">

@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend, Label } from "recharts";
-import { ClipboardList, CheckCircle2, Clock, TrendingUp, CalendarDays, MapPin, RefreshCw, FileDown, Filter, X } from "lucide-react";
+import { ClipboardList, CheckCircle2, Clock, TrendingUp, CalendarDays, MapPin, RefreshCw, FileDown, Filter, X, Sparkles } from "lucide-react";
 import { PRIORITY_LABELS } from "@/lib/constants";
 import { useState, useCallback, useMemo } from "react";
 import { useUnit } from "@/contexts/unit-context";
@@ -39,6 +39,9 @@ export default function Dashboard() {
   const [filterUnit, setFilterUnit] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [aiText, setAiText] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const isAM = unit === "AM";
   // Effective unit for API calls: AM can filter by sub-unit; other units always see themselves
@@ -86,6 +89,29 @@ export default function Dashboard() {
     ]);
     setRefreshing(false);
   }, [queryClient, summaryQueryKey, statsQueryKey]);
+
+  const handleAiSummary = async () => {
+    setAiLoading(true);
+    setAiError(null);
+    setAiText(null);
+    try {
+      const res = await fetch(`${BASE_URL}/api/dashboard/ai-summary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: { ...summary, byTechnician: (stats as any)?.byTechnician, byLocation: (stats as any)?.byLocation },
+          filterLabel,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) setAiError(data.error || "Erro ao gerar resumo.");
+      else setAiText(data.text);
+    } catch {
+      setAiError("Erro de conexão com o servidor.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const daysInMonth = filterMonth !== "0"
     ? new Date(parseInt(filterYear), parseInt(filterMonth), 0).getDate()
@@ -163,6 +189,10 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2" title="Atualizar dados">
               <RefreshCw className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`} />
               Atualizar
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleAiSummary} disabled={aiLoading} className="gap-2" title="Gerar resumo executivo com IA">
+              <Sparkles className={`w-4 h-4 text-primary ${aiLoading ? "animate-pulse" : ""}`} />
+              {aiLoading ? "Gerando…" : "Gerar Resumo"}
             </Button>
             <div className="bg-card border border-border px-4 py-2 rounded-md">
               <span className="text-muted-foreground">Hoje:</span>
@@ -299,6 +329,27 @@ export default function Dashboard() {
       </div>
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="px-6 md:px-8 pb-8 pt-4 max-w-7xl mx-auto space-y-8">
+
+      {/* AI Summary card */}
+      {(aiText || aiError) && (
+        <Card className="bg-primary/5 border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Resumo Executivo IA
+            </CardTitle>
+            <button onClick={() => { setAiText(null); setAiError(null); }} className="text-muted-foreground hover:text-foreground text-xs p-1 rounded">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </CardHeader>
+          <CardContent>
+            {aiError
+              ? <p className="text-sm text-destructive">{aiError}</p>
+              : <p className="text-sm text-foreground leading-relaxed">{aiText}</p>
+            }
+          </CardContent>
+        </Card>
+      )}
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

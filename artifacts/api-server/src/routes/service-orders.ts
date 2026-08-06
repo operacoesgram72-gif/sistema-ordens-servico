@@ -274,6 +274,24 @@ router.post("/service-orders", requireSystemActive, async (req, res) => {
   }
 });
 
+// GET /service-orders/distinct-locations — autocomplete suggestions for location field
+router.get("/service-orders/distinct-locations", async (req, res) => {
+  try {
+    const unidade = resolveUnit(req, req.query.unidade as string | undefined);
+    const result = await db.execute(
+      unidade
+        ? sql`SELECT DISTINCT location FROM service_orders WHERE unidade = ${unidade} AND location IS NOT NULL AND location != '' ORDER BY location LIMIT 150`
+        : sql`SELECT DISTINCT location FROM service_orders WHERE location IS NOT NULL AND location != '' ORDER BY location LIMIT 150`
+    );
+    const locations = (result.rows as any[]).map((r) => r.location as string).filter(Boolean);
+    res.set("Cache-Control", "private, max-age=60");
+    res.json(locations);
+  } catch (err) {
+    req.log.error(err);
+    res.json([]);
+  }
+});
+
 // GET /service-orders/available-years — years that have at least one record
 router.get("/service-orders/available-years", async (req, res) => {
   try {

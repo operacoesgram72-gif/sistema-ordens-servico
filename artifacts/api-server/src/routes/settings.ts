@@ -573,7 +573,7 @@ export async function sendOsNotification(os: {
     subject: `[Nova OS] ${os.number} — ${os.location}`,
     html: `
       <div style="font-family:sans-serif;max-width:520px;margin:auto;border:1px solid #ddd;border-radius:8px;overflow:hidden">
-        <div style="background:#f59e0b;color:#fff;padding:16px 20px">
+        <div style="background:#1179f8;color:#fff;padding:16px 20px">
           <strong style="font-size:18px">Nova Ordem de Serviço Registrada${os.unidade ? ` — ${os.unidade}` : ""}</strong>
         </div>
         <div style="padding:20px;color:#333">
